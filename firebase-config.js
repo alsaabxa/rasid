@@ -1,9 +1,10 @@
-// انسخ إعدادات تطبيق الويب من Firebase Console > Project settings > Your apps.
+// Firebase web app configuration for rasid.
 window.ZAHRA_FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "PASTE_MESSAGING_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyCH71h9Yn4CjIMhaq8PXe4wewkXwKEwfEQ",
+  authDomain: "fir-rc-91dbc.firebaseapp.com",
+  projectId: "fir-rc-91dbc",
+  storageBucket: "fir-rc-91dbc.firebasestorage.app",
+  messagingSenderId: "397366445838",
+  appId: "1:397366445838:web:307e2edd1901b8bdf0795f",
+  measurementId: "G-ZC363SQV1L"
 };
