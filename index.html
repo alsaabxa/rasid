@@ -646,12 +646,35 @@ function viewLogin(){
    <div class="field"><label>البريد الإلكتروني</label><input id="lUser" type="email" required autocomplete="email"></div>
    <div class="field"><label>كلمة المرور</label><input id="lPass" type="password" required minlength="6" autocomplete="current-password"></div>
    <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">تسجيل الدخول</button>
-  </form><p style="margin-top:16px;color:#607d8b;font-size:.78rem">يُفعّل حساب المدرسة بعد مراجعة واعتماد الإدارة.</p></div></div>`;
+  </form><div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:#8299a6;font-size:.8rem"><span style="height:1px;background:#dbe6ec;flex:1"></span>أو<span style="height:1px;background:#dbe6ec;flex:1"></span></div>
+  <button class="btn btn-outline" id="googleLogin" type="button" style="width:100%;justify-content:center">المتابعة باستخدام Google</button>
+  <p style="margin-top:16px;color:#607d8b;font-size:.78rem">يُفعّل حساب المدرسة بعد مراجعة واعتماد الإدارة.</p></div></div>`;
 }
 function bindLogin(){
  let registering=false; const loginTab=document.getElementById('loginTab'), registerTab=document.getElementById('registerTab');
- const setMode=value=>{registering=value;loginTab.classList.toggle('active',!value);registerTab.classList.toggle('active',value);document.getElementById('schoolField').style.display=value?'block':'none';document.getElementById('schoolName').required=value;document.querySelector('#loginForm button[type=submit]').textContent=value?'إرسال طلب التسجيل':'تسجيل الدخول';document.getElementById('loginErr').textContent='';};
+ const setMode=value=>{registering=value;loginTab.classList.toggle('active',!value);registerTab.classList.toggle('active',value);document.getElementById('schoolField').style.display=value?'block':'none';document.getElementById('schoolName').required=value;document.querySelector('#loginForm button[type=submit]').textContent=value?'إرسال طلب التسجيل':'تسجيل الدخول';document.getElementById('googleLogin').textContent=value?'التسجيل باستخدام Google':'المتابعة باستخدام Google';document.getElementById('loginErr').textContent='';};
  loginTab.onclick=()=>setMode(false); registerTab.onclick=()=>setMode(true);
+ document.getElementById('googleLogin').onclick=async()=>{
+  const btn=document.getElementById('googleLogin');btn.disabled=true;btn.textContent='جارٍ الاتصال بـ Google…';
+  try{
+   if(!firebaseReady)throw new Error('أكمل إعداد Firebase أولاً بملف firebase-config.js.');
+   const schoolName=document.getElementById('schoolName').value.trim();if(registering&&!schoolName)throw new Error('اكتب اسم المدرسة أولاً.');
+   pendingRegistration=true;const provider=new firebase.auth.GoogleAuthProvider();const cred=await auth.signInWithPopup(provider);const uid=cred.user.uid;
+   const snap=await db.collection('users').doc(uid).get();const profile=snap.exists?snap.data():null;
+   if(registering){
+    if(profile){await auth.signOut();pendingRegistration=false;throw new Error(profile.status==='approved'?'هذا الحساب مرتبط بمدرسة معتمدة. اختر تسجيل الدخول.':'لديك طلب تسجيل سابق. انتظر اعتماده أو تواصل مع إدارة المنصة.');}
+    await db.collection('users').doc(uid).set({email:cred.user.email,schoolName,schoolId:uid,status:'pending',provider:'google',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await auth.signOut();pendingRegistration=false;document.getElementById('loginErr').textContent='تم إرسال طلب التسجيل. سيعمل الحساب بعد اعتماد المدرسة.';
+   }else{
+    if(!profile||profile.status!=='approved'||!profile.schoolId){await auth.signOut();pendingRegistration=false;throw new Error(profile?'طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.':'اختر «تسجيل مدرسة جديدة» أولاً لإرسال طلب الاعتماد.');}
+    activeSchoolId=profile.schoolId;STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=profile.schoolName||'مدرستي';session={type:'admin',id:uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
+    const data=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get();
+    if(data.exists&&data.data().store){store=data.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}else{store={classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[]};saveStore();}
+    pendingRegistration=false;startAutoSync();navigate('dashboard');
+   }
+  }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/popup-closed-by-user'?'أُغلق تسجيل الدخول قبل اكتماله.':(err.message||'تعذر تسجيل الدخول باستخدام Google.');}
+  finally{btn.disabled=false;btn.textContent=registering?'التسجيل باستخدام Google':'المتابعة باستخدام Google';}
+ };
  document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault(); const email=document.getElementById('lUser').value.trim().toLowerCase(), password=document.getElementById('lPass').value, btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='جارٍ التحقق…';
   try{
    if(!firebaseReady) throw new Error('أكمل إعداد Firebase أولاً بملف firebase-config.js.');
