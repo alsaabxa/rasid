@@ -5,7 +5,7 @@
 ## تجهيز Firebase مرة واحدة
 
 1. أنشئ مشروعًا من [Firebase Console](https://console.firebase.google.com/) ثم أضف تطبيق ويب. انسخ إعدادات التطبيق إلى `firebase-config.js`، واستبدل `YOUR_PROJECT_ID` في `.firebaserc` بمعرّف المشروع.
-2. من **Authentication → Sign-in method** فعّل **Email/Password**.
+2. من **Authentication → Sign-in method** فعّل **Email/Password** و**Google**. في إعداد Google اختر اسم الدعم والبريد، واحفظ التغييرات. أضف نطاق Firebase Hosting (وأي نطاق مخصص) إلى **Authentication → Settings → Authorized domains**.
 3. من **Authentication → Users** أنشئ حسابًا لك ببريد مدير المنصة وكلمة مرور قوية. استخدم البريد نفسه في `OWNER_EMAIL_CHANGE_ME` داخل `firestore.rules` و`admin.html`.
 4. أنشئ قاعدة **Firestore Database** في وضع الإنتاج، ثم انشر `firestore.rules` (تلقائيًا إذا استخدمت Firebase CLI، أو الصق محتواها في تبويب Rules).
 5. جرّب محليًا باستخدام Firebase Hosting Emulator أو انشر الاستضافة.
@@ -20,7 +20,7 @@
 
 ## اعتماد المدارس
 
-- تستخدم المدرسة صفحة المنصة لتسجيل اسم المدرسة والبريد وكلمة المرور (6 أحرف على الأقل).
+- تستخدم المدرسة صفحة المنصة لتسجيل اسم المدرسة بالبريد وكلمة المرور (6 أحرف على الأقل)، أو تختار Google من تبويب تسجيل مدرسة جديدة. في الحالتين يلزم اعتماد الطلب قبل الدخول.
 - يبقى طلبها بحالة معلّقة ولا تدخل للوحة حتى اعتماده.
 - أنت تدخل إلى `/admin.html` بحساب المدير، ثم تضغط **اعتماد**. تستطيع بعدها المدرسة تسجيل الدخول.
 - الرفض يمنع دخولها. يمكن للمدير متابعة الطلبات المعلقة في الصفحة نفسها.
