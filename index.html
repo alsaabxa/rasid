@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>منصة راصد لرصد الغياب — متوسطة آبي شعيب بمكة المكرمة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#102a43;
+  --teal:#0f766e;
+  --gold:#eab308;
+  --bg1:#f6fafc;
+  --bg2:#edf7f5;
+  --text:#183247;
+  --white:#ffffff;
+  --danger:#dc2626;
+  --danger-bg:#fef2f2;
+  --success:#16a34a;
+  --success-bg:#f0fdf4;
+  --line:#dbe6ec;
+  --radius:16px;
+  --shadow:0 8px 24px -8px rgba(16,42,67,.18);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'Cairo',sans-serif;
+  background:linear-gradient(160deg,var(--bg1),var(--bg2));
+  color:var(--text);
+  min-height:100vh;
+  direction:rtl;
+}
+button, input, select{font-family:inherit; font-size:1rem;}
+button{cursor:pointer; border:none; background:none;}
+a{color:inherit; text-decoration:none;}
+::selection{background:var(--gold); color:var(--navy);}
+
+/* ---------- Header ---------- */
+.topbar{
+  background:var(--navy);
+  color:#fff;
+  padding:14px 22px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  position:sticky; top:0; z-index:40;
+  box-shadow:0 4px 18px -6px rgba(0,0,0,.35);
+}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand-mark{
+  width:44px; height:44px; border-radius:12px;
+  background:linear-gradient(135deg,var(--teal),var(--navy));
+  display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:1.3rem; color:var(--gold);
+  border:2px solid rgba(234,179,8,.5);
+}
+.brand-text h1{font-size:1.05rem; font-weight:800; letter-spacing:.2px;}
+.brand-text p{font-size:.75rem; color:#c7d7e0; font-weight:500;}
+.clock{
+  display:flex; align-items:center; gap:14px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14);
+  padding:8px 16px; border-radius:12px;
+  font-size:.85rem;
+}
+.clock .time{font-size:1.15rem; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums;}
+.clock .dates{display:flex; flex-direction:column; gap:2px; color:#dce9ee; line-height:1.3;}
+.topnav{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.nav-btn{
+  color:#e7eff3; padding:8px 14px; border-radius:10px; font-weight:600; font-size:.9rem;
+  transition:background .15s;
+}
+.nav-btn:hover{background:rgba(255,255,255,.1);}
+.nav-btn.active{background:var(--teal); color:#fff;}
+.user-chip{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,.08); padding:6px 12px; border-radius:999px;
+  font-size:.85rem;
+}
+.user-chip .dot{width:8px; height:8px; border-radius:50%; background:var(--gold);}
+.logout-btn{color:#f2b8b8; font-weight:700; font-size:.85rem;}
+
+/* ---------- Layout ---------- */
+.container{max-width:1240px; margin:0 auto; padding:26px 20px 60px;}
+.page-title{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:10px;}
+.page-title h2{font-size:1.4rem; font-weight:800; color:var(--navy);}
+.page-title p{color:#5b7382; font-size:.9rem;}
+
+/* ---------- Stat cards ---------- */
+.stats-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px;}
+@media(max-width:800px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
+.stat-card{
+  background:#fff; border-radius:var(--radius); padding:18px 20px;
+  box-shadow:var(--shadow); border-top:4px solid var(--teal);
+  display:flex; flex-direction:column; gap:6px;
+}
+.stat-card.gold{border-top-color:var(--gold);}
+.stat-card.danger{border-top-color:var(--danger);}
+.stat-card.navy{border-top-color:var(--navy);}
+.stat-card .num{font-size:1.9rem; font-weight:800; color:var(--navy);}
+.stat-card .lbl{color:#5b7382; font-size:.85rem; font-weight:600;}
+
+/* ---------- Class cards ---------- */
+.classes-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px;}
+.class-card{
+  background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+  overflow:hidden; display:flex; flex-direction:column;
+}
+.class-card .cc-top{height:6px; background:linear-gradient(90deg,var(--teal),var(--navy));}
+.class-card .cc-body{padding:18px; display:flex; flex-direction:column; gap:12px;}
+.cc-head{display:flex; align-items:center; justify-content:space-between;}
+.cc-head h3{font-size:1.05rem; font-weight:800; color:var(--navy);}
+.cc-menu{position:relative;}
+.cc-menu-btn{color:#8299a6; font-size:1.2rem; padding:2px 8px; border-radius:6px;}
+.cc-menu-btn:hover{background:#eef3f5;}
+.cc-menu-list{
+  position:absolute; left:0; top:28px; background:#fff; border-radius:10px;
+  box-shadow:var(--shadow); border:1px solid var(--line); min-width:140px; z-index:10; display:none; overflow:hidden;
+}
+.cc-menu-list.open{display:block;}
+.cc-menu-list button{display:block; width:100%; text-align:right; padding:10px 14px; font-size:.85rem; font-weight:600;}
+.cc-menu-list button:hover{background:#f4f8f9;}
+.progress-wrap{background:#eef3f5; border-radius:999px; height:9px; overflow:hidden;}
+.progress-bar{height:100%; background:linear-gradient(90deg,var(--teal),var(--success)); border-radius:999px; transition:width .4s;}
+.cc-nums{display:flex; justify-content:space-between; font-size:.78rem; color:#5b7382; font-weight:600;}
+.cc-nums b{color:var(--navy);}
+.cc-actions{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+.cc-actions button{
+  background:var(--bg1); border:1px solid var(--line); border-radius:9px; padding:8px 4px;
+  font-size:.72rem; font-weight:700; color:var(--navy); display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.cc-actions button:hover{background:#e4f1ee; border-color:var(--teal);}
+.cc-actions button.primary{background:var(--teal); color:#fff; border-color:var(--teal);}
+.cc-actions button.primary:hover{background:#0c5f58;}
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:10px;
+  font-weight:700; font-size:.9rem; transition:transform .1s, box-shadow .15s;
+}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--teal); color:#fff; box-shadow:0 6px 16px -6px rgba(15,118,110,.5);}
+.btn-primary:hover{background:#0c5f58;}
+.btn-gold{background:var(--gold); color:var(--navy); box-shadow:0 6px 16px -6px rgba(234,179,8,.5);}
+.btn-gold:hover{background:#c99a06;}
+.btn-outline{background:#fff; color:var(--navy); border:1.5px solid var(--line);}
+.btn-outline:hover{border-color:var(--teal); color:var(--teal);}
+.btn-danger{background:var(--danger-bg); color:var(--danger); border:1.5px solid #fecaca;}
+.btn-danger:hover{background:#fee2e2;}
+.btn-sm{padding:7px 12px; font-size:.8rem;}
+.btn[disabled]{opacity:.5; cursor:not-allowed;}
+
+/* ---------- Login ---------- */
+.login-wrap{min-height:calc(100vh - 76px); display:flex; align-items:center; justify-content:center; padding:20px;}
+.login-card{
+  background:#fff; border-radius:22px; box-shadow:var(--shadow); width:100%; max-width:400px;
+  padding:36px 32px; text-align:center;
+}
+.login-card .brand-mark{margin:0 auto 14px; width:60px; height:60px; font-size:1.7rem;}
+.login-card h2{color:var(--navy); font-size:1.3rem; font-weight:800; margin-bottom:4px;}
+.login-card p.sub{color:#5b7382; font-size:.85rem; margin-bottom:26px;}
+.field{text-align:right; margin-bottom:14px;}
+.field label{display:block; font-size:.8rem; font-weight:700; color:var(--navy); margin-bottom:6px;}
+.field input, .field select{
+  width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--line); background:var(--bg1);
+  outline:none; transition:border .15s;
+}
+.field input:focus, .field select:focus{border-color:var(--teal); background:#fff;}
+.login-tabs{display:flex; gap:8px; margin-bottom:20px; background:var(--bg1); padding:4px; border-radius:12px;}
+.login-tabs button{flex:1; padding:9px; border-radius:9px; font-weight:700; font-size:.85rem; color:#5b7382;}
+.login-tabs button.active{background:#fff; color:var(--navy); box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.login-error{color:var(--danger); font-size:.82rem; font-weight:600; margin-bottom:10px; min-height:1em;}
+
+/* ---------- Modal ---------- */
+.overlay{
+  position:fixed; inset:0; background:rgba(16,42,67,.55); display:flex; align-items:center; justify-content:center;
+  z-index:100; padding:16px; backdrop-filter:blur(2px);
+}
+.modal{
+  background:#fff; border-radius:20px; width:100%; max-width:560px; max-height:90vh; overflow:auto;
+  box-shadow:0 30px 60px -20px rgba(0,0,0,.4);
+}
+.modal.wide{max-width:820px;}
+.modal-head{
+  padding:20px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; background:#fff; z-index:2;
+}
+.modal-head h3{font-size:1.1rem; font-weight:800; color:var(--navy);}
+.modal-close{font-size:1.3rem; color:#8299a6; padding:4px 10px; border-radius:8px;}
+.modal-close:hover{background:#f2f5f6;}
+.modal-body{padding:22px 24px;}
+.modal-foot{padding:16px 24px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px;}
+.two-col{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+@media(max-width:520px){.two-col{grid-template-columns:1fr;}}
+
+/* ---------- Tables / lists ---------- */
+.list-row{
+  display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:10px;
+  border:1px solid var(--line); margin-bottom:8px;
+}
+.list-row .info b{display:block; color:var(--navy); font-size:.92rem;}
+.list-row .info span{color:#5b7382; font-size:.78rem;}
+.row-actions{display:flex; gap:6px;}
+.icon-btn{width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#5b7382; background:var(--bg1);}
+.icon-btn:hover{background:#e4f1ee; color:var(--teal);}
+.icon-btn.del:hover{background:var(--danger-bg); color:var(--danger);}
+.searchbox{
+  width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--line); margin-bottom:14px; background:var(--bg1);
+}
+.chip-list{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.chip{
+  padding:5px 10px; border-radius:999px; border:1.5px solid var(--line); font-size:.75rem; font-weight:700; color:#5b7382; cursor:pointer;
+}
+.chip.selected{background:var(--teal); color:#fff; border-color:var(--teal);}
+
+/* ---------- Dropzone ---------- */
+.dropzone{
+  border:2px dashed var(--line); border-radius:14px; padding:26px; text-align:center; color:#5b7382; font-size:.85rem;
+  transition:border-color .15s, background .15s; margin-top:14px; cursor:pointer;
+}
+.dropzone.drag{border-color:var(--teal); background:#f0faf8;}
+.dropzone b{color:var(--teal); display:block; margin-bottom:4px; font-size:.95rem;}
+
+/* ---------- Scan page ---------- */
+.scan-wrap{max-width:640px; margin:0 auto; padding:26px 18px 60px;}
+.scan-head{
+  background:linear-gradient(135deg,var(--navy),#183f5f); color:#fff; border-radius:20px; padding:26px 24px; margin-bottom:20px;
+  text-align:center; box-shadow:0 14px 30px -14px rgba(16,42,67,.5); position:relative; overflow:hidden;
+}
+.scan-head::after{
+  content:''; position:absolute; inset:0; background:radial-gradient(circle at 30% -10%, rgba(234,179,8,.25), transparent 60%);
+  pointer-events:none;
+}
+.scan-head h2{font-size:1.3rem; font-weight:800; position:relative;}
+.scan-head p{font-size:.85rem; color:#cfe0e8; margin-top:4px; position:relative;}
+.teacher-field{margin-top:16px; position:relative;}
+.teacher-field input, .teacher-field select{
+  width:100%; padding:11px 14px; border-radius:10px; border:none; text-align:center; font-weight:700; color:var(--navy);
+}
+.student-item{
+  display:flex; align-items:center; justify-content:space-between; background:#fff; border-radius:14px; padding:14px 16px;
+  margin-bottom:10px; box-shadow:0 3px 10px -4px rgba(16,42,67,.12); border:2px solid transparent; transition:.15s;
+}
+.student-item.absent{border-color:var(--danger); background:var(--danger-bg);}
+.student-item .s-info{display:flex; align-items:center; gap:12px;}
+.student-item .s-num{
+  width:34px; height:34px; border-radius:9px; background:var(--bg1); display:flex; align-items:center; justify-content:center;
+  font-weight:800; color:var(--navy); font-size:.85rem;
+}
+.student-item.absent .s-num{background:var(--danger); color:#fff;}
+.student-item .s-name{font-weight:700; color:var(--navy);}
+.absent-toggle{
+  width:56px; height:30px; border-radius:999px; background:#e2ecef; position:relative; transition:.2s; flex-shrink:0;
+}
+.absent-toggle::after{
+  content:'حاضرة'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:.62rem; font-weight:800; color:#5b7382;
+}
+.absent-toggle.on{background:var(--danger);}
+.absent-toggle.on::after{content:'غائبة'; color:#fff;}
+.scan-submit-bar{position:sticky; bottom:14px; margin-top:18px;}
+.scan-submit-bar button{width:100%; padding:15px; font-size:1rem; border-radius:14px; box-shadow:0 14px 26px -10px rgba(15,118,110,.55);}
+.glow{box-shadow:0 0 0 6px rgba(234,179,8,.15), var(--shadow);}
+
+/* confirm screen */
+.confirm-wrap{text-align:center; background:#fff; border-radius:20px; padding:34px 26px; box-shadow:var(--shadow);}
+.confirm-icon{
+  width:74px; height:74px; border-radius:50%; margin:0 auto 16px; display:flex; align-items:center; justify-content:center;
+  font-size:2rem; background:var(--success-bg); color:var(--success);
+}
+.confirm-wrap h2{font-size:1.25rem; font-weight:800; color:var(--navy); margin-bottom:6px;}
+.confirm-nums{display:flex; justify-content:center; gap:14px; margin:18px 0;}
+.confirm-nums .cn{padding:14px 20px; border-radius:14px; background:var(--bg1); min-width:100px;}
+.confirm-nums .cn b{display:block; font-size:1.5rem; color:var(--navy);}
+.confirm-nums .cn.absent b{color:var(--danger);}
+.absent-names{text-align:right; background:var(--danger-bg); border-radius:12px; padding:14px 16px; margin-top:6px; max-height:200px; overflow:auto;}
+.absent-names li{font-size:.85rem; padding:4px 0; color:#7a1f1f; font-weight:600; list-style:none;}
+
+/* ---------- QR page ---------- */
+.qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;}
+.qr-card{background:#fff; border-radius:18px; box-shadow:var(--shadow); padding:20px; text-align:center;}
+.qr-card .qr-school{font-size:.72rem; color:#5b7382; font-weight:700;}
+.qr-card .qr-class{font-size:1.05rem; font-weight:800; color:var(--navy); margin:4px 0 12px;}
+.qr-card .qr-box{display:flex; justify-content:center; margin-bottom:12px;}
+.qr-card .qr-hint{font-size:.72rem; color:var(--teal); font-weight:700; margin-bottom:12px;}
+.qr-card .qr-actions{display:flex; gap:6px; justify-content:center;}
+
+/* ---------- Guardians / Reports ---------- */
+.guardian-phone{color:var(--teal)!important; font-weight:700; direction:ltr; unicode-bidi:plaintext;}
+.report-table{width:100%; border-collapse:collapse; background:#fff; border-radius:14px; overflow:hidden; box-shadow:var(--shadow);}
+.report-table th,.report-table td{padding:11px 12px; border-bottom:1px solid var(--line); text-align:right; font-size:.82rem;}
+.report-table th{background:var(--navy); color:#fff; font-weight:800;}
+.report-table tr:last-child td{border-bottom:none;}
+.status-present{color:var(--success);font-weight:800}.status-absent{color:var(--danger);font-weight:800}.status-missing{color:#8299a6;font-weight:700}
+.report-filters{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:18px}
+@media(max-width:700px){.report-filters{grid-template-columns:1fr}.report-table{font-size:.78rem}.report-table th,.report-table td{padding:8px 7px}}
+/* ---------- Toast ---------- */
+.toast{
+  position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--navy); color:#fff;
+  padding:12px 22px; border-radius:12px; font-weight:700; font-size:.85rem; box-shadow:var(--shadow); opacity:0; transition:.25s; z-index:200;
+  display:flex; align-items:center; gap:8px;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+.toast.err{background:var(--danger);}
+
+
+/* ---------- Responsive: mobile / iPad / desktop ---------- */
+html,body{max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;}
+button,input,select{font:inherit;}
+.topbar{flex-wrap:wrap;gap:10px;}
+.topnav{display:flex;flex-wrap:wrap;gap:6px;}
+.classes-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));}
+.stats-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));}
+.cc-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
+.cc-actions button{min-height:44px;}
+.container,.scan-wrap{width:min(1180px,calc(100% - 24px));}
+input,select,.btn{min-height:42px;}
+.notification-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;font-size:1.2rem;}
+.notification-bell .bell-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:99px;background:#dc2626;color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:800;padding:0 4px;}
+.notification-bell.ring{animation:bellRing .55s ease-in-out 3;}
+@keyframes bellRing{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+@media(max-width:900px){.topbar{padding:10px 12px}.brand-text h1{font-size:1rem}.brand-text p{font-size:.68rem}.clock{display:none}.topnav{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.topnav .nav-btn{white-space:nowrap}.page-title{align-items:flex-start;gap:10px}.cc-actions{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.container,.scan-wrap{width:calc(100% - 16px)}.page-title{flex-direction:column}.page-title>div:last-child{width:100%}.page-title .btn{width:100%}.stats-grid{grid-template-columns:repeat(2,1fr);gap:8px}.stat-card{padding:12px 8px}.stat-card .num{font-size:1.35rem}.class-card{border-radius:14px}.cc-body{padding:12px}.cc-actions{gap:6px}.cc-actions button{font-size:.75rem;padding:9px 5px}.scan-wrap{padding-bottom:12px}.student-item{padding:10px 8px}.student-item .s-name{font-size:.88rem}.report-table{min-width:620px}.report-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.report-filters{gap:8px}.confirm-wrap{padding:24px 14px}.toast{width:calc(100% - 24px);text-align:center;justify-content:center}.notification-bell{width:40px;height:40px}}
+@media(min-width:601px) and (max-width:1024px){.container,.scan-wrap{width:calc(100% - 32px)}.classes-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.cc-actions{grid-template-columns:repeat(3,1fr);}}
+
+.empty{text-align:center; padding:50px 20px; color:#8299a6;}
+.empty b{display:block; color:var(--navy); font-size:1rem; margin-bottom:6px;}
+
+@media print{
+  .topbar, .no-print{display:none !important;}
+  body{background:#fff;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar no-print">
+  <div class="brand">
+    <div class="brand-mark">ر</div>
+    <div class="brand-text">
+      <h1>منصة راصد لرصد الغياب</h1>
+      <p>متوسطة آبي شعيب — مكة المكرمة</p>
+    </div>
+  </div>
+  <div class="clock" id="clock">
+    <div class="dates"><span id="clockHijri">—</span><span id="clockGregorian">—</span></div>
+    <div class="time" id="clockTime">—</div>
+  </div>
+  <div class="topnav" id="topnav"></div>
+</div>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="./firebase-config.js"></script>
+<script>
+/* ==========================================================================
+   منصة راصد لرصد الغياب — تطبيق صفحة واحدة (SPA)
+   ملاحظة: ضع رابط Google Apps Script (بعد نشره كـ Web App) هنا للمزامنة.
+   بدون هذا الرابط يعمل التطبيق محلياً بالكامل عبر LocalStorage.
+   ========================================================================== */
+const SCRIPT_URL = ""; // Firebase replaces the school-specific Google Apps Script endpoint.
+let SCHOOL_NAME = "منصة راصد للمدارس";
+const firebaseConfig = window.ZAHRA_FIREBASE_CONFIG || {};
+let auth = null, db = null, activeSchoolId = null, firebaseReady = false, saveTimer = null, pendingRegistration = false;
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.firestore(); firebaseReady = true;
+  }
+} catch (e) { console.error('Firebase initialization failed', e); }
+const SCHOOL_LOGO_DATA = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCA1NDAuOSA0MTEuMSI+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5jbHMtMSB7CiAgICAgICAgZmlsbDogbm9uZTsKICAgICAgfQoKICAgICAgLmNscy0yIHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC04KTsKICAgICAgfQoKICAgICAgLmNscy0zIHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC03KTsKICAgICAgfQoKICAgICAgLmNscy00IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC01KTsKICAgICAgfQoKICAgICAgLmNscy01IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC02KTsKICAgICAgfQoKICAgICAgLmNscy02IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC05KTsKICAgICAgfQoKICAgICAgLmNscy03IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC00KTsKICAgICAgfQoKICAgICAgLmNscy04IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC0zKTsKICAgICAgfQoKICAgICAgLmNscy05IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC0yKTsKICAgICAgfQoKICAgICAgLmNscy0xMCB7CiAgICAgICAgZmlsbDogdXJsKCNsaW5lYXItZ3JhZGllbnQpOwogICAgICB9CgogICAgICAuY2xzLTExIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTcpOwogICAgICB9CgogICAgICAuY2xzLTEyIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTkpOwogICAgICB9CgogICAgICAuY2xzLTEzIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTEpOwogICAgICB9CgogICAgICAuY2xzLTE0IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTYpOwogICAgICB9CgogICAgICAuY2xzLTE1IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTgpOwogICAgICB9CgogICAgICAuY2xzLTE2IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTApOwogICAgICB9CgogICAgICAuY2xzLTE3IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTUpOwogICAgICB9CgogICAgICAuY2xzLTE4IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTMpOwogICAgICB9CgogICAgICAuY2xzLTE5IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTQpOwogICAgICB9CgogICAgICAuY2xzLTIwIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMTIpOwogICAgICB9CgogICAgICAuY2xzLTIxIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjEpOwogICAgICB9CgogICAgICAuY2xzLTIyIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjcpOwogICAgICB9CgogICAgICAuY2xzLTIzIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjgpOwogICAgICB9CgogICAgICAuY2xzLTI0IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjApOwogICAgICB9CgogICAgICAuY2xzLTI1IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjUpOwogICAgICB9CgogICAgICAuY2xzLTI2IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjIpOwogICAgICB9CgogICAgICAuY2xzLTI3IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjQpOwogICAgICB9CgogICAgICAuY2xzLTI4IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjYpOwogICAgICB9CgogICAgICAuY2xzLTI5IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjMpOwogICAgICB9CgogICAgICAuY2xzLTMwIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTApOwogICAgICB9CgogICAgICAuY2xzLTMxIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTUpOwogICAgICB9CgogICAgICAuY2xzLTMyIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTIpOwogICAgICB9CgogICAgICAuY2xzLTMzIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTcpOwogICAgICB9CgogICAgICAuY2xzLTM0IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTQpOwogICAgICB9CgogICAgICAuY2xzLTM1IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTYpOwogICAgICB9CgogICAgICAuY2xzLTM2IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTMpOwogICAgICB9CgogICAgICAuY2xzLTM3IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTEpOwogICAgICB9CgogICAgICAuY2xzLTM4IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTgpOwogICAgICB9CgogICAgICAuY2xzLTM5IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNTkpOwogICAgICB9CgogICAgICAuY2xzLTQwIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzEpOwogICAgICB9CgogICAgICAuY2xzLTQxIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzIpOwogICAgICB9CgogICAgICAuY2xzLTQyIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzMpOwogICAgICB9CgogICAgICAuY2xzLTQzIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzQpOwogICAgICB9CgogICAgICAuY2xzLTQ0IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzUpOwogICAgICB9CgogICAgICAuY2xzLTQ1IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzkpOwogICAgICB9CgogICAgICAuY2xzLTQ2IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzApOwogICAgICB9CgogICAgICAuY2xzLTQ3IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzYpOwogICAgICB9CgogICAgICAuY2xzLTQ4IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzcpOwogICAgICB9CgogICAgICAuY2xzLTQ5IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMzgpOwogICAgICB9CgogICAgICAuY2xzLTUwIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjcpOwogICAgICB9CgogICAgICAuY2xzLTUxIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjkpOwogICAgICB9CgogICAgICAuY2xzLTUyIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjYpOwogICAgICB9CgogICAgICAuY2xzLTUzIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjgpOwogICAgICB9CgogICAgICAuY2xzLTU0IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjApOwogICAgICB9CgogICAgICAuY2xzLTU1IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjEpOwogICAgICB9CgogICAgICAuY2xzLTU2IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjIpOwogICAgICB9CgogICAgICAuY2xzLTU3IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjMpOwogICAgICB9CgogICAgICAuY2xzLTU4IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjQpOwogICAgICB9CgogICAgICAuY2xzLTU5IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMjUpOwogICAgICB9CgogICAgICAuY2xzLTYwIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNjkpOwogICAgICB9CgogICAgICAuY2xzLTYxIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDEpOwogICAgICB9CgogICAgICAuY2xzLTYyIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDIpOwogICAgICB9CgogICAgICAuY2xzLTYzIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDMpOwogICAgICB9CgogICAgICAuY2xzLTY0IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDQpOwogICAgICB9CgogICAgICAuY2xzLTY1IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDUpOwogICAgICB9CgogICAgICAuY2xzLTY2IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDkpOwogICAgICB9CgogICAgICAuY2xzLTY3IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDApOwogICAgICB9CgogICAgICAuY2xzLTY4IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDYpOwogICAgICB9CgogICAgICAuY2xzLTY5IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDcpOwogICAgICB9CgogICAgICAuY2xzLTcwIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtNDgpOwogICAgICB9CgogICAgICAuY2xzLTcxIHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMSk7CiAgICAgIH0KCiAgICAgIC5jbHMtNzIgewogICAgICAgIGNsaXAtcGF0aDogdXJsKCNjbGlwcGF0aC0zKTsKICAgICAgfQoKICAgICAgLmNscy03MyB7CiAgICAgICAgY2xpcC1wYXRoOiB1cmwoI2NsaXBwYXRoLTQpOwogICAgICB9CgogICAgICAuY2xzLTc0IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtMik7CiAgICAgIH0KCiAgICAgIC5jbHMtNzUgewogICAgICAgIGNsaXAtcGF0aDogdXJsKCNjbGlwcGF0aC03KTsKICAgICAgfQoKICAgICAgLmNscy03NiB7CiAgICAgICAgY2xpcC1wYXRoOiB1cmwoI2NsaXBwYXRoLTYpOwogICAgICB9CgogICAgICAuY2xzLTc3IHsKICAgICAgICBjbGlwLXBhdGg6IHVybCgjY2xpcHBhdGgtOSk7CiAgICAgIH0KCiAgICAgIC5jbHMtNzggewogICAgICAgIGNsaXAtcGF0aDogdXJsKCNjbGlwcGF0aC04KTsKICAgICAgfQoKICAgICAgLmNscy03OSB7CiAgICAgICAgY2xpcC1wYXRoOiB1cmwoI2NsaXBwYXRoLTUpOwogICAgICB9CgogICAgICAuY2xzLTgwIHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC00Myk7CiAgICAgIH0KCiAgICAgIC5jbHMtODEgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTQwKTsKICAgICAgfQoKICAgICAgLmNscy04MiB7CiAgICAgICAgZmlsbDogdXJsKCNsaW5lYXItZ3JhZGllbnQtNDEpOwogICAgICB9CgogICAgICAuY2xzLTgzIHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC00Mik7CiAgICAgIH0KCiAgICAgIC5jbHMtODQgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTQ5KTsKICAgICAgfQoKICAgICAgLmNscy04NSB7CiAgICAgICAgZmlsbDogdXJsKCNsaW5lYXItZ3JhZGllbnQtNDgpOwogICAgICB9CgogICAgICAuY2xzLTg2IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC00NSk7CiAgICAgIH0KCiAgICAgIC5jbHMtODcgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTQ3KTsKICAgICAgfQoKICAgICAgLmNscy04OCB7CiAgICAgICAgZmlsbDogdXJsKCNsaW5lYXItZ3JhZGllbnQtNDQpOwogICAgICB9CgogICAgICAuY2xzLTg5IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC00Nik7CiAgICAgIH0KCiAgICAgIC5jbHMtOTAgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTEwKTsKICAgICAgfQoKICAgICAgLmNscy05MSB7CiAgICAgICAgZmlsbDogdXJsKCNsaW5lYXItZ3JhZGllbnQtMTEpOwogICAgICB9CgogICAgICAuY2xzLTkyIHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC0xMik7CiAgICAgIH0KCiAgICAgIC5jbHMtOTMgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTEzKTsKICAgICAgfQoKICAgICAgLmNscy05NCB7CiAgICAgICAgZmlsbDogdXJsKCNsaW5lYXItZ3JhZGllbnQtMTkpOwogICAgICB9CgogICAgICAuY2xzLTk1IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC0xNCk7CiAgICAgIH0KCiAgICAgIC5jbHMtOTYgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTIxKTsKICAgICAgfQoKICAgICAgLmNscy05NyB7CiAgICAgICAgZmlsbDogdXJsKCNsaW5lYXItZ3JhZGllbnQtMjApOwogICAgICB9CgogICAgICAuY2xzLTk4IHsKICAgICAgICBmaWxsOiB1cmwoI2xpbmVhci1ncmFkaWVudC0yMik7CiAgICAgIH0KCiAgICAgIC5jbHMtOTkgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTIzKTsKICAgICAgfQoKICAgICAgLmNscy0xMDAgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTI4KTsKICAgICAgfQoKICAgICAgLmNscy0xMDEgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTI1KTsKICAgICAgfQoKICAgICAgLmNscy0xMDIgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTMyKTsKICAgICAgfQoKICAgICAgLmNscy0xMDMgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTMxKTsKICAgICAgfQoKICAgICAgLmNscy0xMDQgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTMzKTsKICAgICAgfQoKICAgICAgLmNscy0xMDUgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTMwKTsKICAgICAgfQoKICAgICAgLmNscy0xMDYgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTE1KTsKICAgICAgfQoKICAgICAgLmNscy0xMDcgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTE2KTsKICAgICAgfQoKICAgICAgLmNscy0xMDggewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTE3KTsKICAgICAgfQoKICAgICAgLmNscy0xMDkgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTE4KTsKICAgICAgfQoKICAgICAgLmNscy0xMTAgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTM1KTsKICAgICAgfQoKICAgICAgLmNscy0xMTEgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTM0KTsKICAgICAgfQoKICAgICAgLmNscy0xMTIgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTM2KTsKICAgICAgfQoKICAgICAgLmNscy0xMTMgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTM4KTsKICAgICAgfQoKICAgICAgLmNscy0xMTQgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTI3KTsKICAgICAgfQoKICAgICAgLmNscy0xMTUgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTI0KTsKICAgICAgfQoKICAgICAgLmNscy0xMTYgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTI2KTsKICAgICAgfQoKICAgICAgLmNscy0xMTcgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTI5KTsKICAgICAgfQoKICAgICAgLmNscy0xMTggewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTM3KTsKICAgICAgfQoKICAgICAgLmNscy0xMTkgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTM5KTsKICAgICAgfQoKICAgICAgLmNscy0xMjAgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTU3KTsKICAgICAgfQoKICAgICAgLmNscy0xMjEgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTU4KTsKICAgICAgfQoKICAgICAgLmNscy0xMjIgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTU5KTsKICAgICAgfQoKICAgICAgLmNscy0xMjMgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTUzKTsKICAgICAgfQoKICAgICAgLmNscy0xMjQgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTU0KTsKICAgICAgfQoKICAgICAgLmNscy0xMjUgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTU1KTsKICAgICAgfQoKICAgICAgLmNscy0xMjYgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTU2KTsKICAgICAgfQoKICAgICAgLmNscy0xMjcgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTUwKTsKICAgICAgfQoKICAgICAgLmNscy0xMjggewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTUxKTsKICAgICAgfQoKICAgICAgLmNscy0xMjkgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTUyKTsKICAgICAgfQoKICAgICAgLmNscy0xMzAgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTY3KTsKICAgICAgfQoKICAgICAgLmNscy0xMzEgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTY4KTsKICAgICAgfQoKICAgICAgLmNscy0xMzIgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTY5KTsKICAgICAgfQoKICAgICAgLmNscy0xMzMgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTYzKTsKICAgICAgfQoKICAgICAgLmNscy0xMzQgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTY0KTsKICAgICAgfQoKICAgICAgLmNscy0xMzUgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTY1KTsKICAgICAgfQoKICAgICAgLmNscy0xMzYgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTY2KTsKICAgICAgfQoKICAgICAgLmNscy0xMzcgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTYwKTsKICAgICAgfQoKICAgICAgLmNscy0xMzggewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTYxKTsKICAgICAgfQoKICAgICAgLmNscy0xMzkgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTYyKTsKICAgICAgfQoKICAgICAgLmNscy0xNDAgewogICAgICAgIGZpbGw6IHVybCgjbGluZWFyLWdyYWRpZW50LTcwKTsKICAgICAgfQoKICAgICAgLmNscy0xNDEgewogICAgICAgIGNsaXAtcGF0aDogdXJsKCNjbGlwcGF0aCk7CiAgICAgIH0KICAgIDwvc3R5bGU+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNDcyLjEsMTI3LjVjLTUuOSwwLTExLjIsNS41LTExLjIsMTEuMywwLDIuOSwxLjIsNS44LDMuMyw3LjksMi4xLDIuMSw1LDMuNCw3LjksMy4zLDIuOSwwLDUuOC0xLjIsNy45LTMuMywyLjEtMi4xLDMuMy00LjksMy4zLTcuOSwwLTIuOS0xLjEtNS45LTMuMy04LTIuMS0yLjEtNS0zLjMtNy45LTMuM2gtLjFaIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQiIHgxPSItMTU3LjQiIHkxPSI2MzEuMyIgeDI9Ii0xNTMuOSIgeTI9IjYzMS4zIiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTE5LjcgLTEzMzQyNS41KSBzY2FsZSgyMTEuNikiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMjU3ZWI0Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjIiIHN0b3AtY29sb3I9IiMyODg0YWIiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNiIgc3RvcC1jb2xvcj0iIzMyOTU5MyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM0MGFmNzAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTEiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zODQuNywxNDIuOGMtMi4zLDQuMi0uNyw5LjUsMy42LDExLjgsMy40LDEuOCw3LjUsMS4yLDEwLjItMS41LjYtLjUsMS4xLTEuMiwxLjUtMiwyLjMtNC4yLjctOS41LTMuNi0xMS44LTEuMy0uNy0yLjctMS00LjEtMS0zLjEsMC02LjEsMS42LTcuNiw0LjUiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0yIiB4MT0iLTE1Ny40IiB5MT0iNjMxLjEiIHgyPSItMTUzLjkiIHkyPSI2MzEuMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzEwNC45IC0xMzMzODMuOSkgc2NhbGUoMjExLjYpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzI1N2ViNCIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii4zIiBzdG9wLWNvbG9yPSIjMmI4YWEyIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjkiIHN0b3AtY29sb3I9IiMzZGFiNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDBhZjcwIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC0yIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNDI0LjcsMTMyLjJoMGMtMy41LDQuNy0yLjcsMTEuNCwyLDE1LDQuMywzLjQsMTAuMywyLjksMTQuMS0uOC4zLS4zLjYtLjYuOC0xLDMuNi00LjcsMi44LTExLjQtMS45LTE1LTItMS41LTQuMi0yLjItNi41LTIuMi0zLjIsMC02LjMsMS40LTguNCw0Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMyIgeDE9Ii0xNTcuNCIgeTE9IjYzMS4yIiB4Mj0iLTE1My45IiB5Mj0iNjMxLjIiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxMDkuNyAtMTMzNDA2LjkpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTMiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zNTYuMSwxNTUuM2MtMy4yLDAtNiwyLjgtNiw2LDAsMS42LjYsMy4xLDEuNyw0LjIsMS4xLDEuMSwyLjYsMS44LDQuMywxLjhzMy4xLS42LDQuMy0xLjhjMS4xLTEuMSwxLjgtMi42LDEuNy00LjIsMC0xLjYtLjYtMy4yLTEuNy00LjMtMS4xLTEuMS0yLjctMS43LTQuMy0xLjdoMFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC00IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjEiIHgyPSItMTUzLjkiIHkyPSI2MzEuMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzEwNS42IC0xMzMzNjAuMikgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNCI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTcyLjcsMTI4LjVjLTUuOCwwLTExLjQsNS4zLTExLjMsMTEuMywwLDIuOSwxLjIsNS44LDMuMyw3LjksMi4xLDIuMSw1LjEsMy4zLDgsMy4zLDIuOSwwLDUuOC0xLjIsNy45LTMuMywyLjEtMi4xLDMuNC01LDMuMy03LjksMC0yLjktMS4yLTUuOC0zLjMtNy45LTItMi00LjgtMy4zLTcuNi0zLjNzLS4yLDAtLjMsMCIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTUiIHgxPSItMTU3LjQiIHkxPSI2MzAuNCIgeDI9Ii0xNTMuOSIgeTI9IjYzMC40IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMDE4LjggLTEzMzIzNykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNSI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTE0OC40LDE0MC4yYy00LjIsMi4yLTUuOCw3LjUtMy41LDExLjcsMi4zLDQuMiw3LjUsNS44LDExLjgsMy42LjctLjQsMS40LS45LDItMS41LDIuNy0yLjcsMy40LTYuOCwxLjUtMTAuMi0xLjYtMi45LTQuNi00LjYtNy43LTQuNnMtMi44LjMtNC4xLDEiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC02IiB4MT0iLTE1Ny40IiB5MT0iNjMwLjYiIHgyPSItMTUzLjkiIHkyPSI2MzAuNiIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA0NC43IC0xMzMyNzAuNCkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNiI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTEwNi41LDEzMS4zaDBjLTQuNSwzLjctNS40LDEwLjMtMS44LDE1LDMuNiw0LjcsMTAuMyw1LjUsMTUsMS45LjQtLjIuNy0uNSwxLS44LDMuOC0zLjgsNC4yLTkuOC44LTE0LjEtMi4xLTIuNy01LjMtNC4xLTguNS00LjFzLTQuNi43LTYuNSwyLjIiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC03IiB4MT0iLTE1Ny40IiB5MT0iNjMwLjUiIHgyPSItMTUzLjkiIHkyPSI2MzAuNSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzAyOS4xIC0xMzMyNTUuNykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNyI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTM1NC45LDExNC4zYy0xLjksNC4zLDAsOS41LDQuNSwxMS41LDMuNCwxLjQsNy4yLjYsOS42LTEuOC44LS44LDEuNC0xLjcsMS44LTIuNywxLjktNC40LDAtOS41LTQuNS0xMS41LTEuMS0uNS0yLjItLjctMy40LS43LTMuNCwwLTYuNiwyLTgsNS4yIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtOCIgeDE9Ii0xNTcuNCIgeTE9IjYzMSIgeDI9Ii0xNTMuOSIgeTI9IjYzMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA3Ny41IC0xMzMzODQpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTgiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00NjkuMSw0My43Yy03LjQsMC0xNC4zLDYuOC0xNC4xLDE0LjItLjEsMy43LDEuNSw3LjMsNC4yLDEwLDIuNiwyLjYsNi4yLDQuMiw5LjksNC4xLDMuNywwLDcuNC0xLjQsMTAuMS00LjEsMi42LTIuNiw0LjEtNi4zLDQuMS05LjlzLTEuNS03LjUtNC4xLTEwLjFjLTIuNi0yLjYtNi4yLTQuMS05LjgtNC4xcy0uMiwwLS40LDAiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC05IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjEiIHgyPSItMTUzLjkiIHkyPSI2MzEuMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA2NC44IC0xMzM0NjIuNCkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtOSI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTI5NC40LDEwNi43Yy0uOSwzLjksMS41LDcuOCw1LjMsOC43LDIuNS42LDUtLjIsNi43LTIsLjktLjksMS42LTIuMSwxLjktMy40LjktMy45LTEuNS03LjctNS4zLTguNy0uNS0uMS0xLjEtLjItMS42LS4yLTMuMywwLTYuMiwyLjItNyw1LjYiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0xMCIgeDE9Ii0xNTcuNCIgeTE9IjYzMC44IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjgiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwNTUuNCAtMTMzMzU5LjYpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTEwIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzI0LjQsODcuM2MtMS42LDQuNC43LDkuMyw1LjEsMTAuOSwzLjIsMS4xLDYuNy4zLDguOS0yLC44LS44LDEuNS0xLjksMi0zLjFoMGMxLjYtNC40LS43LTkuMy01LTEwLjktMS0uNC0xLjktLjUtMi45LS41LTMuNSwwLTYuNywyLjEtOCw1LjYiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0xMSIgeDE9Ii0xNTcuNCIgeTE9IjYzMC45IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjkiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwNTEuNSAtMTMzMzgyLjYpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTExIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzU1LjIsNzIuM2MtMi43LDUuNC0uNSwxMi4xLDQuOSwxNC43LDQuMywyLjMsOS41LDEuMywxMi44LTIsLjgtLjgsMS40LTEuNywyLTIuOCwyLjctNS40LjUtMTIuMS00LjgtMTQuOC0xLjYtLjgtMy4zLTEuMi01LTEuMi00LDAtNy45LDIuMi05LjksNi4xIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMTIiIHgxPSItMTU3LjQiIHkxPSI2MzAuOSIgeDI9Ii0xNTMuOSIgeTI9IjYzMC45IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMDUyIC0xMzM0MDMuOSkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMTIiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zODguNCw2MS4xYy0zLjksNS45LTIuMywxNCwzLjcsMTcuOSw1LjIsMy42LDExLjksMi42LDE2LjItMS42LjUtLjUsMS4yLTEuMiwxLjUtMS45LDMuOS01LjksMi40LTEzLjktMy42LTE4LTIuMi0xLjQtNC42LTIuMS03LjEtMi4xLTQuMiwwLTguMywyLTEwLjgsNS44Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMTMiIHgxPSItMTU3LjQiIHkxPSI2MzEiIHgyPSItMTUzLjkiIHkyPSI2MzEiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwNTQuNyAtMTMzNDI0LjEpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTEzIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNDI0LjIsNTMuNWMtNC43LDUuNC00LDEzLjUsMS40LDE4LjIsNS4zLDQuNCwxMi44LDQsMTcuNS0uNy4zLS4zLjUtLjUuNy0uNyw0LjYtNS41LDMuOS0xMy42LTEuNS0xOC4yLTIuNC0yLTUuNC0zLTguMy0zcy03LjMsMS41LTkuOCw0LjYiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0xNCIgeDE9Ii0xNTcuNCIgeTE9IjYzMSIgeDI9Ii0xNTMuOSIgeTI9IjYzMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA1OC43IC0xMzM0NDMuOCkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMTQiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00NTguNCw5OS45YzAsMy40LDEuMyw2LjQsMy43LDguOCwyLjMsMi4zLDUuNCwzLjYsOC43LDMuNiwzLjQsMCw2LjUtMS4yLDguOS0zLjYsMi4zLTIuMywzLjYtNS42LDMuNS04LjgsMC0zLjMtMS4yLTYuNS0zLjUtOC44LTIuNC0yLjQtNS43LTMuNy04LjgtMy43LTYuNSwwLTEyLjYsNS45LTEyLjUsMTIuNSIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTE1IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjIiIHgyPSItMTUzLjkiIHkyPSI2MzEuMiIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA5Mi44IC0xMzM0NDMuNSkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMTUiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0yOTMuMywxNTIuMmMtLjUsMy42LDIsNyw1LjcsNy40LDIuMS4zLDQuMi0uNCw1LjYtMS45LDEtMSwxLjYtMi4zLDEuOC0zLjguNS0zLjYtMi4xLTYuOS01LjctNy40LS4zLDAtLjYsMC0uOSwwLTMuMiwwLTYuMSwyLjQtNi41LDUuNyIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTE2IiB4MT0iLTE1Ny40IiB5MT0iNjMwLjkiIHgyPSItMTUzLjkiIHkyPSI2MzAuOSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA4NC45IC0xMzMzMzcuNykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMTYiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zMjIuNSwxMzEuMWMtMS4yLDQuMiwxLjMsOC42LDUuNSw5LjgsMi45LjgsNS44LDAsNy44LTIsMS0xLDEuNi0yLjEsMi4xLTMuNCwxLjItNC4yLTEuMy04LjYtNS41LTkuOC0uNy0uMi0xLjUtLjMtMi4yLS4zLTMuNSwwLTYuNiwyLjMtNy42LDUuOCIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTE3IiB4MT0iLTE1Ny40IiB5MT0iNjMxIiB4Mj0iLTE1My45IiB5Mj0iNjMxIiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMDgwIC0xMzMzNjEuMikgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMTciPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zODguNSwxMDEuNGMtMyw0LjktMS41LDExLjMsMy40LDE0LjQsNC4yLDIuNiw5LjUsMS44LDEyLjktMS41LjUtLjUsMS0xLjIsMS41LTEuOSwzLTQuOSwxLjUtMTEuMy0zLjUtMTQuMy0xLjctMS0zLjUtMS41LTUuNC0xLjUtMy41LDAtNi45LDEuNy04LjksNC45Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMTgiIHgxPSItMTU3LjQiIHkxPSI2MzEiIHgyPSItMTUzLjkiIHkyPSI2MzEiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwNzkuNiAtMTMzNDA1LjEpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTE4Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNDI0LjMsOTMuOGMtMy45LDQuOC0zLjIsMTEuOSwxLjYsMTUuOSw0LjUsMy43LDExLDMuMiwxNS4xLS44LjItLjIuNS0uNS44LS44aDBjNC00LjgsMy4zLTExLjktMS42LTE1LjgtMi4xLTEuNy00LjYtMi42LTcuMS0yLjZzLTYuNSwxLjQtOC43LDQuMSIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTE5IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjEiIHgyPSItMTUzLjkiIHkyPSI2MzEuMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA4NC40IC0xMzM0MjQuOSkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMTkiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik03NS41LDQzLjdjLTcuMywwLTE0LjIsNi43LTE0LjEsMTQuMi0uMSwzLjcsMS40LDcuNCw0LjEsMTAuMSwyLjYsMi42LDYuMyw0LjEsMTAuMSw0LjFzNy4zLTEuNSw5LjktNC4xYzIuNy0yLjcsNC4yLTYuNCw0LjEtMTAuMSwwLTMuNy0xLjUtNy4zLTQuMS05LjktMi42LTIuNi02LjEtNC4yLTkuNy00LjJzLS4yLDAtLjMsMCIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTIwIiB4MT0iLTE1Ny40IiB5MT0iNjMwLjIiIHgyPSItMTUzLjkiIHkyPSI2MzAuMiIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMjk2NSAtMTMzMjc3KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC0yMCI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTI0MS44LDEwMi4zYy0zLjkuOS02LjIsNC43LTUuNCw4LjYsMSwzLjgsNC44LDYuMiw4LjcsNS4zLDEuMy0uMywyLjUtMSwzLjQtMS45LDEuNy0xLjcsMi41LTQuMywyLTYuNy0uOC0zLjMtMy44LTUuNS03LTUuNXMtMS4xLDAtMS43LjIiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0yMSIgeDE9Ii0xNTcuNCIgeTE9IjYzMC43IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjciIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwNDEuMyAtMTMzMzMxLjgpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTIxIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjA5LjYsODMuMWMtNC40LDEuNi02LjcsNi41LTUsMTAuOSwxLjYsNC4zLDYuNCw2LjcsMTAuOCw1aDBjMS4yLS40LDIuMi0xLjEsMy4xLTEuOSwyLjMtMi4zLDMuMS01LjcsMi04LjktMS4yLTMuNS00LjUtNS42LTgtNS42LTEsMC0xLjkuMi0yLjkuNSIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTIyIiB4MT0iLTE1Ny40IiB5MT0iNjMwLjYiIHgyPSItMTUzLjkiIHkyPSI2MzAuNiIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzAyMi4zIC0xMzMzMjUuNCkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMjIiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNzQuOCw2OC4zYy01LjUsMi44LTcuNiw5LjQtNC45LDE0LjksMi43LDUuNCw5LjQsNy42LDE0LjgsNC44LDEuMS0uNiwyLTEuMiwyLjgtMiwzLjMtMy4zLDQuMy04LjUsMi0xMi44LTEuOS0zLjktNS44LTYuMS05LjgtNi4xcy0zLjMuNC00LjksMS4yIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMjMiIHgxPSItMTU3LjQiIHkxPSI2MzAuNSIgeDI9Ii0xNTMuOSIgeTI9IjYzMC41IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMDA1LjMgLTEzMzMxNi4xKSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC0yMyI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTE0NS42LDU2LjNjLTIuNCwwLTQuOS43LTcuMSwyLjEtNS45LDMuOS03LjYsMTItMy42LDE3LjksNC4xLDUuOSwxMiw3LjUsMTgsMy42LjctLjQsMS40LTEsMS45LTEuNSw0LjMtNC4zLDUuMi0xMSwxLjYtMTYuMi0yLjUtMy43LTYuNi01LjgtMTAuOC01LjhoMCIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTI0IiB4MT0iLTE1Ny40IiB5MT0iNjMwLjQiIHgyPSItMTUzLjkiIHkyPSI2MzAuNCIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMjk5MC43IC0xMzMzMDQuMikgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMjQiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xMDIuNSw1My41Yy01LjUsNC42LTYuMSwxMi43LTEuNiwxOC4xLDQuNyw1LjQsMTIuOCw2LDE4LjIsMS41bC43LS43YzQuNy00LjcsNS4xLTEyLjIuNy0xNy41LTIuNi0zLTYuMi00LjUtOS44LTQuNXMtNS45LDEtOC40LDMuMSIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTI1IiB4MT0iLTE1Ny40IiB5MT0iNjMwLjMiIHgyPSItMTUzLjkiIHkyPSI2MzAuMyIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMjk3OCAtMTMzMjkwLjcpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTI1Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNzMuOCw4OC4zYy02LjYsMC0xMi40LDYuMS0xMi40LDEyLjVzMS4zLDYuNCwzLjcsOC44YzIuMywyLjMsNS42LDMuNiw4LjgsMy41LDMuMywwLDYuNS0xLjIsOC44LTMuNSwyLjQtMi40LDMuNi01LjYsMy42LTguOSwwLTMuNC0xLjMtNi40LTMuNi04LjctMi40LTIuNC01LjUtMy43LTguOC0zLjdoLS4xWiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTI2IiB4MT0iLTE1Ny40IiB5MT0iNjMwLjMiIHgyPSItMTUzLjkiIHkyPSI2MzAuMyIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMjk5Mi45IC0xMzMyNTYpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTI2Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjQ0LjEsMTQ3LjVjLTMuNy41LTYuMiwzLjgtNS43LDcuNC41LDMuNiwzLjgsNi4yLDcuNCw1LjcsMS41LS4yLDIuOC0uOCwzLjgtMS44LDEuNC0xLjQsMi4yLTMuNSwxLjktNS42LS40LTMuMy0zLjMtNS43LTYuNS01LjdzLS42LDAtLjksMCIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTI3IiB4MT0iLTE1Ny40IiB5MT0iNjMwLjgiIHgyPSItMTUzLjkiIHkyPSI2MzAuOCIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA3MS44IC0xMzMzMTEuMykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMjciPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0yMTIuNiwxMjYuNWMtNC4yLDEuMi02LjcsNS42LTUuNSw5LjgsMS4yLDQuMiw1LjYsNi43LDkuOCw1LjUsMS40LS41LDIuNS0xLjEsMy40LTIuMSwyLTIsMi45LTQuOSwyLTcuOC0xLTMuNS00LjItNS44LTcuNi01LjhzLTEuNCwwLTIuMS4zIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMjgiIHgxPSItMTU3LjQiIHkxPSI2MzAuNyIgeDI9Ii0xNTMuOSIgeTI9IjYzMC43IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMDUxLjkgLTEzMzMwNi4xKSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC0yOCI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTE3OC42LDExMC44Yy00LjQsMS45LTYuNCw3LTQuNSwxMS40LDIsNC40LDcuMSw2LjQsMTEuNSw0LjUsMS0uNCwxLjktMSwyLjctMS44LDIuNC0yLjQsMy4zLTYuMiwxLjgtOS42LTEuNS0zLjMtNC43LTUuMi04LTUuMnMtMi4zLjItMy41LjciLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0yOSIgeDE9Ii0xNTcuNCIgeTE9IjYzMC42IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjYiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwMzIuMiAtMTMzMjk4LjIpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTI5Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMTQyLDk5Yy00LjgsMy02LjMsOS40LTMuNCwxNC4zLDMsNC45LDkuNCw2LjUsMTQuMywzLjUuNy0uNCwxLjQtMSwxLjktMS41LDMuNC0zLjQsNC4xLTguNywxLjUtMTIuOS0yLTMuMi01LjUtNC45LTktNC45cy0zLjguNS01LjUsMS41Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMzAiIHgxPSItMTU3LjQiIHkxPSI2MzAuNSIgeDI9Ii0xNTMuOSIgeTI9IjYzMC41IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMDE3IC0xMzMyODYuOSkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMzAiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xMDMuNyw5My4yYy00LjgsNC01LjUsMTEtMS41LDE1LjgsMy45LDQuOCwxMSw1LjYsMTUuNywxLjZoMGMuMy0uMi42LS41LjgtLjcsNC4xLTQsNC41LTEwLjYuOC0xNS4xLTIuMy0yLjctNS41LTQuMS04LjgtNC4xcy01LC44LTcuMSwyLjUiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0zMSIgeDE9Ii0xNTcuNCIgeTE9IjYzMC40IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjQiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwMDMuMyAtMTMzMjcyLjUpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTMxIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMTg4LjcsMTU2LjJjLTMuMiwwLTYsMi44LTYsNiwwLDEuNi42LDMuMiwxLjcsNC4zLDEuMSwxLjEsMi43LDEuOCw0LjMsMS43LDEuNiwwLDMuMS0uNiw0LjItMS43LDEuMi0xLjEsMS44LTIuNiwxLjgtNC4zcy0uNy0zLjItMS44LTQuM2MtMS4xLTEuMS0yLjUtMS44LTQuMS0xLjhoLS4yWiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTMyIiB4MT0iLTE1Ny40IiB5MT0iNjMwLjciIHgyPSItMTUzLjkiIHkyPSI2MzAuNyIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA2My4xIC0xMzMyODEpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTMyIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjcyLjIsMTIzLjNjLTMuNSwwLTYuNywzLjItNi43LDYuNywwLDEuOC43LDMuNSwxLjksNC44LDEuMiwxLjIsMi45LDEuOSw0LjcsMS45czMuNS0uNyw0LjctMS45YzEuMy0xLjMsMS45LTMsMS45LTQuOHMtLjctMy40LTEuOS00LjdjLTEuMi0xLjItMi45LTItNC42LTJoLS4xWiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTMzIiB4MT0iLTE1Ny40IiB5MT0iNjMwLjgiIHgyPSItMTUzLjkiIHkyPSI2MzAuOCIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzA2Mi43IC0xMzMzMzUuNikgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMzMiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0yNjYuMiwxNzguNGMwLDEuNi42LDMuMSwxLjgsNC4zLDEuMSwxLjEsMi43LDEuOCw0LjIsMS44LDEuNiwwLDMuMi0uNiw0LjMtMS43LDEuMi0xLjIsMS44LTIuOCwxLjgtNC4zLDAtMS42LS42LTMuMi0xLjgtNC4zLTEuMi0xLjItMi43LTEuOC00LjMtMS44LTMuMiwwLTYuMSwyLjktNiw2LjEiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0zNCIgeDE9Ii0xNTcuNCIgeTE9IjYzMC45IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjkiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwOTQuMiAtMTMzMzEyLjkpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTM0Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjY2LjUsMzI2LjVjLTEuNiwwLTMuMS4yLTQuNC43LTEuMy41LTIuMywxLjItMy4yLDIuMi0xLjMsMS41LTEuNCwzLjQtMS42LDUuOHYuN2MwLDAsMCwxOSwwLDE5aDMuN3YtMTMuNGg2LjR2LTIuNGgtNi4zdi0zYzAtMS4zLjEtMi41LjQtMy42LjMtMSwuNi0xLjgsMS4xLTIuMy41LS42LDEuMS0xLDEuOC0xLjIuNi0uMiwxLjMtLjMsMi4yLS4zaC4yczIsMCwyLDB2LTIuMmgtMi4yWiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTM1IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjMiIHgyPSItMTUzLjkiIHkyPSI2MzEuMyIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzIwMC40IC0xMzMyMzEuNykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMzUiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0yMTQuNiwzMzMuMnYxMi4xYzAsMS4zLS4yLDIuNS0uNCwzLjYtLjMsMS0uNiwxLjgtMS4xLDIuMy0uNS41LTEuMSwxLTEuOCwxLjItLjUuMi0xLjEuMi0xLjguMy0uOCwwLTEuNC0uMS0xLjktLjMtLjctLjItMS40LS43LTEuOC0xLjItLjUtLjYtLjgtMS4zLTEuMS0yLjMtLjItMS0uNC0yLjItLjQtMy42di0xMi4xaC0zLjh2MTIuM3MwLC43LDAsLjdjLjIsMi40LjQsNC40LDEuNiw1LjguOCwxLDEuOSwxLjcsMy4yLDIuMiwxLjEuNCwyLjMuNiwzLjguN2guMXMwLDAsMCwwYy4xLDAsLjIsMCwuMywwaDBzLjEsMCwuMSwwYzEuNSwwLDIuNy0uMywzLjgtLjcuMiwwLC40LS4yLjUtLjMsMCwwLC4yLS4xLjMtLjJoLjJjMC0uMSwwLDQsMCw0LDAsMS4zLS4xLDIuNS0uNCwzLjYtLjMsMS0uNiwxLjctMS4xLDIuMy0uNS42LTEuMSwxLTEuOCwxLjItLjYuMi0xLjQuMy0yLjIuM2wuMiwyLjJjMS42LDAsMy0uMyw0LjMtLjcsMS4zLS41LDIuMy0xLjIsMy4yLTIuMiwxLjMtMS41LDEuNC0zLjQsMS42LTUuOHYtLjdjMCwwLDAtMTIuMSwwLTEyLjF2LS4zczAtMTIuMywwLTEyLjNoLTMuOFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0zNiIgeDE9Ii0xNTcuNCIgeTE9IjYzMS4yIiB4Mj0iLTE1My45IiB5Mj0iNjMxLjIiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxOTMuOCAtMTMzMjAxLjgpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTM2Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNOTcuNywzMjguNXYuN2MwLDEuMS45LDIsMiwyczItLjksMi0ydi0uN2MwLTEuMS0uOS0yLTItMnMtMiwuOS0yLDIiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0zNyIgeDE9Ii0xNTcuNCIgeTE9IjYzMC45IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjkiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxNTAuNCAtMTMzMTYwLjYpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTM3Ij4KICAgICAgPHBvbHlnb24gY2xhc3M9ImNscy0xIiBwb2ludHM9Ijk3LjcgMzMzLjUgOTcuNyAzNTQuOSAxMDEuNyAzNTQuOSAxMDEuNyAzMzMuNSAxMDEuNyAzMzMuNSA5Ny43IDMzMy41Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMzgiIHgxPSItMTU3LjQiIHkxPSI2MzEiIHgyPSItMTUzLjkiIHkyPSI2MzEiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxNjIgLTEzMzE1Mykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMzgiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xMzcuOCwzMjguNXYuN2MwLDEuMS45LDIsMiwyczItLjksMi0ydi0uN2MwLTEuMS0uOS0yLTItMnMtMiwuOS0yLDIiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC0zOSIgeDE9Ii0xNTcuNCIgeTE9IjYzMSIgeDI9Ii0xNTMuOSIgeTI9IjYzMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzE2MC44IC0xMzMxNzkuNCkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtMzkiPgogICAgICA8cG9seWdvbiBjbGFzcz0iY2xzLTEiIHBvaW50cz0iMTM3LjggMzMzLjIgMTM3LjggMzMzLjIgMTM3LjggMzU0LjkgMTQxLjggMzU0LjkgMTQxLjggMzU0LjkgMTQxLjggMzMzLjIgMTM3LjggMzMzLjIiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC00MCIgeDE9Ii0xNTcuNCIgeTE9IjYzMS4xIiB4Mj0iLTE1My45IiB5Mj0iNjMxLjEiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxNzEuOSAtMTMzMTcyKSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC00MCI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTQyMy4yLDMyOC41di4yYzAsMS4xLjksMiwyLDJzMi0uOSwyLTJ2LS4yYzAtMS4xLS45LTItMi0ycy0yLC45LTIsMiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTQxIiB4MT0iLTE1Ny40IiB5MT0iNjMxLjciIHgyPSItMTUzLjkiIHkyPSI2MzEuNyIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzIzNy4yIC0xMzMzMTIuOSkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNDEiPgogICAgICA8cG9seWdvbiBjbGFzcz0iY2xzLTEiIHBvaW50cz0iNDIzLjIgMzMzLjIgNDIzLjIgMzU0LjkgNDI3LjIgMzU0LjkgNDI3LjIgMzU0LjkgNDI3LjIgMzMzLjMgNDI3LjIgMzMzLjIgNDIzLjIgMzMzLjIiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC00MiIgeDE9Ii0xNTcuNCIgeTE9IjYzMS43IiB4Mj0iLTE1My45IiB5Mj0iNjMxLjciIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMyNDMuMiAtMTMzMzA2LjcpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTQyIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzQ3LjksMzMzLjJ2MTkuNWgtNy41Yy0yLjksMC01LjItMi40LTUuMi01LjJ2LTE0LjNoLTMuOXYxMS4zYzAsNCwxLjMsNi4xLDIuNCw3LjQuOCwxLDEuOSwxLjcsMy4yLDIuMiwxLjEuNCwyLjMuNywzLjguN2gwczExLjMsMCwxMS4zLDB2LTIxLjdoLTRaIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNDMiIHgxPSItMTU3LjQiIHkxPSI2MzEuNSIgeDI9Ii0xNTMuOSIgeTI9IjYzMS41IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMjIzLjEgLTEzMzI2Nykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNDMiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zMDguNiwzNDcuNnYtN2MwLTIuOSwyLjQtNS4yLDUuMi01LjJoNy41djE3LjVoLTcuNWMtMi45LDAtNS4yLTIuNC01LjItNS4yTTMyMS40LDMyNi41djYuN2gtNy45Yy0xLjQsMC0yLjcuMy0zLjguNy0xLjMuNS0yLjQsMS4yLTMuMiwyLjItMS43LDItMi40LDQuMy0yLjQsNy40djEuMWMwLDQsMS4zLDYuMSwyLjQsNy40LjgsMSwxLjksMS43LDMuMiwyLjIsMS4xLjQsMi40LjYsMy44LjdoLjFzMTEuOCwwLDExLjgsMHYtMjguNGgtNFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC00NCIgeDE9Ii0xNTcuNCIgeTE9IjYzMS40IiB4Mj0iLTE1My45IiB5Mj0iNjMxLjQiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMyMTQuMSAtMTMzMjU2KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC00NCI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTQ1OC43LDMzMy4ydjIxLjdoNHYtMTkuNmg3LjVjMi45LDAsNS4yLDIuMyw1LjIsNS4ydjE0LjNoNC4xdi0xMS40YzAtMy4yLS43LTUuNC0yLjQtNy40LS44LTEtMS45LTEuNy0zLjItMi4yLTEuMS0uNC0yLjQtLjctMy44LS43aC0uMXMtMTEuMywwLTExLjMsMFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC00NSIgeDE9Ii0xNTcuNCIgeTE9IjYzMS44IiB4Mj0iLTE1My45IiB5Mj0iNjMxLjgiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMyNTUuNSAtMTMzMzI3LjEpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTQ1Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzY2LjUsMzMzLjNjLTEuNCwwLTIuNi4zLTMuNy43LTEuMy41LTIuMywxLjItMy4yLDIuMi0xLjIsMS40LTIuNCwzLjItMi40LDZ2Mi43YzAsMy4xLjcsNS40LDIuNCw3LjMuOC45LDEuOSwxLjcsMy4yLDIuMSwxLjEuNCwyLjMuNiwzLjcuN2guMXM5LjQsMCw5LjQsMHYtMi4xaC05LjFjLTIuOSwwLTUuMi0yLjMtNS4yLTUuMiwwLDAtLjItMi40LS4yLTMuN3MuMi0zLjQuMi0zLjRjMC0yLjksMi4zLTUuMiw1LjItNS4yaDkuMXYtMi4xaC05LjVaIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNDYiIHgxPSItMTU3LjQiIHkxPSI2MzEuNiIgeDI9Ii0xNTMuOSIgeTI9IjYzMS42IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMjI5LjIgLTEzMzI3OC45KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC00NiI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTE1MiwzMzNjLTEuMy41LTIuMiwxLjEtMy4xLDIuMS0xLjcsMi0xLjcsNSwwLDcuMS45LDEsMiwxLjgsMy4zLDIuMy45LjMsMS44LjUsMi45LjdoLjJjMS4zLjEsMi43LjMsMy42LDEuNCwxLDEuMiwxLjIsMi4zLjYsMy4zLTEuMywyLjItMy44LDIuNS02LDIuNWgtNC41djIuOGMuOCwwLDYuNSwwLDcuMiwwLDMtLjMsNS4yLTEuMyw2LjctMi45LDEuMS0xLjMsMS42LTMuMSwxLjEtNC44LS4yLS44LS42LTEuNi0xLjEtMi4yLS45LTEtMi0xLjgtMy4zLTIuMy0uNy0uMy0xLjYtLjQtMi41LS41LTIuMS0uMy00LjYtLjYtNS4xLTMuMS0uNC0xLjcsMS4xLTMsMi43LTMuNS42LS4yLDEuMy0uMywyLjEtLjNoNC4xdi0yLjdjLS43LDAtMS41LDAtMi4yLDAtLjgsMC0xLjcsMC0yLjUsMC0xLjUsMC0zLC4xLTQuNC42Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNDciIHgxPSItMTU3LjQiIHkxPSI2MzEuMSIgeDI9Ii0xNTMuOSIgeTI9IjYzMS4xIiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTc1LjYgLTEzMzE3OS44KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC00NyI+CiAgICAgIDxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI4NC44IDMyNi41IDczLjggMzQ4LjYgNzMuNCAzNDguNiA3My40IDM0OC41IDYyLjIgMzI2LjUgNTcuNSAzMjYuNSA1Ny41IDM1NC45IDYxLjUgMzU0LjkgNjEuNSAzMzQuNiA3MS45IDM1NC45IDc0IDM1NC45IDg0LjQgMzMzLjkgODUuMiAzMzIuNSA4NS4yIDM1NC45IDg5LjQgMzU0LjkgODkuNCAzMjYuNSA4NC44IDMyNi41Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNDgiIHgxPSItMTU3LjQiIHkxPSI2MzAuOSIgeDI9Ii0xNTMuOSIgeTI9IjYzMC45IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTUyLjIgLTEzMzE0Mi41KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC00OCI+CiAgICAgIDxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSIyODIuMSAzMjYuNSAyODIuMSAzMjYuNSAyODIuMSAzNTQuOSAzMDEuMiAzNTQuOSAzMDEuMiAzNTIuOCAyODYuMSAzNTIuOCAyODYuMSAzNDAuOCAyOTYuMiAzNDAuOCAyOTYuMiAzMzguNiAyODYuMSAzMzguNiAyODYuMSAzMjguOSAzMDEuMiAzMjguOSAzMDEuMiAzMjYuNSAyODIuMSAzMjYuNSIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTQ5IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjQiIHgyPSItMTUzLjkiIHkyPSI2MzEuNCIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzIwOC4yIC0xMzMyNDUuMSkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNDkiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xNjguMSwzMjYuOHYxOC43czAsLjcsMCwuN2MuMiwyLjQuNCw0LjMsMS42LDUuOC44LDEsMS45LDEuNywzLjIsMi4yLDEuMi41LDIuNy43LDQuNC43aDEuN3YtMi4xaC0xLjVjLS44LDAtMS42LS4xLTIuMy0uNC0uNy0uMi0xLjQtLjctMS44LTEuMi0uNS0uNi0uOC0xLjMtMS4xLTIuMy0uMi0xLS40LTIuMi0uNC0zLjZ2LTkuM3M2LjMsMCw2LjMsMHYtMi44aC02LjR2LTYuNGgtMy44WiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTUwIiB4MT0iLTE1Ny40IiB5MT0iNjMxLjEiIHgyPSItMTUzLjkiIHkyPSI2MzEuMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzE3OC4yIC0xMzMxODkuNSkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNTAiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xOTMuNiwzMzMuM2MtMS43LDAtMy4yLjMtNC41LjgtMS4zLjUtMi41LDEuMy0zLjMsMi4zLTEuMywxLjUtMS41LDMuNS0xLjcsNi4xdi43YzAsMCwwLDExLjksMCwxMS45aDMuOXYtMTEuN2MwLTEuNC4yLTIuNy40LTMuNy4zLTEsLjctMS44LDEuMi0yLjQuNS0uNiwxLjEtMSwxLjktMS4zLjctLjIsMS41LS4zLDIuNS0uM2gxLjd2LTIuM2gtMloiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC01MSIgeDE9Ii0xNTcuNCIgeTE9IjYzMS4yIiB4Mj0iLTE1My45IiB5Mj0iNjMxLjIiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxODUgLTEzMzE5NS41KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC01MSI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTQzNy4zLDM0Ni42Yy0uMy0yLjctLjQtNy41LDEuNi05LjcsMS0xLDIuMy0xLjYsMy43LTEuNmgxLjZjNC4yLDAsNS4xLDQuMiw1LjQsNiwuMiwxLjQuNCw0LjEsMCw2LjUtLjIsMS4yLS42LDIuMi0xLjEsMi45LTEsMS4zLTIuNSwyLjEtNC4xLDIuMWgtMS42Yy00LjMsMC01LjItNC40LTUuNC02LjJNNDQyLjQsMzMzLjJoLS4xYy0xLjQsMC0yLjYuMy0zLjcuNy0xLjIuNS0yLjMsMS4yLTMuMSwyLjEtMS4xLDEuMy0yLjQsMy4zLTIuNCw3LjJ2MS41YzAsMy4xLjcsNS4zLDIuNCw3LjIuOC45LDEuOSwxLjcsMy4xLDIuMSwxLjEuNCwyLjMuNiwzLjcuN2gyLjVjMS40LDAsMi42LS4zLDMuNy0uNywxLjItLjUsMi4zLTEuMiwzLjEtMi4xLDEuNi0xLjksMi40LTQuMSwyLjQtNy4ydi0xLjVjMC0zLjEtLjctNS4zLTIuNC03LjItLjgtLjktMS45LTEuNy0zLjEtMi4xLTEuMS0uNC0yLjMtLjYtMy43LS43aC0uMXMtMi4yLDAtMi4yLDBaIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNTIiIHgxPSItMTU3LjQiIHkxPSI2MzEuNyIgeDI9Ii0xNTMuOSIgeTI9IjYzMS43IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMjQ5IC0xMzMzMTUpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTUyIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzgzLjYsMzQ3LjVzLS4yLTEuNy0uMi0zLjQuMi0zLjQuMi0zLjRjMC0yLjksMi40LTUuMyw1LjMtNS4zaDcuNnYxMi4xYzAsMi45LTIuNiw1LjMtNS42LDUuM2gtMi4xYy0yLjksMC01LjMtMi40LTUuMy01LjNNMzg4LjYsMzMzLjJoLS4xYy0xLjQsMC0yLjcuMy0zLjguNy0xLjMuNS0yLjQsMS4yLTMuMywyLjItMS43LDItMi41LDQuMy0yLjUsNy42djIuN2MuNCwyLjIsMS4yLDQsMi41LDUuNS45LDEsMiwxLjcsMy4zLDIuMi42LjIsMS4zLjQsMS45LjUsMS40LjMsMi42LjIsMy45LjMuOCwwLDEuNCwwLDIuMi0uMWgwYy43LS4yLDEuNS0uMywyLjItLjYuNi0uMiwxLjEtLjUsMS41LS44bC4yLS4ydjEuNmg0LjF2LTIxLjdoMHMtMTIuMSwwLTEyLjEsMFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC01MyIgeDE9Ii0xNTcuNCIgeTE9IjYzMS42IiB4Mj0iLTE1My45IiB5Mj0iNjMxLjYiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMyMzUuMSAtMTMzMjg5LjgpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTUzIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNDA3LjMsMzI2Ljh2MTguN2MwLDAsMCwuNywwLC43LjIsMi40LjQsNC4zLDEuNiw1LjguOSwxLDEuOSwxLjcsMy4yLDIuMiwxLjIuNSwyLjcuNyw0LjQuN2gxLjd2LTIuMWgtMS41Yy0uOCwwLTEuNi0uMS0yLjMtLjQtLjctLjItMS40LS43LTEuOC0xLjItLjUtLjYtLjgtMS4zLTEuMS0yLjMtLjItMS0uNC0yLjItLjQtMy42di05LjdzNi4zLDAsNi4zLDB2LTIuNGgtNi4zdi02LjRoLTMuOFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC01NCIgeDE9Ii0xNTcuNCIgeTE9IjYzMS43IiB4Mj0iLTE1My45IiB5Mj0iNjMxLjciIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMyMzkuMyAtMTMzMzAyKSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC01NCI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTIzNi41LDM0Ni42Yy0uMy0yLjctLjUtNy41LDEuNi05LjcsMS0xLDIuMy0xLjYsMy44LTEuNmgxLjZjNC4yLDAsNS4yLDQuMiw1LjQsNiwuMiwxLjQuNCw0LjEsMCw2LjUtLjIsMS4yLS42LDIuMi0xLjEsMi45LTEsMS4zLTIuNSwyLjEtNC4yLDIuMWgtMS42Yy00LjMsMC01LjItNC40LTUuNC02LjNNMjQxLjYsMzMzLjJoLS4xYy0xLjQsMC0yLjYuMy0zLjcuNy0xLjIuNS0yLjMsMS4yLTMuMSwyLjEtMS43LDEuOS0yLjQsNC4yLTIuNCw3LjN2MS41YzAsMy4xLjcsNS4zLDIuNCw3LjMuOC45LDEuOSwxLjcsMy4xLDIuMSwxLjEuNCwyLjMuNiwzLjcuN2gyLjVjMS40LDAsMi42LS4zLDMuNy0uNywxLjItLjUsMi4zLTEuMiwzLjEtMi4xLDEuNi0xLjksMi40LTQuMiwyLjQtNy4zdi0xLjVjMC0zLjEtLjctNS4zLTIuNC03LjMtLjgtLjktMS45LTEuNy0zLjEtMi4xLTEuMS0uNC0yLjMtLjYtMy43LS43aC0uMXMtMi4yLDAtMi4yLDBaIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNTUiIHgxPSItMTU3LjQiIHkxPSI2MzEuMyIgeDI9Ii0xNTMuOSIgeTI9IjYzMS4zIiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTk3LjUgLTEzMzIyMC42KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC01NSI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTEwOS4xLDMzMy4yaDB2MjEuN2g0di0xOS42aDcuNWMyLjksMCw1LjIsMi4zLDUuMiw1LjJ2MTQuM2g0LjF2LTExLjRjMC0zLjItLjctNS40LTIuNC03LjQtLjgtMS0xLjktMS43LTMuMi0yLjItMS4xLS40LTIuNC0uNy0zLjgtLjdoLS4xcy0xMS4zLDAtMTEuMywwWiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTU2IiB4MT0iLTE1Ny40IiB5MT0iNjMxIiB4Mj0iLTE1My45IiB5Mj0iNjMxIiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTY2LjcgLTEzMzE2Mi41KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC01NiI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTM1My40LDI0NS4yYzAsMiwxLjYsMy42LDMuNiwzLjZzMy42LTEuNiwzLjYtMy42LTEuNi0zLjYtMy42LTMuNi0zLjYsMS42LTMuNiwzLjYiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC01NyIgeDE9Ii0xNTcuNCIgeTE9IjYzMS4zIiB4Mj0iLTE1My45IiB5Mj0iNjMxLjMiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxNjEuOSAtMTMzMzIwLjgpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTU3Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNDI2LjYsMjU2LjV2MjguOWMwLDEuOC0uMiwzLjQtLjUsNC43LS40LDEuMy0uOCwyLjMtMS40LDMtLjYuNy0xLjQsMS4yLTIuMywxLjUtLjguMy0xLjkuNC0zLjEuNGgtLjFsLjMsMy42aC4xYzIuMywwLDQuMy0uMyw2LjEtMSwxLjgtLjcsMy4zLTEuNyw0LjQtMywxLjktMi4yLDMtNS4yLDMuNC05di0yOS4yaC02LjhaIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNTgiIHgxPSItMTU3LjQiIHkxPSI2MzEuNSIgeDI9Ii0xNTMuOSIgeTI9IjYzMS41IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTk5LjggLTEzMzMzOC40KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC01OCI+CiAgICAgIDxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI0MDguOSAyNDEuNiA0MDguOSAyNDEuNiA0MDguOSAyODMuOSA0MTUuNCAyODMuOSA0MTUuNCAyNDEuNiA0MTUuNCAyNDEuNiA0MDguOSAyNDEuNiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTU5IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjUiIHgyPSItMTUzLjkiIHkyPSI2MzEuNSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzE4Ni41IC0xMzMzMzguOCkgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNTkiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zOTEuOCwyNTYuNXYyOC45YzAsMS44LS4yLDMuNC0uNSw0LjctLjQsMS4zLS44LDIuMy0xLjQsMy0uNi43LTEuNCwxLjItMi4zLDEuNS0uOC4zLTEuOS40LTMuMS40aC0uMWwuMywzLjZoLjFjMi4zLDAsNC4zLS4zLDYuMS0xLDEuOC0uNywzLjMtMS43LDQuNC0zLDEuOS0yLjIsMy01LjIsMy40LTl2LTI5LjJoLTYuOFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC02MCIgeDE9Ii0xNTcuNCIgeTE9IjYzMS41IiB4Mj0iLTE1My45IiB5Mj0iNjMxLjUiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxOTEuNSAtMTMzMzIxLjkpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTYwIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzQ4LjUsMjcwYzAtNC41LDMuNi04LjEsOC4xLTguMWgxNi4zdjE2LjJoLTI0LjR2LTguMVpNMzU2LDI1Ni41Yy03LjgsMC0xNC4yLDYuMy0xNC4yLDE0LjJ2MTMuMmgzNy43di0yNy4zaC0yMy41WiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTYxIiB4MT0iLTE1Ny40IiB5MT0iNjMxLjQiIHgyPSItMTUzLjkiIHkyPSI2MzEuNCIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzE3OC44IC0xMzMzMTEpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTYxIj4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMjY0LjQsMjQ1LjJjMCwyLDEuNiwzLjYsMy42LDMuNnMzLjYtMS42LDMuNi0zLjYtMS42LTMuNi0zLjYtMy42LTMuNiwxLjYtMy42LDMuNiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTYyIiB4MT0iLTE1Ny40IiB5MT0iNjMxLjEiIHgyPSItMTUzLjkiIHkyPSI2MzEuMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzEzNy45IC0xMzMyODAuNykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNjIiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0xMDIuMSwyOTQuOWMwLDIsMS42LDMuNiwzLjYsMy42czMuNi0xLjYsMy42LTMuNi0xLjYtMy42LTMuNi0zLjYtMy42LDEuNi0zLjYsMy42Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNjMiIHgxPSItMTU3LjQiIHkxPSI2MzAuOSIgeDI9Ii0xNTMuOSIgeTI9IjYzMC45IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTI4LjYgLTEzMzE3OS43KSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC02MyI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTExMi41LDI5NC45YzAsMiwxLjYsMy42LDMuNiwzLjZzMy42LTEuNiwzLjYtMy42LTEuNi0zLjYtMy42LTMuNi0zLjYsMS42LTMuNiwzLjYiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC02NCIgeDE9Ii0xNTcuNCIgeTE9IjYzMC45IiB4Mj0iLTE1My45IiB5Mj0iNjMwLjkiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxMzMgLTEzMzE4NC4xKSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogICAgPGNsaXBQYXRoIGlkPSJjbGlwcGF0aC02NCI+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTI3NC44LDI0NS4yYzAsMiwxLjYsMy42LDMuNiwzLjZzMy42LTEuNiwzLjYtMy42LTEuNi0zLjYtMy42LTMuNi0zLjYsMS42LTMuNiwzLjYiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC02NSIgeDE9Ii0xNTcuNCIgeTE9IjYzMS4xIiB4Mj0iLTE1My45IiB5Mj0iNjMxLjEiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMxMzkuOSAtMTMzMjg0LjMpIHNjYWxlKDIxMS42KSIgeGxpbms6aHJlZj0iI2xpbmVhci1ncmFkaWVudC0yIi8+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXBwYXRoLTY1Ij4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMzYzLjgsMjQ1LjJjMCwyLDEuNiwzLjYsMy42LDMuNnMzLjYtMS42LDMuNi0zLjYtMS42LTMuNi0zLjYtMy42LTMuNiwxLjYtMy42LDMuNiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTY2IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjMiIHgyPSItMTUzLjkiIHkyPSI2MzEuMyIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzE2Mi4zIC0xMzMzMjYuMykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNjYiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00MjYuNCwyNDUuMmMwLDIsMS42LDMuNiwzLjYsMy42czMuNi0xLjYsMy42LTMuNi0xLjYtMy42LTMuNi0zLjYtMy42LDEuNi0zLjYsMy42Ii8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNjciIHgxPSItMTU3LjQiIHkxPSI2MzEuNSIgeDI9Ii0xNTMuOSIgeTI9IjYzMS41IiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTgwIC0xMzMzNTUuMykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNjciPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik02OSwyNjIuNGMwLS4yLjItLjQuNC0uNGgxOS4xcy41LDAsLjUsMGMuMywwLC41LDAsLjguMSwzLjkuNyw2LjgsNC4yLDYuOCw4LjJ2Ny45aC0yNy41di0xNS43Wk0yOTUuOCwyNDEuNnYzNi41aC0xNi41di0yMS42aC02LjZ2MjEuNmgtNjUuOHYtNy42YzAtNC43LDMuOC04LjUsOC41LTguNWgyOC4xdi01LjRoLTI4LjZjLTguMSwwLTE0LjYsNi41LTE0LjYsMTQuNnY3aC01My4xdi0zNi41aC02LjV2MzYuNWgtMTguM3YtMjEuNmgtNi42djIxLjZoLTEyLjV2LTYuNmMwLDAsMCwwLDAsMGgwYzAtNC43LTEuNS04LjQtNC4zLTExLTIuNS0yLjQtNi4yLTMuOC0xMC44LTRoLTI2LjF2MjcuOGMwLDEuOCwwLDMuNC0uNCw0LjctLjQsMS4zLS44LDIuMy0xLjQsMy0uNi43LTEuNCwxLjItMi4zLDEuNS0uMSwwLS4zLDAtLjQuMXYzLjhjMS4zLS4yLDIuNi0uNCwzLjctLjksMS44LS43LDMuMi0xLjcsNC40LTMsMS45LTIuMiwzLTUuMiwzLjMtOXYtLjdoMjMzLjV2LTQyLjJoLTYuOFoiLz4KICAgIDwvY2xpcFBhdGg+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImxpbmVhci1ncmFkaWVudC02OCIgeDE9Ii0xNTcuNCIgeTE9IjYzMSIgeDI9Ii0xNTMuOSIgeTI9IjYzMSIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzEzMi4zIC0xMzMyMjYuMykgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNjgiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00NDguNSwyNzAuM2MwLTQuNiwzLjctOC4zLDguMy04LjNoMTUuOXYxNi4yaC0yNC4zdi03LjlaTTQ1Ni4zLDI1Ni41Yy03LjksMC0xNC40LDYuNC0xNC40LDE0LjR2MTIuOWgzMC44djEuNmMwLDEuOC0uMiwzLjQtLjUsNC43LS40LDEuMy0uOCwyLjMtMS40LDMtLjYuNy0xLjQsMS4yLTIuMywxLjUtLjMuMS0uOC4yLTEuMi4zdjMuN2MxLjYtLjEsMy4xLS40LDQuNC0uOSwxLjgtLjcsMy4zLTEuNyw0LjQtMywxLjktMi4yLDMtNS4yLDMuNC05di0yOS4yaC0yMy4zWiIvPgogICAgPC9jbGlwUGF0aD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50LTY5IiB4MT0iLTE1Ny40IiB5MT0iNjMxLjYiIHgyPSItMTUzLjkiIHkyPSI2MzEuNiIgZ3JhZGllbnRUcmFuc2Zvcm09InRyYW5zbGF0ZSgzMzIwOC44IC0xMzMzNTQuNikgc2NhbGUoMjExLjYpIiB4bGluazpocmVmPSIjbGluZWFyLWdyYWRpZW50LTIiLz4KICAgIDxjbGlwUGF0aCBpZD0iY2xpcHBhdGgtNjkiPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zMTIuNSwyNDEuNmMwLDAsMCwwLDAsMHY0MmMwLDAsMCwwLDAsMGg2LjRjMCwwLDAsMCwwLDB2LTQyYzAsMCwwLDAsMCwwaC02LjRaIi8+CiAgICA8L2NsaXBQYXRoPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtNzAiIHgxPSItMTU3LjQiIHkxPSI2MzEuMiIgeDI9Ii0xNTMuOSIgeTI9IjYzMS4yIiBncmFkaWVudFRyYW5zZm9ybT0idHJhbnNsYXRlKDMzMTYyLjMgLTEzMzI5My4zKSBzY2FsZSgyMTEuNikiIHhsaW5rOmhyZWY9IiNsaW5lYXItZ3JhZGllbnQtMiIvPgogIDwvZGVmcz4KICA8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMjguNy4xLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogMS4yLjAgQnVpbGQgMTQyKSAgLS0+CiAgPGc+CiAgICA8ZyBpZD0iTGF5ZXJfMSI+CiAgICAgIDxnPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMTQxIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTAiIHg9IjQ1Ni4yIiB5PSIxMjIuOSIgd2lkdGg9IjMxLjkiIGhlaWdodD0iMzEuOSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjcuNSAzNDkuNykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTcxIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtOSIgeD0iMzc4LjkiIHk9IjEzMy45IiB3aWR0aD0iMjYuOSIgaGVpZ2h0PSIyNi43IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxLjYgMjk4LjcpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy03NCI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTgiIHg9IjQxNi42IiB5PSIxMjMiIHdpZHRoPSIzMi45IiBoZWlnaHQ9IjMyLjgiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDE3LjIgMzIzLjkpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy03MiI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTciIHg9IjM0Ny42IiB5PSIxNTIuOCIgd2lkdGg9IjE3IiBoZWlnaHQ9IjE3IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTYuOSAyNzguMikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTczIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtNCIgeD0iNTYuNyIgeT0iMTIzLjciIHdpZHRoPSIzMS45IiBoZWlnaHQ9IjMxLjkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03NC42IDgzLjkpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy03OSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTUiIHg9IjEzOC45IiB5PSIxMzUuMSIgd2lkdGg9IjI2LjgiIGhlaWdodD0iMjYuOCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTYwLjIgMTM5LjIpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy03NiI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTMiIHg9Ijk2LjQiIHk9IjEyNCIgd2lkdGg9IjMyLjkiIGhlaWdodD0iMzIuOCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTY0LjkgMTEwLjkpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy03NSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTIiIHg9IjM0OS40IiB5PSIxMDQuOCIgd2lkdGg9IjI2LjciIGhlaWdodD0iMjYuNiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTMuNSAyNzEuNykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTc4Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtNiIgeD0iNDQ5IiB5PSIzNy44IiB3aWR0aD0iNDAuMiIgaGVpZ2h0PSI0MC4yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4MC42IDMyNy4xKSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtNzciPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy05MCIgeD0iMjkwLjYiIHk9Ijk3LjciIHdpZHRoPSIyMS42IiBoZWlnaHQ9IjIxLjUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQuMyAyMjguMykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTE2Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtOTEiIHg9IjMxOS40IiB5PSI3Ny42IiB3aWR0aD0iMjYiIGhlaWdodD0iMjUuOSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMjQuMiAyNDQuMykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTEzIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtOTIiIHg9IjM0OCIgeT0iNjAuOCIgd2lkdGg9IjM0LjIiIGhlaWdodD0iMzQiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQxIDI2Mi45KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMjAiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy05MyIgeD0iMzc5LjIiIHk9IjQ5IiB3aWR0aD0iNDAiIGhlaWdodD0iMzkuOCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNTUuNSAyODMuNCkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTE4Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtOTUiIHg9IjQxNC4yIiB5PSI0Mi43IiB3aWR0aD0iMzkuNSIgaGVpZ2h0PSIzOS40IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2OC43IDMwNC45KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMTkiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMDYiIHg9IjQ1My4yIiB5PSI4Mi4yIiB3aWR0aD0iMzUuNCIgaGVpZ2h0PSIzNS40IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSg1My4xIDMzOSkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTE3Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTA3IiB4PSIyOTAiIHk9IjE0My41IiB3aWR0aD0iMTkuNSIgaGVpZ2h0PSIxOS41IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMjUuOSAyMzguNikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTE0Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTA4IiB4PSIzMTguMSIgeT0iMTIxLjUiIHdpZHRoPSIyNC4xIiBoZWlnaHQ9IjI0IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNS4xIDI1My44KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMTEiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMDkiIHg9IjM4MS4yIiB5PSI5MS40IiB3aWR0aD0iMzIuMyIgaGVpZ2h0PSIzMi4xIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgyOS40IDI5MS45KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMTUiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy05NCIgeD0iNDE1LjgiIHk9Ijg0LjMiIHdpZHRoPSIzNC42IiBoZWlnaHQ9IjM0LjUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQyLjQgMzE0LjIpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy0xMiI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTk3IiB4PSI1NS40IiB5PSIzNy44IiB3aWR0aD0iNDAuMiIgaGVpZ2h0PSI0MC4yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTkuNCA2NSkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTU0Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtOTYiIHg9IjIzMi41IiB5PSI5OC45IiB3aWR0aD0iMjEuNiIgaGVpZ2h0PSIyMS41IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTEuMiAxODkuOSkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTU1Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtOTgiIHg9IjE5OS4zIiB5PSI3OC43IiB3aWR0aD0iMjYiIGhlaWdodD0iMjUuOSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTcuMSAxNjQuNikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTU2Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtOTkiIHg9IjE2Mi40IiB5PSI2MS45IiB3aWR0aD0iMzQuMSIgaGVpZ2h0PSIzNCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTcgMTM5LjYpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy01NyI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTExNSIgeD0iMTI1LjUiIHk9IjUwLjEiIHdpZHRoPSIzOS45IiBoZWlnaHQ9IjM5LjgiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC05LjcgMTE0LjcpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy01OCI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEwMSIgeD0iOTAuOSIgeT0iNDQuMyIgd2lkdGg9IjM5LjUiIGhlaWdodD0iMzkuNCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0LjUgOTApIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy01OSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTExNiIgeD0iNTYuMiIgeT0iODMuMiIgd2lkdGg9IjM1LjMiIGhlaWdodD0iMzUuMyIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTQ4LjQgNzQuOCkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTUyIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTE0IiB4PSIyMzUuMiIgeT0iMTQ0LjUiIHdpZHRoPSIxOS41IiBoZWlnaHQ9IjE5LjUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC00MC41IDIwMi4zKSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtNTAiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMDAiIHg9IjIwMi41IiB5PSIxMjIuNiIgd2lkdGg9IjI0LjEiIGhlaWdodD0iMjQuMSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTM1LjIgMTc3LjEpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy01MyI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTExNyIgeD0iMTY4LjUiIHk9IjEwNiIgd2lkdGg9IjI2LjciIGhlaWdodD0iMjYuNiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTMzLjMgMTUxLjQpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy01MSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEwNSIgeD0iMTMxLjIiIHk9IjkyLjUiIHdpZHRoPSIzMi4zIiBoZWlnaHQ9IjMyLjIiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0zNC45IDEyNS43KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtNDYiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMDMiIHg9IjkzLjQiIHk9Ijg1LjQiIHdpZHRoPSIzNC42IiBoZWlnaHQ9IjM0LjUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC00MC4yIDk5LjgpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy00MCI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEwMiIgeD0iMTgwLjIiIHk9IjE1My43IiB3aWR0aD0iMTciIGhlaWdodD0iMTciIHRyYW5zZm9ybT0idHJhbnNsYXRlKC02MC4xIDE2Ni45KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtNDEiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMDQiIHg9IjI2Mi44IiB5PSIxMjAuNiIgd2lkdGg9IjE4LjgiIGhlaWdodD0iMTguOCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE3LjQgMjE0LjMpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy00MiI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTExMSIgeD0iMjYzLjYiIHk9IjE2OS44IiB3aWR0aD0iMTcuMiIgaGVpZ2h0PSIxNy4yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNDkuNyAyMjYuNikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTQzIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTEwIiB4PSIyNDkuMiIgeT0iMzI2LjMiIHdpZHRoPSIyNy41IiBoZWlnaHQ9IjI4LjgiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNjAuMSAyNjEuNykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTQ0Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTEyIiB4PSIxOTEuMyIgeT0iMzMxLjYiIHdpZHRoPSIzNi4xIiBoZWlnaHQ9IjM3LjQiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xODAuMSAyMjguNSkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTQ3Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTE4IiB4PSI5Ni43IiB5PSIzMjUuOCIgd2lkdGg9IjYiIGhlaWdodD0iNiIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE5My43IDE0OS45KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtNDgiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMTMiIHg9IjkxLjEiIHk9IjMzNC45IiB3aWR0aD0iMTcuMiIgaGVpZ2h0PSIxOC42IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMjAzLjkgMTUzLjkpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy00OSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTExOSIgeD0iMTM2LjciIHk9IjMyNS44IiB3aWR0aD0iNiIgaGVpZ2h0PSI2IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTgzLjUgMTc2LjYpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy00NSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTgxIiB4PSIxMzEiIHk9IjMzNC43IiB3aWR0aD0iMTcuNCIgaGVpZ2h0PSIxOC45IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTkzLjcgMTgwLjUpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy02NyI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTgyIiB4PSI0MjIuNCIgeT0iMzI1LjciIHdpZHRoPSI1LjciIGhlaWdodD0iNS43IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTEwLjggMzY2LjcpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy02MSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTgzIiB4PSI0MTYuNSIgeT0iMzM0LjciIHdpZHRoPSIxNy40IiBoZWlnaHQ9IjE4LjkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xMjEuMSAzNzAuNikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTYyIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtODAiIHg9IjMyNi42IiB5PSIzMjkuMSIgd2lkdGg9IjI5LjkiIGhlaWdodD0iMjkuOSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0Mi40IDMxNC45KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtNjMiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy04OCIgeD0iMjk3LjMiIHk9IjMyMyIgd2lkdGg9IjM0LjgiIGhlaWdodD0iMzUuNCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE0NyAyOTYuMikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTY0Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtODYiIHg9IjQ1NC4xIiB5PSIzMjkuMSIgd2lkdGg9IjMwIiBoZWlnaHQ9IjMwLjEiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xMTAgMzk5LjkpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy02NSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTg5IiB4PSIzNTIuNCIgeT0iMzI5LjciIHdpZHRoPSIyOC41IiBoZWlnaHQ9IjI4LjciIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xMzYgMzMxLjYpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy02OCI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTg3IiB4PSIxNDEuOSIgeT0iMzI5LjQiIHdpZHRoPSIyOC4xIiBoZWlnaHQ9IjI4LjUiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xODkuMyAxOTEuMikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTY5Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtODUiIHg9IjUyLjEiIHk9IjMxOS41IiB3aWR0aD0iNDIuNyIgaGVpZ2h0PSI0Mi40IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMjA4LjMgMTM1LjUpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy03MCI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTg0IiB4PSIyNzUuMSIgeT0iMzIzLjciIHdpZHRoPSIzMy4yIiBoZWlnaHQ9IjMzLjkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNTIuOCAyODAuOCkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTY2Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTI3IiB4PSIxNjAuMSIgeT0iMzI2LjciIHdpZHRoPSIyNi45IiBoZWlnaHQ9IjI4LjMiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xODIuOSAyMDIuMikgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTMwIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTI4IiB4PSIxNzguMyIgeT0iMzMyLjEiIHdpZHRoPSIyMy4xIiBoZWlnaHQ9IjIzLjkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xODAuOSAyMTMuOSkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTM3Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTI5IiB4PSI0MjguNSIgeT0iMzI5LjEiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTExNi41IDM4Mi44KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMzIiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMjMiIHg9IjM3NC40IiB5PSIzMjguNyIgd2lkdGg9IjMwLjgiIGhlaWdodD0iMzAuOCIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTEzMC4xIDM0Nykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTM2Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTI0IiB4PSIzOTkuMyIgeT0iMzI2LjciIHdpZHRoPSIyNi45IiBoZWlnaHQ9IjI4LjMiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xMjIuMiAzNjEuNSkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTM0Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTI1IiB4PSIyMjcuNyIgeT0iMzI5IiB3aWR0aD0iMzAuMSIgaGVpZ2h0PSIzMC4xIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTY3LjUgMjQ5LjEpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy0zMSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEyNiIgeD0iMTA0LjUiIHk9IjMyOS4xIiB3aWR0aD0iMzAiIGhlaWdodD0iMzAuMSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTE5OC44IDE2Nykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTM1Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTIwIiB4PSIzNTEuOSIgeT0iMjQwLjEiIHdpZHRoPSIxMC4yIiBoZWlnaHQ9IjEwLjIiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03Mi42IDMwMC4xKSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMzMiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMjEiIHg9IjQwNi44IiB5PSIyNTcuMSIgd2lkdGg9IjM4LjciIGhlaWdodD0iNDEiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03Ni42IDM1NC40KSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMzgiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMjIiIHg9IjM5NS42IiB5PSIyNDQuOCIgd2lkdGg9IjMzIiBoZWlnaHQ9IjM1LjkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03MC4zIDM0MS4zKSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMzkiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMzciIHg9IjM3Mi4xIiB5PSIyNTcuMSIgd2lkdGg9IjM4LjciIGhlaWdodD0iNDEiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC04NS40IDMzMS4yKSByb3RhdGUoLTQxLjgpIi8+CiAgICAgICAgPC9nPgogICAgICAgIDxnIGNsYXNzPSJjbHMtMjQiPgogICAgICAgICAgPHJlY3QgY2xhc3M9ImNscy0xMzgiIHg9IjMzNy42IiB5PSIyNDcuNSIgd2lkdGg9IjQ2LjMiIGhlaWdodD0iNDUuNSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTg4LjMgMzA4LjkpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy0yMSI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEzOSIgeD0iMjYyLjkiIHk9IjI0MC4xIiB3aWR0aD0iMTAuMiIgaGVpZ2h0PSIxMC4yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtOTUuMiAyNDAuOCkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTI2Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTMzIiB4PSIxMDAuNiIgeT0iMjg5LjgiIHdpZHRoPSIxMC4yIiBoZWlnaHQ9IjEwLjIiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0xNjkuNiAxNDUuMykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTI5Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTM0IiB4PSIxMTEiIHk9IjI4OS44IiB3aWR0aD0iMTAuMiIgaGVpZ2h0PSIxMC4yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTY2LjkgMTUyLjIpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy0yNyI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEzNSIgeD0iMjczLjMiIHk9IjI0MC4xIiB3aWR0aD0iMTAuMiIgaGVpZ2h0PSIxMC4yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtOTIuNiAyNDcuNykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTI1Ij4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTM2IiB4PSIzNjIuMyIgeT0iMjQwLjEiIHdpZHRoPSIxMC4yIiBoZWlnaHQ9IjEwLjIiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC03MCAzMDcpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy0yOCI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEzMCIgeD0iNDI0LjkiIHk9IjI0MC4xIiB3aWR0aD0iMTAuMiIgaGVpZ2h0PSIxMC4yIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNTQuMSAzNDguNykgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTIyIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTMxIiB4PSI3MC4xIiB5PSIxNjcuMSIgd2lkdGg9IjIxOS45IiBoZWlnaHQ9IjIwNC44IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMTMzLjggMTg4LjQpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgY2xhc3M9ImNscy0yMyI+CiAgICAgICAgICA8cmVjdCBjbGFzcz0iY2xzLTEzMiIgeD0iNDMyLjciIHk9IjI0OS4zIiB3aWR0aD0iNTYuMSIgaGVpZ2h0PSI1Ni41IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNjcuOCAzNzcuNCkgcm90YXRlKC00MS44KSIvPgogICAgICAgIDwvZz4KICAgICAgICA8ZyBjbGFzcz0iY2xzLTYwIj4KICAgICAgICAgIDxyZWN0IGNsYXNzPSJjbHMtMTQwIiB4PSIyOTkuMiIgeT0iMjQ0LjgiIHdpZHRoPSIzMyIgaGVpZ2h0PSIzNS45IiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtOTQuOCAyNzcpIHJvdGF0ZSgtNDEuOCkiLz4KICAgICAgICA8L2c+CiAgICAgIDwvZz4KICAgIDwvZz4KICA8L2c+Cjwvc3ZnPg==";
+const ADMIN_USER = "admin";
+// لا تُخزَّن كلمة المرور نصاً؛ الهاش يُستخدم فقط كاحتياط عند تعذر الاتصال بالخادم أو إن كان الخادم قديماً.
+const ADMIN_PASS_HASH = "c4d540fde6b9ea2fc77307195da7b65ec1d76a236b46dbe5198586bfd8f7bcd7";
+let STORAGE_KEY = "zahra_store_v1";
+const SESSION_KEY = "zahra_session_v1";
+
+/* ---------- state ---------- */
+let store = loadStore();
+let session = loadSession();
+let route = { name: session ? "dashboard" : "login" };
+let dashboardQuery = '';
+let pendingClassForScan = null; // used for ?class= deep link
+
+function loadStore(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(!Array.isArray(parsed.teacherNames)) parsed.teacherNames = [];
+      if(!Array.isArray(parsed.guardians)) parsed.guardians = [];
+      return parsed;
+    }
+  }catch(e){}
+  return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[] };
+}
+function saveStore(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  if(db && activeSchoolId && session && session.approved){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').set({store,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.error('Cloud save failed',e)),450);
+  }
+}
+function loadSession(){
+  try{ const raw = sessionStorage.getItem(SESSION_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+  return null;
+}
+function saveSession(){ sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); }
+function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function nowTimeStr(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function normalizeNameClient(name){
+  return String(name==null?'':name).replace(/[\u064B-\u0652\u0670\u0640]/g,'').replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g,'').replace(/[\u00A0]/g,' ').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/\s+/g,' ').trim();
+}
+function guardianForStudent(student){
+  const key=normalizeNameClient(student&&student.name);
+  return (store.guardians||[]).find(g=>g.id===key) || null;
+}
+function normalizePhoneClient(phone){
+  let s=String(phone==null?'':phone).replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\D/g,'');
+  if(s.indexOf('00966')===0) s=s.slice(2);
+  if(/^05\d{8}$/.test(s)) s='966'+s.slice(1);
+  else if(/^5\d{8}$/.test(s)) s='966'+s;
+  return s;
+}
+function guardianPhoneForStudent(student){ return (guardianForStudent(student)||{}).phone || student.guardianPhone || ''; }
+
+
+function playAttendanceBell(absentCount){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(AC){ const ctx=new AC(); const now=ctx.currentTime;
+      [0,0.16].forEach((d,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=i?880:660;g.gain.setValueAtTime(.0001,now+d);g.gain.exponentialRampToValueAtTime(.16,now+d+.02);g.gain.exponentialRampToValueAtTime(.0001,now+d+.13);o.connect(g);g.connect(ctx.destination);o.start(now+d);o.stop(now+d+.15);});
+    }
+  }catch(e){}
+  const bell=document.getElementById('notificationBell');
+  const count=document.getElementById('bellCount');
+  if(bell){bell.classList.remove('ring'); void bell.offsetWidth; bell.classList.add('ring');}
+  if(count) count.textContent=String(Math.max(0,absentCount||0));
+}
+function notificationTodayList(){
+  const today=todayStr(), map=new Map();
+  (store.attendance||[]).filter(a=>String(a.date)===today).forEach(a=>{
+    const key=String(a.classId||a.className||''); if(!key)return;
+    const cls=store.classes.find(c=>String(c.id)===String(a.classId)), old=map.get(key);
+    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?.name||a.className||a.classId,time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>r.status==='غائب'||r.status==='absent').length});
+  });
+  return [...map.values()].sort((a,b)=>String(b.time).localeCompare(String(a.time)));
+}
+function refreshNotificationBell(){const c=document.getElementById('bellCount');if(c)c.textContent=String(notificationTodayList().length);}
+function bindNotificationBell(){
+  const b=document.getElementById('notificationBell'); if(!b)return; refreshNotificationBell();
+  b.onclick=()=>{
+    let panel=document.getElementById('notificationPanel');
+    if(!panel){panel=document.createElement('div');panel.id='notificationPanel';panel.style.cssText='position:fixed;top:72px;right:18px;width:min(360px,calc(100vw - 36px));max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(16,42,67,.18);z-index:1000;padding:12px;direction:rtl';document.body.appendChild(panel);}
+    const list=notificationTodayList();
+    panel.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 4px 10px;border-bottom:1px solid var(--line)"><b>تنبيهات اليوم</b><button id="closeNotificationPanel" class="icon-btn">✕</button></div>`+(list.length?list.map(x=>`<button data-notify-class="${esc(x.classId||'')}" style="display:block;width:100%;text-align:right;border:0;border-bottom:1px solid var(--line);background:#fff;padding:12px 6px;cursor:pointer"><b>${esc(x.className)}</b><div style="font-size:.78rem;color:#607d8b;margin-top:4px">${esc(x.time||'')} ${x.teacher?'— '+esc(x.teacher):''} — غائبات: ${x.absent}</div></button>`).join(''):'<div style="padding:22px 8px;text-align:center;color:#8299a6">لا يوجد رصد اليوم</div>');
+    panel.querySelector('#closeNotificationPanel').onclick=()=>panel.remove();
+    panel.querySelectorAll('[data-notify-class]').forEach(el=>el.onclick=()=>{panel.remove();navigate('scan',{classId:el.dataset.notifyClass});});
+  };
+}
+
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.className='toast', 2600);
+}
+
+/* ---------- clock ---------- */
+function tickClock(){
+  const now = new Date();
+  const time = now.toLocaleTimeString('ar-SA-u-nu-latn', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
+  let hijri = '—', greg = '—';
+  try{
+    hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now) + ' هـ';
+  }catch(e){}
+  try{
+    greg = new Intl.DateTimeFormat('ar-SA-u-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now) + ' م';
+  }catch(e){}
+  document.getElementById('clockTime').textContent = time;
+  document.getElementById('clockHijri').textContent = hijri;
+  document.getElementById('clockGregorian').textContent = greg;
+}
+setInterval(tickClock, 1000); tickClock();
+if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)return;try{const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();if(!p||p.status!=='approved'){await auth.signOut();session=null;render();return;}activeSchoolId=p.schoolId;STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();await pullFromServer(true);startAutoSync();render();}catch(e){console.error(e);}});}
+
+
+/* ==========================================================================
+   المزامنة مع Google Sheets
+   ========================================================================== */
+let syncTimer = null;
+let guardianImportBusy = false;
+async function pushToServer(){ return {ok:false,offline:true}; }
+async function pullFromServer(silent){
+ if(!db || !activeSchoolId) return false;
+ try{const snap=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get(); if(snap.exists && snap.data().store){store=snap.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); if(!silent)render();return true;}}catch(e){console.error('Cloud load failed',e);} return false;
+}
+let syncListenersBound = false;
+function startAutoSync(){
+  if(syncTimer) clearInterval(syncTimer);
+  if(!db || !activeSchoolId) return;
+  pullFromServer(true);
+  syncTimer = setInterval(()=>pullFromServer(true), 4000);
+  if(!syncListenersBound){
+    syncListenersBound = true;
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pullFromServer(true); });
+    window.addEventListener('focus', ()=> pullFromServer(true));
+  }
+}
+
+/* ==========================================================================
+   المصادقة
+   ========================================================================== */
+async function sha256Hex(s){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(s)));
+  return Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+// التحقق يتم على الخادم. إن رفض الخادم صراحةً (error:'invalid') نرفض؛ وإن تعذر الوصول إليه أو كان إصداراً قديماً نستخدم الاحتياط المحلي.
+async function doLoginAdmin(){ return false; }
+async function verifyAdminPassword(){ return false; }
+async function doLoginStaff(){ return false; }
+function logout(){
+  session = null; sessionStorage.removeItem(SESSION_KEY);
+  if(auth) auth.signOut(); activeSchoolId=null;
+  navigate('login');
+}
+
+/* ==========================================================================
+   التنقل
+   ========================================================================== */
+function navigate(name, params){
+  route = Object.assign({name}, params||{});
+  render();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ==========================================================================
+   الحسابات المساعدة
+   ========================================================================== */
+function studentUniqueKey(st){
+  const cls=String(st.classId||'');
+  const name=normalizeNameClient(st.name||'');
+  return cls+'|'+(name || String(st.id||''));
+}
+function dedupeStudents(list){
+  const seen=new Set(); const out=[];
+  (list||[]).forEach(st=>{
+    const key=studentUniqueKey(st);
+    if(seen.has(key)) return;
+    seen.add(key); out.push(st);
+  });
+  return out;
+}
+function studentsOfClass(classId){ return dedupeStudents(store.students.filter(s=>s.classId===classId)); }
+function attendanceOf(classId, date){ return store.attendance.find(a=>a.classId===classId && a.date===(date||todayStr())); }
+function classStats(cls){
+  const total = studentsOfClass(cls.id).length;
+  const att = attendanceOf(cls.id);
+  const marked = att ? att.records.length : 0;
+  const absent = att ? att.records.filter(r=>r.status==='غائب').length : 0;
+  const present = marked - absent;
+  const pct = total ? Math.round((present/total)*100) : 0;
+  return { total, marked, absent, present, pct };
+}
+function visibleClasses(){
+  if(!session) return [];
+  if(session.type==='admin') return store.classes;
+  return store.classes.filter(c=> (session.classes||[]).includes(c.id));
+}
+
+/* ==========================================================================
+   العرض الرئيسي
+   ========================================================================== */
+function render(){
+  const active = document.activeElement;
+  let focusInfo = null;
+  if(active && active.id && (active.tagName==='INPUT' || active.tagName==='TEXTAREA')){
+    focusInfo = { id: active.id, selStart: active.selectionStart, selEnd: active.selectionEnd };
+  }
+  renderTopnav();
+  const app = document.getElementById('app');
+  if(route.name==='scanDeep'){ app.innerHTML = viewScan(route.classId); bindScan(); }
+  else if(!session){ app.innerHTML = viewLogin(); bindLogin(); }
+  else{
+    switch(route.name){
+      case 'dashboard': app.innerHTML = viewDashboard(); bindDashboard(); break;
+      case 'scan': app.innerHTML = viewScan(route.classId); bindScan(); break;
+      case 'qr': app.innerHTML = viewQR(); bindQR(); break;
+      case 'staff': app.innerHTML = viewStaff(); bindStaff(); break;
+      case 'guardians': app.innerHTML = viewGuardians(); bindGuardians(); break;
+      case 'absenceReport': app.innerHTML = viewAbsenceReport(); bindAbsenceReport(); break;
+      default: app.innerHTML = viewDashboard(); bindDashboard();
+    }
+  }
+  if(focusInfo){
+    const el = document.getElementById(focusInfo.id);
+    if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
+      el.focus();
+      try{ el.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); }catch(e){}
+    }
+  }
+}
+function renderTopnav(){
+  const nav = document.getElementById('topnav');
+  if(!session){ nav.innerHTML=''; return; }
+  let links = `<a class="nav-btn ${route.name==='dashboard'?'active':''}" data-nav="dashboard">لوحة التحكم</a>`;
+  links += `<button class="notification-bell no-print" id="notificationBell" title="تنبيهات الرصد" aria-label="تنبيهات الرصد">🔔<span class="bell-count" id="bellCount">0</span></button>`;
+  links += `<a class="nav-btn ${route.name==='qr'?'active':''}" data-nav="qr">أكواد QR</a>`;
+  if(session.type==='admin'){
+    links += `<a class="nav-btn ${route.name==='staff'?'active':''}" data-nav="staff">الإداريات</a>`;
+    links += `<a class="nav-btn ${route.name==='guardians'?'active':''}" data-nav="guardians">أولياء الأمور</a>`;
+    links += `<a class="nav-btn ${route.name==='absenceReport'?'active':''}" data-nav="absenceReport">تقرير الغياب</a>`;
+  }
+  nav.innerHTML = `
+    ${links}
+    <div class="user-chip"><span class="dot"></span> ${esc(session.name)}</div>
+    <button class="nav-btn logout-btn" id="logoutBtn">خروج</button>
+  `;
+  nav.querySelectorAll('[data-nav]').forEach(el=> el.onclick = ()=> navigate(el.dataset.nav));
+  document.getElementById('logoutBtn').onclick = logout;
+  bindNotificationBell();
+}
+
+/* ==========================================================================
+   شاشة الدخول
+   ========================================================================== */
+function viewLogin(){
+  return `<div class="login-wrap"><div class="login-card"><div class="brand-mark">ر</div><h2>منصة راصد لرصد الغياب</h2><p class="sub">إدارة المدارس بحساب معتمد</p>
+  <div class="login-tabs"><button id="loginTab" class="active">تسجيل الدخول</button><button id="registerTab">تسجيل مدرسة جديدة</button></div>
+  <div class="login-error" id="loginErr"></div><form id="loginForm">
+   <div class="field" id="schoolField" style="display:none"><label>اسم المدرسة</label><input id="schoolName" autocomplete="organization"></div>
+   <div class="field"><label>البريد الإلكتروني</label><input id="lUser" type="email" required autocomplete="email"></div>
+   <div class="field"><label>كلمة المرور</label><input id="lPass" type="password" required minlength="6" autocomplete="current-password"></div>
+   <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">تسجيل الدخول</button>
+  </form><p style="margin-top:16px;color:#607d8b;font-size:.78rem">يُفعّل حساب المدرسة بعد مراجعة واعتماد الإدارة.</p></div></div>`;
+}
+function bindLogin(){
+ let registering=false; const loginTab=document.getElementById('loginTab'), registerTab=document.getElementById('registerTab');
+ const setMode=value=>{registering=value;loginTab.classList.toggle('active',!value);registerTab.classList.toggle('active',value);document.getElementById('schoolField').style.display=value?'block':'none';document.getElementById('schoolName').required=value;document.querySelector('#loginForm button[type=submit]').textContent=value?'إرسال طلب التسجيل':'تسجيل الدخول';document.getElementById('loginErr').textContent='';};
+ loginTab.onclick=()=>setMode(false); registerTab.onclick=()=>setMode(true);
+ document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault(); const email=document.getElementById('lUser').value.trim().toLowerCase(), password=document.getElementById('lPass').value, btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='جارٍ التحقق…';
+  try{
+   if(!firebaseReady) throw new Error('أكمل إعداد Firebase أولاً بملف firebase-config.js.');
+   if(registering){
+    const schoolName=document.getElementById('schoolName').value.trim(); if(!schoolName) throw new Error('اكتب اسم المدرسة.');
+    pendingRegistration=true; const cred=await auth.createUserWithEmailAndPassword(email,password); const uid=cred.user.uid;
+    await db.collection('users').doc(uid).set({email,schoolName,schoolId:uid,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await auth.signOut(); pendingRegistration=false; document.getElementById('loginErr').textContent='تم إرسال الطلب. سيعمل الحساب بعد اعتماد المدرسة.';
+   } else {
+    const cred=await auth.signInWithEmailAndPassword(email,password); const snap=await db.collection('users').doc(cred.user.uid).get(); const profile=snap.data();
+    if(!profile || profile.status!=='approved' || !profile.schoolId){await auth.signOut();throw new Error('طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.');}
+    activeSchoolId=profile.schoolId; STORAGE_KEY='zahra_store_v1_'+activeSchoolId; store=loadStore(); SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
+    const data=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get();
+    if(data.exists && data.data().store){store=data.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}
+    else {store={classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[]};saveStore();}
+    startAutoSync(); navigate('dashboard');
+   }
+  }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/email-already-in-use'?'هذا البريد مسجل مسبقًا.':err.code==='auth/invalid-credential'?'البريد أو كلمة المرور غير صحيحة.':err.code==='auth/weak-password'?'كلمة المرور يجب أن تكون 6 أحرف على الأقل.':(err.message||'تعذر إتمام الطلب.');}
+  finally{btn.disabled=false;btn.textContent=registering?'إرسال طلب التسجيل':'تسجيل الدخول';}
+ };
+}
+
+/* ==========================================================================
+   لوحة التحكم
+   ========================================================================== */
+function classCardHtml(c){
+  const s = classStats(c);
+  return `
+  <div class="class-card">
+    <div class="cc-top"></div>
+    <div class="cc-body">
+      <div class="cc-head">
+        <h3>${esc(c.name)}</h3>
+        ${session.type==='admin' ? `
+        <div class="cc-menu">
+          <button class="cc-menu-btn" data-menu="${c.id}">⋮</button>
+          <div class="cc-menu-list" id="menu-${c.id}">
+            <button data-edit-class="${c.id}">تعديل الفصل</button>
+            <button data-manage-students="${c.id}">إدارة الطالبات</button>
+            <button data-del-class="${c.id}">حذف الفصل</button>
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${s.pct}%"></div></div>
+      <div class="cc-nums"><span>نسبة الحضور <b>${s.pct}%</b></span><span>مرصود <b>${s.marked}/${s.total}</b></span></div>
+      <div class="cc-nums"><span>غياب اليوم <b style="color:var(--danger)">${s.absent}</b></span></div>
+      <div class="cc-actions">
+        <button class="primary" data-goto-scan="${c.id}">📋<span>رصد</span></button>
+        <button data-view-absent="${c.id}">🚫<span>الغائبات</span></button>
+        <button data-goto-qr="${c.id}">🔗<span>QR</span></button>
+        <button data-export-xlsx="${c.id}">📊<span>Excel</span></button>
+        <button data-export-pdf="${c.id}">📄<span>PDF</span></button>
+        ${session.type==='admin' ? `<button data-report-class="${c.id}">📱<span>تقرير الفصل</span></button>` : ''}
+        ${session.type==='admin' ? `<button data-del-today="${c.id}">↺<span>حذف اليوم</span></button>` : `<span></span>`}
+      </div>
+    </div>
+  </div>`;
+}
+function filteredDashboardClasses(){
+  const q = (dashboardQuery||'').trim();
+  const classes = visibleClasses();
+  if(!q) return classes;
+  return classes.filter(c=>{
+    if(c.name.includes(q) || String(c.number||'').includes(q)) return true;
+    return studentsOfClass(c.id).some(s=> s.name.includes(q) || String(s.number||'').includes(q));
+  });
+}
+function viewDashboard(){
+  const allClasses = visibleClasses();
+  const classes = filteredDashboardClasses();
+  const totalClasses = allClasses.length;
+  const totalStudents = allClasses.reduce((a,c)=>a+studentsOfClass(c.id).length,0);
+  let markedToday=0, absentToday=0;
+  allClasses.forEach(c=>{ const s=classStats(c); markedToday+=s.marked; absentToday+=s.absent; });
+
+  const cards = classes.map(classCardHtml).join('');
+
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>لوحة التحكم</h2><p>${esc(SCHOOL_NAME)}</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" id="refreshNowBtn">↻ تحديث الآن</button>
+        ${session.type==='admin' ? `<button class="btn btn-gold" id="addClassBtn">+ إضافة فصل</button>` : ''}
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card navy"><div class="num">${totalClasses}</div><div class="lbl">عدد الفصول</div></div>
+      <div class="stat-card"><div class="num">${totalStudents}</div><div class="lbl">عدد الطالبات الكلي</div></div>
+      <div class="stat-card gold"><div class="num">${markedToday}</div><div class="lbl">المرصودات اليوم</div></div>
+      <div class="stat-card danger"><div class="num">${absentToday}</div><div class="lbl">الغياب اليوم</div></div>
+    </div>
+    <input class="searchbox" id="dashSearch" style="margin-bottom:16px; width:100%;" placeholder="🔍 ابحثي باسم الطالبة أو باسم/رقم الفصل..." value="${esc(dashboardQuery)}">
+    <div class="classes-grid" id="classesGrid">
+      ${cards || `<div class="empty" style="grid-column:1/-1"><b>${dashboardQuery? 'لا توجد نتائج مطابقة':'لا توجد فصول بعد'}</b>${dashboardQuery? 'جربي كلمة بحث أخرى' : (session.type==='admin' ? 'اضغطي "إضافة فصل" للبدء' : 'لم يتم إسناد فصول لك بعد')}</div>`}
+    </div>
+  </div>
+  <div id="modalHost"></div>`;
+}
+
+function bindDashboard(){
+  bindClassCardEvents();
+  document.getElementById('addClassBtn') && (document.getElementById('addClassBtn').onclick = ()=> openClassModal());
+  const refreshBtn = document.getElementById('refreshNowBtn');
+  if(refreshBtn){
+    refreshBtn.onclick = async ()=>{
+      refreshBtn.disabled = true; refreshBtn.textContent = '... جارٍ التحديث';
+      const ok = await pullFromServer(false);
+      if(ok===false) toast('تعذّر الاتصال بالخادم للمزامنة', true);
+      else toast('تم تحديث البيانات');
+    };
+  }
+  const dashSearch = document.getElementById('dashSearch');
+  if(dashSearch){
+    dashSearch.oninput = (e)=>{
+      dashboardQuery = e.target.value;
+      const classes = filteredDashboardClasses();
+      const cards = classes.map(classCardHtml).join('');
+      document.getElementById('classesGrid').innerHTML = cards || `<div class="empty" style="grid-column:1/-1"><b>${dashboardQuery? 'لا توجد نتائج مطابقة':'لا توجد فصول بعد'}</b>${dashboardQuery? 'جربي كلمة بحث أخرى' : ''}</div>`;
+      bindClassCardEvents();
+    };
+  }
+}
+
+function bindClassCardEvents(){
+  document.querySelectorAll('[data-menu]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      document.querySelectorAll('.cc-menu-list').forEach(m=>{ if(m.id!=='menu-'+btn.dataset.menu) m.classList.remove('open'); });
+      document.getElementById('menu-'+btn.dataset.menu).classList.toggle('open');
+    };
+  });
+  document.addEventListener('click', ()=> document.querySelectorAll('.cc-menu-list').forEach(m=>m.classList.remove('open')), {once:true});
+
+  document.querySelectorAll('[data-edit-class]').forEach(b=> b.onclick = ()=> openClassModal(store.classes.find(c=>c.id===b.dataset.editClass)));
+  document.querySelectorAll('[data-del-class]').forEach(b=> b.onclick = ()=> deleteClass(b.dataset.delClass));
+  document.querySelectorAll('[data-manage-students]').forEach(b=> b.onclick = ()=> openStudentsModal(b.dataset.manageStudents));
+  document.querySelectorAll('[data-goto-scan]').forEach(b=> b.onclick = ()=> navigate('scan', {classId:b.dataset.gotoScan}));
+  document.querySelectorAll('[data-goto-qr]').forEach(b=> b.onclick = ()=> navigate('qr', {focusClass:b.dataset.gotoQr}));
+  document.querySelectorAll('[data-view-absent]').forEach(b=> b.onclick = ()=> openAbsentModal(b.dataset.viewAbsent));
+  document.querySelectorAll('[data-export-xlsx]').forEach(b=> b.onclick = ()=> exportClassExcel(b.dataset.exportXlsx));
+  document.querySelectorAll('[data-export-pdf]').forEach(b=> b.onclick = ()=> exportClassPDF(b.dataset.exportPdf));
+  document.querySelectorAll('[data-report-class]').forEach(b=> b.onclick = ()=> navigate('absenceReport',{classId:b.dataset.reportClass}));
+  document.querySelectorAll('[data-del-today]').forEach(b=> b.onclick = ()=> deleteTodayAttendance(b.dataset.delToday));
+}
+
+function openAbsentModal(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const att = attendanceOf(classId);
+  const absentees = att ? att.records.filter(r=>r.status==='غائب') : [];
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal">
+      <div class="modal-head"><h3>غائبات فصل ${esc(cls.name)} — ${todayStr()}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        ${absentees.length ? absentees.map(a=>`<div class="list-row"><div class="info"><b>${esc(a.studentName)}</b></div><span style="color:var(--danger); font-weight:700; font-size:.8rem;">غائبة</span></div>`).join('') : `<div class="empty"><b>لا يوجد غياب مسجّل اليوم</b></div>`}
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('cl').onclick = ()=> host.innerHTML='';
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') host.innerHTML=''; };
+}
+
+async function deleteClass(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const count = studentsOfClass(classId).length;
+  const msg = count>0
+    ? `سيتم حذف فصل "${cls?cls.name:''}" مع جميع طالباته (${count}) وسجلات غيابه نهائياً. متابعة؟`
+    : 'تأكيد حذف الفصل؟';
+  if(!confirm(msg)) return;
+  const pass = prompt('لتأكيد الحذف، يرجى إدخال كلمة مرور المشرفة:');
+  if(pass===null) return; // ألغت العملية
+  if(!(await verifyAdminPassword(pass))){ toast('كلمة المرور غير صحيحة — لم يتم حذف الفصل', true); return; }
+  store.classes = store.classes.filter(c=>c.id!==classId);
+  store.students = store.students.filter(s=>s.classId!==classId);
+  store.attendance = store.attendance.filter(a=>a.classId!==classId);
+  saveStore(); render();
+  await pushToServer('deleteClass', {id:classId});
+  toast('تم حذف الفصل وجميع طالباته');
+}
+async function deleteTodayAttendance(classId){
+  if(!confirm('حذف رصد اليوم لهذا الفصل؟')) return;
+  store.attendance = store.attendance.filter(a=>!(a.classId===classId && a.date===todayStr()));
+  saveStore(); render();
+  await pushToServer('deleteToday', {classId, date:todayStr()});
+  toast('تم حذف رصد اليوم');
+}
+
+/* ---------- إضافة / تعديل فصل ---------- */
+function openClassModal(existing){
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal wide">
+      <div class="modal-head"><h3>${existing? 'تعديل فصل':'إضافة فصل جديد وإدارة الطالبات'}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div class="two-col">
+          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):''}" placeholder="مثال: 1"></div>
+          <div class="field"><label>اسم / رقم الفصل</label><input id="cName" value="${existing? esc(existing.name):''}" placeholder="مثال: أول متوسط / 1"></div>
+        </div>
+        ${existing ? `
+        <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
+        <p style="font-weight:800; color:var(--navy); margin-bottom:10px;">طالبات الفصل (<span id="editStudentCount">0</span>)</p>
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <input class="searchbox" style="margin:0;" id="editSearchS" placeholder="بحث بالاسم أو الرقم...">
+          <button class="btn btn-outline" id="editAddS" style="flex-shrink:0;">+ إضافة طالبة</button>
+        </div>
+        <div id="editStudentsList" style="max-height:280px; overflow:auto;"></div>
+        ` : ''}
+        ${!existing ? `
+        <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
+        <p style="font-weight:800; color:var(--navy); margin-bottom:12px;">إضافة الطالبات إلى الفصل (اختاري إحدى الطرق أو استخدميها معاً):</p>
+
+        <div class="field">
+          <label style="color:#5b7382;">1) إضافة اسم اسم</label>
+          <div style="display:flex; gap:8px;">
+            <input id="singleStudentName" placeholder="اكتبي اسم الطالبة واضغطي إضافة">
+            <button class="btn btn-outline" id="btnAddSingle" style="flex-shrink:0;">إضافة</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="color:#5b7382;">2) السحب والإسقاط (أي صيغة ملف)</label>
+          <div class="dropzone" id="dz">
+            <b>📥 اسحبي ملف الأسماء وأسقطيه هنا</b>
+            أو اضغطي لاختيار ملف من جهازك
+            <input type="file" id="fileInput" style="display:none">
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="color:#5b7382;">3) لصق قائمة أسماء كاملة (اسم واحد في كل سطر)</label>
+          <textarea id="bulkStudentsText" rows="3" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--line); background:var(--bg1); resize:vertical;" placeholder="ألصقي قائمة الأسماء هنا..."></textarea>
+          <button class="btn btn-sm btn-outline" id="btnParseText" style="margin-top:8px;">حفظ الأسماء</button>
+        </div>
+
+        <div style="margin-top:16px;">
+          <p style="font-weight:800; color:var(--navy); margin-bottom:8px;">قائمة الطالبات المضافة (<span id="studentCount">0</span>)</p>
+          <div id="tempStudentList" style="max-height:220px; overflow:auto;"></div>
+        </div>
+        ` : ''}
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="cancel">إلغاء</button>
+        <button class="btn btn-primary" id="save">${existing? 'حفظ' : 'حفظ الفصل والطالبات'}</button>
+      </div>
+    </div>
+  </div>`;
+  let tempStudents = [];
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('cancel').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+
+  if(existing){
+    const drawEditStudents = (filter)=>{
+      let list = studentsOfClass(existing.id).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+      if(filter) list = list.filter(s=> s.name.includes(filter) || String(s.number).includes(filter));
+      document.getElementById('editStudentCount').textContent = studentsOfClass(existing.id).length;
+      document.getElementById('editStudentsList').innerHTML = list.map(s=>`
+        <div class="list-row">
+          <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
+          <div class="row-actions">
+            <button class="icon-btn" data-edit-student-inline="${s.id}">✎</button>
+            <button class="icon-btn del" data-del-student-inline="${s.id}">🗑</button>
+          </div>
+        </div>`).join('') || `<div class="empty"><b>لا توجد طالبات مطابقة</b></div>`;
+      document.querySelectorAll('[data-edit-student-inline]').forEach(b=> b.onclick = ()=> openStudentFormModal(existing.id, store.students.find(s=>s.id===b.dataset.editStudentInline), ()=> drawEditStudents(document.getElementById('editSearchS').value.trim())));
+      document.querySelectorAll('[data-del-student-inline]').forEach(b=> b.onclick = async ()=>{
+        if(!confirm('حذف هذه الطالبة؟')) return;
+        store.students = store.students.filter(s=>s.id!==b.dataset.delStudentInline); saveStore();
+        await pushToServer('deleteStudent', {id:b.dataset.delStudentInline});
+        drawEditStudents(document.getElementById('editSearchS').value.trim());
+        toast('تم حذف الطالبة');
+      });
+    };
+    drawEditStudents();
+    document.getElementById('editSearchS').oninput = (e)=> drawEditStudents(e.target.value.trim());
+    document.getElementById('editAddS').onclick = ()=> openStudentFormModal(existing.id, null, ()=> drawEditStudents(document.getElementById('editSearchS').value.trim()));
+  }
+
+  if(!existing){
+    const renderTemp = ()=>{
+      document.getElementById('studentCount').textContent = tempStudents.length;
+      document.getElementById('tempStudentList').innerHTML = tempStudents.map((name,i)=>`
+        <div class="list-row" style="margin-bottom:6px; padding:9px 12px;">
+          <div class="info"><b style="font-size:.88rem;">${esc(name)}</b></div>
+          <button class="icon-btn del" data-rm="${i}">🗑</button>
+        </div>`).join('') || `<p style="color:#8299a6; font-size:.85rem;">لم تتم إضافة أي طالبة بعد</p>`;
+      document.querySelectorAll('[data-rm]').forEach(b=> b.onclick = ()=>{ tempStudents.splice(Number(b.dataset.rm),1); renderTemp(); });
+    };
+    const addNames = (names)=>{
+      names.forEach(n=>{ if(n && !tempStudents.includes(n)) tempStudents.push(n); });
+      renderTemp();
+    };
+    renderTemp();
+
+    document.getElementById('btnAddSingle').onclick = ()=>{
+      const inp = document.getElementById('singleStudentName');
+      const val = inp.value.trim();
+      if(val){ addNames([val]); inp.value=''; inp.focus(); }
+    };
+    document.getElementById('singleStudentName').addEventListener('keypress', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnAddSingle').click(); }
+    });
+    document.getElementById('btnParseText').onclick = ()=>{
+      const text = document.getElementById('bulkStudentsText').value;
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      addNames(lines);
+      document.getElementById('bulkStudentsText').value='';
+    };
+
+    const dz = document.getElementById('dz');
+    dz.onclick = ()=> document.getElementById('fileInput').click();
+    dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+    dz.addEventListener('drop', e=>{
+      e.preventDefault(); dz.classList.remove('drag');
+      if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    document.getElementById('fileInput').onchange = (e)=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
+
+    function handleFile(file){
+      const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        try{
+          if(isExcel){
+            const wb = XLSX.read(ev.target.result, {type:'binary'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+            const names = rows.filter(r=>r.length && r[0]!=='').map(r=> String(r.length>=2? r[1] : r[0]).trim()).filter(Boolean);
+            addNames(names);
+          }else{
+            const text = ev.target.result;
+            const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+            addNames(lines);
+          }
+          toast(`تم استيراد الأسماء من "${file.name}"`);
+        }catch(err){ toast('تعذّرت قراءة الملف', true); }
+      };
+      if(isExcel) reader.readAsBinaryString(file); else reader.readAsText(file);
+    }
+  }
+
+  document.getElementById('save').onclick = async ()=>{
+    const number = document.getElementById('cNum').value.trim();
+    const name = document.getElementById('cName').value.trim();
+    if(!name){ toast('يرجى إدخال اسم الفصل', true); return; }
+    if(existing){
+      existing.number = number; existing.name = name;
+      saveStore(); await pushToServer('saveClass', existing);
+      toast('تم تحديث الفصل');
+    }else{
+      const classId = uid();
+      const classObj = { id: classId, number: number || name, name };
+      const newStudents = tempStudents.map((n,i)=>({ id: uid(), classId, number: String(i+1), name: n }));
+      store.classes.push(classObj);
+      store.students.push(...newStudents);
+      saveStore();
+      await pushToServer('saveClassWithStudents', { classObj, students: newStudents });
+      toast('تم حفظ الفصل والطالبات بنجاح');
+    }
+    close(); render();
+  };
+}
+
+/* ---------- إدارة الطالبات ---------- */
+function openStudentsModal(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const host = document.getElementById('modalHost');
+  const draw = (filter)=>{
+    let list = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+    if(filter) list = list.filter(s=> s.name.includes(filter) || String(s.number).includes(filter));
+    return list.map(s=>`
+      <div class="list-row">
+        <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
+        <div class="row-actions">
+          <button class="icon-btn" data-edit-student="${s.id}">✎</button>
+          <button class="icon-btn del" data-del-student="${s.id}">🗑</button>
+        </div>
+      </div>`).join('') || `<div class="empty"><b>لا توجد طالبات</b></div>`;
+  };
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal wide">
+      <div class="modal-head"><h3>طالبات فصل ${esc(cls.name)}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div style="display:flex; gap:10px; margin-bottom:14px;">
+          <input class="searchbox" style="margin:0;" id="searchS" placeholder="بحث بالاسم أو الرقم...">
+          <button class="btn btn-primary" id="addS" style="flex-shrink:0;">+ إضافة طالبة</button>
+        </div>
+        <div id="studentsList">${draw()}</div>
+      </div>
+    </div>
+  </div>`;
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+  document.getElementById('searchS').oninput = (e)=>{ document.getElementById('studentsList').innerHTML = draw(e.target.value.trim()); bindStudentRowEvents(); };
+  document.getElementById('addS').onclick = ()=> openStudentFormModal(classId, null, ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); });
+  function bindStudentRowEvents(){
+    document.querySelectorAll('[data-edit-student]').forEach(b=> b.onclick = ()=> openStudentFormModal(classId, store.students.find(s=>s.id===b.dataset.editStudent), ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); }));
+    document.querySelectorAll('[data-del-student]').forEach(b=> b.onclick = async ()=>{
+      if(!confirm('حذف هذه الطالبة؟')) return;
+      store.students = store.students.filter(s=>s.id!==b.dataset.delStudent); saveStore();
+      await pushToServer('deleteStudent', {id:b.dataset.delStudent});
+      document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents();
+      renderTopnav();
+    });
+  }
+  bindStudentRowEvents();
+}
+
+function nextStudentNumber(classId, excludeId){
+  const numbers = studentsOfClass(classId)
+    .filter(s=>s.id!==excludeId)
+    .map(s=>Number(String(s.number||'').trim()))
+    .filter(n=>Number.isSafeInteger(n) && n>0);
+  return String(Math.max(0, ...numbers)+1);
+}
+
+function openStudentFormModal(classId, existing, onDone){
+  const host = document.getElementById('modalHost');
+  const prevHTML = host.innerHTML;
+  const classOptions = store.classes.map(c=>`<option value="${c.id}" ${existing&&existing.classId===c.id?'selected':(c.id===classId?'selected':'')}>${esc(c.name)}</option>`).join('');
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+  <div class="overlay" id="ov2" style="z-index:110;">
+    <div class="modal">
+      <div class="modal-head"><h3>${existing?'تعديل طالبة':'إضافة طالبة'}</h3><button class="modal-close" id="cl2">✕</button></div>
+      <div class="modal-body">
+        <div class="field"><label>الفصل</label><select id="sClass">${classOptions}</select></div>
+        <div class="two-col">
+          <div class="field"><label>رقم الطالبة</label><input id="sNum" value="${existing?esc(existing.number):esc(nextStudentNumber(classId))}" readonly><small style="display:block;color:#8299a6;font-size:.72rem;margin-top:4px;">يُحدد تلقائياً حسب ترتيب الفصل</small></div>
+          <div class="field"><label>الاسم الكامل</label><input id="sName" value="${existing?esc(existing.name):''}"></div>
+        </div>
+        <div class="field"><label>رقم جوال ولي الأمر <span style="color:#8299a6;font-weight:500;">(اختياري)</span></label><input id="sGuardian" inputmode="tel" placeholder="05xxxxxxxx" value="${existing?esc(guardianPhoneForStudent(existing)):''}"></div>
+      </div>
+      <div class="modal-foot"><button class="btn btn-outline" id="cancel2">إلغاء</button><button class="btn btn-primary" id="save2">حفظ</button></div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const close = ()=> document.body.removeChild(wrap);
+  wrap.querySelector('#cl2').onclick = close;
+  wrap.querySelector('#cancel2').onclick = close;
+  wrap.querySelector('#ov2').onclick = (e)=>{ if(e.target.id==='ov2') close(); };
+  wrap.querySelector('#sClass').onchange = ()=>{
+    const selectedClassId = wrap.querySelector('#sClass').value;
+    if(!existing || selectedClassId!==existing.classId){
+      wrap.querySelector('#sNum').value = nextStudentNumber(selectedClassId, existing&&existing.id);
+    }else{
+      wrap.querySelector('#sNum').value = existing.number;
+    }
+  };
+  wrap.querySelector('#save2').onclick = async ()=>{
+    const name = wrap.querySelector('#sName').value.trim();
+    const clsId = wrap.querySelector('#sClass').value;
+    const number = existing && clsId===existing.classId ? existing.number : nextStudentNumber(clsId, existing&&existing.id);
+    const guardianPhone = wrap.querySelector('#sGuardian').value.trim();
+    if(!name){ toast('أدخلي اسم الطالبة', true); return; }
+    if(existing){
+      const oldName = existing.name;
+      const updated = Object.assign({}, existing, {name, number, classId:clsId, guardianPhone, oldName});
+      const result = await pushToServer('saveStudent', updated);
+      if(!result.ok) { toast('تعذر حفظ التعديل في Google Sheets — لم يتم اعتماده محلياً', true); return; }
+      Object.assign(existing, updated); delete existing.oldName; saveStore();
+      toast('تم تحديث بيانات الطالبة ورقم ولي الأمر ومزامنتها');
+    }else{
+      const st = { id: uid(), classId: clsId, number, name, guardianPhone };
+      const result = await pushToServer('saveStudent', st);
+      if(!result.ok) { toast('تعذر حفظ الطالبة في Google Sheets', true); return; }
+      store.students.push(st); saveStore();
+      toast('تمت إضافة الطالبة ورقم ولي الأمر ومزامنتهما');
+    }
+    close(); onDone && onDone(); renderTopnav();
+  };
+}
+
+/* ==========================================================================
+   صفحة الرصد
+   ========================================================================== */
+function viewScan(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  if(!cls){
+    return `<div class="scan-wrap"><div class="empty"><b>لم يتم العثور على هذا الفصل</b>تأكدي من رابط كود QR${session? `<div style="margin-top:14px;"><button class="btn btn-primary" onclick="navigate('dashboard')">العودة للوحة التحكم</button></div>`:''}</div></div>`;
+  }
+  const existing = attendanceOf(cls.id);
+  if(existing && !route.editing){
+    return viewScanConfirm(cls, existing);
+  }
+  const students = studentsOfClass(cls.id).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+  const allTeacherNames = [...new Set([...store.staff.map(s=>s.name), ...(store.teacherNames||[])])].filter(Boolean);
+  const staffOptions = allTeacherNames.map(n=>`<option value="${esc(n)}"></option>`).join('');
+  const defaultTeacher = session && session.type==='staff' ? session.name : (existing? existing.teacher : '');
+  return `
+  <div class="scan-wrap">
+    ${session ? `<button class="btn btn-outline" style="margin-bottom:14px;" onclick="navigate('dashboard')">→ العودة للوحة التحكم</button>` : ''}
+    <div class="scan-head glow">
+      <h2>رصد غياب فصل ${esc(cls.name)}</h2>
+      <p>${esc(SCHOOL_NAME)} — ${todayStr()}</p>
+      <div class="teacher-field" style="display:flex; gap:8px; align-items:stretch;">
+        <input id="teacherSelect" list="teacherNamesList" placeholder="اسم المعلمة (اختياري)" value="${esc(defaultTeacher)}" autocomplete="off" style="flex:1;">
+        <datalist id="teacherNamesList">${staffOptions}</datalist>
+        <button type="button" id="addTeacherNameBtn" title="إضافة اسم معلمة جديد للقائمة" style="flex-shrink:0; width:42px; border-radius:10px; background:rgba(255,255,255,.16); color:#fff; font-weight:800; font-size:1.1rem;">+</button>
+      </div>
+      <p style="font-size:.72rem; color:#cfe0e8; margin-top:6px; position:relative;">اختياري — يمكنك اختيار اسمك من القائمة أو كتابته أو تركه فارغاً</p>
+    </div>
+    ${students.length ? `
+    <div class="field" style="margin:16px 0 0;">
+      <label style="font-weight:800; color:var(--navy);">مسح الباركود / رقم الطالبة</label>
+      <input id="barcodeInput" placeholder="امسحي الباركود هنا أو اكتبي رقم الطالبة واضغطي Enter..." autocomplete="off" style="text-align:center; font-weight:700;">
+    </div>` : ''}
+    <div id="studentsList">
+      ${students.length ? students.map(s=>`
+        <div class="student-item" data-id="${s.id}">
+          <div class="s-info"><div class="s-num">${esc(s.number)}</div><div class="s-name">${esc(s.name)}</div></div>
+          <button class="absent-toggle" data-toggle="${s.id}"></button>
+        </div>`).join('') : `<div class="empty"><b>لا توجد طالبات في هذا الفصل بعد</b></div>`}
+    </div>
+    ${students.length ? `
+    <div class="scan-submit-bar">
+      <button class="btn btn-primary" id="finishScan">✅ إنهاء الرصد</button>
+    </div>` : ''}
+  </div>`;
+}
+
+function viewScanConfirm(cls, att){
+  const absentees = att.records.filter(r=>r.status==='غائب');
+  const present = att.records.length - absentees.length;
+  return `
+  <div class="scan-wrap">
+    ${session ? `<button class="btn btn-outline" style="margin-bottom:14px;" onclick="navigate('dashboard')">→ العودة للوحة التحكم</button>` : ''}
+    <div class="confirm-wrap">
+      <div class="confirm-icon">✔</div>
+      <h2>تم رصد الغياب بنجاح</h2>
+      <p style="color:#5b7382; font-size:.85rem;">فصل ${esc(cls.name)} — رصدتها: ${esc(att.teacher||'—')} — الساعة ${esc(att.time||'')}</p>
+      <div class="confirm-nums">
+        <div class="cn"><b>${present}</b>حاضرة</div>
+        <div class="cn absent"><b>${absentees.length}</b>غائبة</div>
+      </div>
+      ${absentees.length ? `<ul class="absent-names">${absentees.map(a=>`<li>${esc(a.studentName)}</li>`).join('')}</ul>` : `<p style="color:var(--success); font-weight:700;">جميع الطالبات حاضرات 🎉</p>`}
+      <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+        <button class="btn btn-outline" id="editScanBtn">تعديل الرصد</button>
+        ${session ? `<button class="btn btn-primary" onclick="navigate('dashboard')">لوحة التحكم</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+let scanAbsentSet = new Set();
+function toggleStudentAbsent(id){
+  const btn = document.querySelector(`[data-toggle="${id}"]`);
+  if(!btn) return false;
+  const item = btn.closest('.student-item');
+  if(scanAbsentSet.has(id)){ scanAbsentSet.delete(id); btn.classList.remove('on'); item.classList.remove('absent'); }
+  else{ scanAbsentSet.add(id); btn.classList.add('on'); item.classList.add('absent'); }
+  return true;
+}
+function bindScan(){
+  scanAbsentSet = new Set();
+  const list = document.getElementById('studentsList');
+  if(!list) { bindEditBtn(); return; }
+  list.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-toggle]');
+    if(!btn) return;
+    toggleStudentAbsent(btn.dataset.toggle);
+  });
+  const barcodeInput = document.getElementById('barcodeInput');
+  if(barcodeInput){
+    barcodeInput.addEventListener('keypress', (e)=>{
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      const code = barcodeInput.value.trim();
+      barcodeInput.value = '';
+      if(!code) return;
+      const students = studentsOfClass(route.classId);
+      const match = students.find(s => String(s.number) === code || s.id === code);
+      if(match){
+        toggleStudentAbsent(match.id);
+        toast(scanAbsentSet.has(match.id) ? `تم تحديد "${match.name}" غائبة` : `تم تحديد "${match.name}" حاضرة`);
+      }else{
+        toast('لم يتم العثور على طالبة بهذا الرقم', true);
+      }
+    });
+  }
+  const finishBtn = document.getElementById('finishScan');
+  if(finishBtn) finishBtn.onclick = submitScan;
+  const addNameBtn = document.getElementById('addTeacherNameBtn');
+  if(addNameBtn) addNameBtn.onclick = addTeacherNameQuick;
+  bindEditBtn();
+}
+async function addTeacherNameQuick(){
+  const name = (prompt('اكتبي اسم المعلمة لإضافته إلى القائمة:')||'').trim();
+  if(!name) return;
+  if(!store.teacherNames) store.teacherNames = [];
+  if(!store.teacherNames.includes(name)){
+    store.teacherNames.push(name);
+    saveStore();
+    // اسم محلي للقائمة السريعة فقط؛ code.gs الحالي لا يحتاج تخزينه على الخادم.
+  }
+  // نحدّث القائمة المنسدلة وحقل الإدخال مباشرة دون إعادة رسم الصفحة
+  // حتى لا تُفقد حالة الطالبات المحددات كغائبات أثناء الرصد.
+  const list = document.getElementById('teacherNamesList');
+  if(list && !Array.from(list.options).some(o=>o.value===name)){
+    const opt = document.createElement('option'); opt.value = name; list.appendChild(opt);
+  }
+  const input = document.getElementById('teacherSelect');
+  if(input) input.value = name;
+  toast(`تمت إضافة "${name}" إلى قائمة المعلمات`);
+}
+function bindEditBtn(){
+  const editBtn = document.getElementById('editScanBtn');
+  if(editBtn) editBtn.onclick = ()=>{ route.editing = true; render(); };
+}
+async function submitScan(){
+  const classId = route.classId;
+  const teacherSel = document.getElementById('teacherSelect');
+  const teacher = (teacherSel ? teacherSel.value.trim() : '') || 'غير محدد';
+  const students = studentsOfClass(classId);
+  const records = students.map(s=>({ studentId:s.id, studentName:s.name, status: scanAbsentSet.has(s.id)?'غائب':'حاضر' }));
+  const session_ = { id: classId+'|'+todayStr(), classId, date: todayStr(), teacher, time: nowTimeStr(), records };
+  store.attendance = store.attendance.filter(a=>!(a.classId===classId && a.date===todayStr()));
+  store.attendance.push(session_);
+  saveStore();
+  const saveResult = await pushToServer('saveAttendance', session_);
+  const absentCount = records.filter(r=>r.status==='غائب').length;
+  playAttendanceBell(absentCount);
+  if(saveResult.ok) toast('تم حفظ الرصد ومزامنته مع Google Sheets');
+  else { console.warn('saveAttendance failed:', saveResult); toast('تعذر تأكيد مزامنة الرصد مع Google Sheets — لم يُعتبر محفوظاً على الخادم', true); }
+  speakThanks(teacher, absentCount);
+  route.editing = false;
+  render();
+}
+function speakThanks(teacher, absentCount){
+  try{
+    const greeting = (teacher && teacher!=='غير محدد') ? `شكراً لك ${teacher}، ` : 'شكراً لك، ';
+    const msg = absentCount>0
+      ? `${greeting}تم رصد الغياب بنجاح. عدد الغائبات ${absentCount}.`
+      : `${greeting}تم رصد الحضور. جميع الطالبات حاضرات.`;
+    const utter = new SpeechSynthesisUtterance(msg);
+    utter.lang = 'ar-SA';
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  }catch(e){}
+}
+
+/* ==========================================================================
+   صفحة أكواد QR
+   ========================================================================== */
+function viewQR(){
+  const classes = visibleClasses();
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>أكواد QR للفصول</h2><p>كل فصل له رابط رصد مستقل — يُطبع ويُلصق في الفصل</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline" id="printAll">🖨 طباعة الكل</button>
+      </div>
+    </div>
+    <div class="qr-grid" id="qrGrid">
+      ${classes.map(c=>`
+      <div class="qr-card" id="qrcard-${c.id}">
+        <div class="qr-school">${esc(SCHOOL_NAME)}</div>
+        <div class="qr-class">${esc(c.name)}</div>
+        <div class="qr-box" id="qrbox-${c.id}"></div>
+        <div class="qr-hint">امسحي الكود لبدء رصد الغياب</div>
+        <div class="qr-actions">
+          <button class="btn btn-sm btn-outline" data-copy="${c.id}">نسخ الرابط</button>
+          <button class="btn btn-sm btn-outline" data-print="${c.id}">طباعة</button>
+        </div>
+      </div>`).join('') || `<div class="empty" style="grid-column:1/-1"><b>لا توجد فصول</b></div>`}
+    </div>
+  </div>`;
+}
+function classScanUrl(classId){
+  const url = new URL(window.location.href);
+  url.search = '?class=' + encodeURIComponent(classId);
+  url.hash = '';
+  return url.toString();
+}
+function bindQR(){
+  visibleClasses().forEach(c=>{
+    const box = document.getElementById('qrbox-'+c.id);
+    if(box && window.QRCode) new QRCode(box, { text: classScanUrl(c.id), width:150, height:150, colorDark:'#102a43', colorLight:'#ffffff' });
+  });
+  document.querySelectorAll('[data-copy]').forEach(b=> b.onclick = ()=>{
+    navigator.clipboard.writeText(classScanUrl(b.dataset.copy)).then(()=> toast('تم نسخ الرابط')).catch(()=> toast('تعذّر النسخ', true));
+  });
+  document.querySelectorAll('[data-print]').forEach(b=> b.onclick = ()=>{
+    printElement(document.getElementById('qrcard-'+b.dataset.print).outerHTML, 'كود ' + b.dataset.print);
+  });
+  document.getElementById('printAll').onclick = ()=>{
+    printElement(document.getElementById('qrGrid').outerHTML, 'أكواد QR لكل الفصول');
+  };
+}
+function statusRank(s){ s=String(s||''); if(s==='غائبة'||s==='غائب'||s==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s==='present') return 1; return 2; }
+// الغائبات أولاً ثم الحاضرات ثم غير المرصودات (مع الحفاظ على الترتيب الأصلي داخل كل مجموعة)
+function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); return rows.map((r,i)=>[r,i]).sort((a,b)=>statusRank(getStatus(a[0]))-statusRank(getStatus(b[0]))||a[1]-b[1]).map(x=>x[0]); }
+function printElement(html, title){
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Cairo',sans-serif; padding:20px; direction:rtl;}
+    .qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:20px;}
+    .qr-card{border:2px solid #102a43; border-radius:14px; padding:18px; text-align:center; page-break-inside:avoid;}
+    .qr-school{font-size:11px; color:#555;}
+    .qr-class{font-size:18px; font-weight:800; color:#102a43; margin:6px 0 12px;}
+    .qr-box{display:flex; justify-content:center; margin-bottom:10px;}
+    .qr-hint{font-size:11px; color:#0f766e; font-weight:700;}
+    .qr-actions{display:none;}
+  </style></head><body>${html}</body></html>`);
+  w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 400);
+}
+
+/* ==========================================================================\n   أولياء الأمور + تقرير الغياب\n   ========================================================================== */
+function viewGuardians(){
+  const list=(store.guardians||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
+  return `<div class="container">
+    <div class="page-title"><div><h2>أرقام أولياء الأمور</h2><p>الربط يتم باسم الطالبة المطبّع، ولا يتغير QR الفصل.</p></div>
+      <div style="display:flex;gap:8px;"><button class="btn btn-outline" id="importGuardiansBtn">📥 استيراد Excel</button><button class="btn btn-gold" id="addGuardianBtn">+ إضافة رقم</button></div>
+    </div>
+    <div class="field"><input class="searchbox" id="guardianSearch" placeholder="🔍 البحث باسم الطالبة أو رقم ولي الأمر..."></div>
+    <div id="guardiansList">${guardiansRowsHtml(list)}</div>
+  </div><div id="modalHost"></div>`;
+}
+function guardiansRowsHtml(list){
+  return list.length ? list.map(g=>`<div class="list-row" style="padding:14px 16px;"><div class="info"><b>${esc(g.name)}</b><span class="guardian-phone">${esc(g.phone)}</span></div><div class="row-actions"><button class="icon-btn" data-edit-guardian="${esc(g.id)}">✎</button><button class="icon-btn del" data-del-guardian="${esc(g.id)}">🗑</button></div></div>`).join('') : `<div class="empty"><b>لا توجد أرقام أولياء أمور</b><span>يمكنك إضافتها من إدارة الطالبات أو من زر إضافة رقم.</span></div>`;
+}
+function bindGuardians(){
+  document.getElementById('addGuardianBtn').onclick=()=>openGuardianModal();
+  document.getElementById('importGuardiansBtn').onclick=()=>openGuardianImportModal();
+  const refresh=()=>{
+    const q=(document.getElementById('guardianSearch').value||'').trim();
+    const list=(store.guardians||[]).filter(g=>!q || g.name.includes(q) || g.phone.includes(q));
+    document.getElementById('guardiansList').innerHTML=guardiansRowsHtml(list); bindGuardianRows();
+  };
+  document.getElementById('guardianSearch').oninput=refresh;
+  bindGuardianRows();
+}
+function bindGuardianRows(){
+  document.querySelectorAll('[data-edit-guardian]').forEach(b=>b.onclick=()=>openGuardianModal(store.guardians.find(g=>g.id===b.dataset.editGuardian)));
+  document.querySelectorAll('[data-del-guardian]').forEach(b=>b.onclick=async()=>{
+    const g=store.guardians.find(x=>x.id===b.dataset.delGuardian); if(!g) return;
+    if(!confirm(`حذف رقم ولي الأمر للطالبة "${g.name}"؟`)) return;
+    await pushToServer('deleteGuardian',{name:g.name});
+    store.guardians=store.guardians.filter(x=>x.id!==g.id);
+    store.students=store.students.map(s=>Object.assign({},s,{guardianPhone:s.name===g.name?'':s.guardianPhone}));
+    saveStore(); render(); toast('تم حذف رقم ولي الأمر');
+  });
+}
+function openGuardianModal(existing){
+  const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="overlay" id="gov"><div class="modal"><div class="modal-head"><h3>${existing?'تعديل رقم ولي الأمر':'إضافة رقم ولي أمر'}</h3><button class="modal-close" id="gcl">✕</button></div><div class="modal-body">
+    <div class="field"><label>الطالبة</label><input id="gName" list="gStudents" value="${existing?esc(existing.name):''}" placeholder="اكتبي اسم الطالبة"><datalist id="gStudents">${store.students.map(s=>`<option value="${esc(s.name)}">`).join('')}</datalist></div>
+    <div class="field"><label>رقم الجوال</label><input id="gPhone" inputmode="tel" value="${existing?esc(existing.phone):''}" placeholder="05xxxxxxxx"></div>
+    <p style="font-size:.75rem;color:#8299a6;">يتم تطبيع الرقم تلقائياً في الخادم إلى الصيغة السعودية المناسبة.</p>
+  </div><div class="modal-foot"><button class="btn btn-outline" id="gcancel">إلغاء</button><button class="btn btn-primary" id="gsave">حفظ</button></div></div></div>`;
+  const close=()=>host.innerHTML=''; document.getElementById('gcl').onclick=close; document.getElementById('gcancel').onclick=close;
+  document.getElementById('gov').onclick=e=>{if(e.target.id==='gov')close()};
+  document.getElementById('gsave').onclick=async()=>{
+    const name=document.getElementById('gName').value.trim(), phone=document.getElementById('gPhone').value.trim();
+    if(!name||!phone){toast('أدخلي اسم الطالبة ورقم ولي الأمر',true);return;}
+    const result=await pushToServer('saveGuardian',{name,phone});
+    if(!result.ok){toast('تعذر حفظ الرقم على الخادم',true);return;}
+    const id=normalizeNameClient(name), normalized=result.phone||phone;
+    const g={id,name,phone:normalized};
+    store.guardians=(store.guardians||[]).filter(x=>x.id!==id); store.guardians.push(g);
+    store.students=store.students.map(s=>normalizeNameClient(s.name)===id?Object.assign({},s,{guardianPhone:normalized}):s); saveStore();
+    close(); render(); toast('تم حفظ رقم ولي الأمر');
+  };
+}
+function openGuardianImportModal(){
+  const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="overlay" id="iov"><div class="modal wide"><div class="modal-head"><h3>استيراد أرقام أولياء الأمور</h3><button class="modal-close" id="icl">✕</button></div><div class="modal-body">
+  <p style="font-size:.82rem;color:#5b7382;margin-bottom:12px;">يفضل أن يحتوي الملف على عمودين: <b>اسم الطالبة</b> و<b>رقم الجوال</b>.</p>
+  <div class="dropzone" id="gdz"><b>📥 اسحبي ملف Excel هنا</b>أو اضغطي لاختيار الملف<input type="file" id="gfile" accept=".xlsx,.xls,.csv" style="display:none"></div>
+  <div id="gimportPreview" style="margin-top:14px;"></div>
+  </div><div class="modal-foot"><button class="btn btn-outline" id="icancel">إلغاء</button><button class="btn btn-primary" id="gimportSave" disabled>استيراد</button></div></div></div>`;
+  let rows=[]; const close=()=>host.innerHTML=''; document.getElementById('icl').onclick=close; document.getElementById('icancel').onclick=close; document.getElementById('iov').onclick=e=>{if(e.target.id==='iov')close()};
+  const dz=document.getElementById('gdz'), file=document.getElementById('gfile'); dz.onclick=()=>file.click();
+  const read=f=>{const rd=new FileReader(); const excel=/\.(xlsx|xls)$/i.test(f.name); rd.onload=e=>{try{
+    if(excel){
+      const wb=XLSX.read(e.target.result,{type:'binary'}), ws=wb.Sheets[wb.SheetNames[0]], data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const headers=(data[0]||[]).map(x=>String(x).trim());
+      let ni=headers.findIndex(h=>h.includes('اسم الطالبة')||h==='الطالبة'||h.includes('اسم'));
+      let pi=headers.findIndex(h=>h.includes('رقم')||h.includes('جوال')||h.includes('هاتف')||h.includes('ولي'));
+      if(ni<0) ni=0; if(pi<0) pi=1;
+      rows=data.slice(1).map(r=>({name:String(r[ni]??'').trim(),phone:normalizePhoneClient(r[pi])})).filter(x=>x.name&&x.phone);
+    }else{
+      rows=String(e.target.result).split(/\r?\n/).slice(1).map(l=>l.split(/[,;\t]/)).map(r=>({name:String(r[0]||'').trim(),phone:normalizePhoneClient(r[1])})).filter(x=>x.name&&x.phone);
+    }
+    document.getElementById('gimportPreview').innerHTML=`<div class="list-row"><div class="info"><b>جاهز للاستيراد</b><span>${rows.length} سجل</span></div></div>`;
+    document.getElementById('gimportSave').disabled=!rows.length;
+  }catch(err){toast('تعذر قراءة الملف',true)}}; excel?rd.readAsBinaryString(f):rd.readAsText(f)};
+  file.onchange=e=>{if(e.target.files[0])read(e.target.files[0])}; dz.ondragover=e=>{e.preventDefault();dz.classList.add('drag')}; dz.ondragleave=()=>dz.classList.remove('drag'); dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])read(e.dataTransfer.files[0])};
+  document.getElementById('gimportSave').onclick=async()=>{
+    const btn=document.getElementById('gimportSave'); btn.disabled=true;
+    guardianImportBusy = true;
+    // نعرض الأرقام فوراً محلياً، ثم نحاول حفظها على الخادم.
+    const incoming=rows.map(g=>({id:normalizeNameClient(g.name),name:g.name,phone:normalizePhoneClient(g.phone)}));
+    const map={}; (store.guardians||[]).forEach(g=>map[g.id]=g);
+    incoming.forEach(g=>map[g.id]=g);
+    store.guardians=Object.values(map);
+    store.students=store.students.map(st=>{const g=map[normalizeNameClient(st.name)]; return g?Object.assign({},st,{guardianPhone:g.phone}):st;});
+    saveStore(); render();
+    const result=await pushToServer('importGuardians',{guardians:rows});
+    if(!result.ok){ guardianImportBusy=false; toast('تم تحميل الأرقام في الصفحة، لكن تعذر حفظها في Google Sheets. تأكدي من نشر code.gs كنسخة جديدة.',true); btn.disabled=false; return; }
+    guardianImportBusy = false;
+    close(); toast(`تم الاستيراد: ${result.added||0} إضافة، ${result.updated||0} تحديث`);
+  };
+}
+function viewAbsenceReport(){
+  const classes=visibleClasses(); const selected=route.classId||classes[0]?.id||''; const date=route.date||todayStr();
+  return `<div class="container"><div class="page-title"><div><h2>تقارير الحضور والغياب</h2><p>تقارير يومية وأسبوعية وشهرية</p></div><button class="btn btn-outline" id="reportRefresh">↻ تحديث البيانات</button></div>
+  <div class="report-filters"><div class="field"><label>الفصل</label><select id="reportClass">${classes.map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>نوع التقرير</label><select id="reportPeriod"><option value="daily">يومي</option><option value="weekly">أسبوعي</option><option value="monthly">شهري</option></select></div><div class="field"><label>التاريخ المرجعي</label><input id="reportDate" type="date" value="${esc(date)}"></div><button class="btn btn-primary" id="loadReport">عرض التقرير</button><button class="btn btn-outline" id="allClassesReport">🖨 تقرير اليوم لجميع الفصول</button></div>
+  <div id="reportHost"></div></div>`;
+}
+async function fetchReportBootstrap(){
+  try{
+    const res=await fetch(SCRIPT_URL+'?action=bootstrap&_report='+Date.now(),{cache:'no-store'});
+    const data=await res.json();
+    if(data && data.ok){
+      return {
+        classes:Array.isArray(data.classes)?data.classes:[],
+        students:Array.isArray(data.students)?data.students:[],
+        attendance:Array.isArray(data.attendance)?data.attendance:[],
+        guardians:Array.isArray(data.guardians)?data.guardians:[]
+      };
+    }
+  }catch(e){}
+  return null;
+}
+// يزيل عمود واتساب من نسخة الطباعة
+function stripWaColumn(html){ return String(html).replace(/<(th|td) class="wa-col">[\s\S]*?<\/\1>/g,''); }
+function whatsappLink(phone, name, date){
+  const num = normalizePhoneClient(phone);
+  if(!num) return '';
+  const msg = 'السلام عليكم ورحمة الله وبركاته\nولي أمر الطالبة / '+name+'\nنفيدكم بأن ابنتكم غائبة اليوم '+date+' — '+SCHOOL_NAME+'.\nنأمل إفادتنا بسبب الغياب. شاكرين لكم تعاونكم.';
+  return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg);
+}
+function reportPeriodBounds(period, date){
+  const [y,m,d]=date.split('-').map(Number); const selected=new Date(y,m-1,d);
+  if(period==='monthly') return {start:`${y}-${String(m).padStart(2,'0')}-01`,end:`${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`};
+  if(period==='weekly'){
+    const day=selected.getDay(); const from=new Date(y,m-1,d-day); const to=new Date(from); to.setDate(from.getDate()+6);
+    const fmt=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+    return {start:fmt(from),end:fmt(to)};
+  }
+  return {start:date,end:date};
+}
+function reportStatus(att, student){
+  const rec=att?.records?.find(r=>String(r.studentId)===String(student.id)||normalizeNameClient(r.studentName||'')===normalizeNameClient(student.name));
+  if(!rec)return 'لم يُرصد';
+  return (rec.status==='غائب'||rec.status==='absent')?'غائبة':(rec.status==='حاضر'||rec.status==='present')?'حاضرة':String(rec.status||'لم يُرصد');
+}
+async function loadAbsenceReport(){
+  const classId=document.getElementById('reportClass').value, date=document.getElementById('reportDate').value||todayStr(), period=document.getElementById('reportPeriod').value;
+  route.classId=classId;route.date=date;
+  const host=document.getElementById('reportHost'); host.innerHTML='<div class="empty"><b>جارٍ تحميل التقرير...</b></div>';
+  const fresh=await fetchReportBootstrap();
+  if(fresh){
+    store.students=dedupeStudents(fresh.students.map(s=>({id:s.id,classId:s.classId,number:s.number,name:s.name})));
+    store.guardians=fresh.guardians.map(g=>({id:String(g.id||''),name:String(g.name||''),phone:String(g.phone||'')}));
+    const amap={}; fresh.attendance.forEach(r=>{const k=String(r.classId)+'|'+String(r.date); if(!amap[k]) amap[k]={id:k,classId:r.classId,date:r.date,teacher:r.teacher,time:r.time,records:[]}; amap[k].records.push({studentId:r.studentId,studentName:r.studentName,status:r.status});});
+    store.attendance=Object.values(amap); saveStore();
+  }
+  const bounds=reportPeriodBounds(period,date), guardianMap={};
+  (store.guardians||[]).forEach(g=>guardianMap[normalizeNameClient(g.name)]=g.phone);
+  const students=studentsOfClass(classId).slice().sort((a,b)=>(a.number||'').localeCompare(b.number||'','ar',{numeric:true}));
+  const sessions=store.attendance.filter(a=>String(a.classId)===String(classId)&&String(a.date)>=bounds.start&&String(a.date)<=bounds.end).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const dates=period==='daily'?[date]:[...new Set(sessions.map(a=>String(a.date)))];
+  const rows=[];
+  dates.forEach(day=>{
+    const att=sessions.find(a=>String(a.date)===day)||attendanceOf(classId,day);
+    const dayRows=students.map(st=>({date:day,number:st.number||'',name:st.name,phone:guardianMap[normalizeNameClient(st.name)]||guardianPhoneForStudent(st)||'',status:reportStatus(att,st)}));
+    rows.push(...sortAbsentFirst(dayRows));
+  });
+  const absent=rows.filter(r=>statusRank(r.status)===0).length, present=rows.filter(r=>statusRank(r.status)===1).length;
+  const periodLabel=period==='daily'?'يومي':period==='weekly'?'أسبوعي':'شهري';
+  const dateLabel=period==='daily'?date:`${bounds.start} إلى ${bounds.end}`;
+  host.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 14px"><p style="font-size:.85rem;color:#5b7382">${periodLabel} | ${esc(dateLabel)} | الغياب: <b style="color:#dc2626">${absent}</b> | الحضور: <b style="color:#16a34a">${present}</b> | السجلات: <b>${rows.length}</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" id="reportExcel">📊 Excel</button><button class="btn btn-primary btn-sm" id="reportPdf">📄 PDF</button></div></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>#</th>${period==='daily'?'':'<th>التاريخ</th>'}<th>رقم الطالبة</th><th>اسم الطالبة</th><th>رقم ولي الأمر</th><th>الحالة</th><th class="wa-col">إرسال واتساب</th></tr></thead><tbody>${rows.map((r,i)=>{const wa=statusRank(r.status)===0&&r.phone?whatsappLink(r.phone,r.name,r.date):'';return `<tr><td>${i+1}</td>${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td class="guardian-phone">${r.phone?esc(r.phone):'—'}</td><td class="${statusRank(r.status)===0?'status-absent':statusRank(r.status)===1?'status-present':'status-missing'}">${esc(r.status)}</td><td class="wa-col">${wa?`<a href="${wa}" target="_blank" rel="noopener" aria-label="إرسال واتساب لولي أمر ${esc(r.name)}" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:#25d366;color:#fff;font-size:18px;font-weight:800;text-decoration:none" title="إرسال إشعار الغياب عبر واتساب"><svg viewBox="0 0 32 32" width="21" height="21" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16 .5C7.44.5.5 7.43.5 15.98c0 2.73.72 5.4 2.08 7.77L.5 31.5l7.94-2.08a15.47 15.47 0 0 0 7.55 1.95h.01c8.55 0 15.5-6.94 15.5-15.49A15.38 15.38 0 0 0 16 .5Zm0 28.25h-.01a12.84 12.84 0 0 1-6.54-1.79l-.47-.28-4.71 1.23 1.26-4.59-.31-.48a12.8 12.8 0 0 1-1.97-6.86C3.25 8.82 8.85 3.25 16 3.25s12.75 5.57 12.75 12.63c0 7.1-5.68 12.87-12.75 12.87Zm7-9.64c-.38-.19-2.23-1.1-2.58-1.22-.35-.13-.6-.19-.85.19-.25.37-.98 1.22-1.2 1.47-.22.25-.44.28-.82.09-.38-.19-1.6-.59-3.04-1.88-1.12-1-1.88-2.23-2.1-2.61-.22-.38-.02-.58.16-.77.17-.16.38-.44.57-.66.19-.22.25-.38.38-.63.12-.25.06-.47-.03-.66-.1-.19-.85-2.04-1.16-2.79-.3-.73-.61-.63-.85-.64h-.72c-.25 0-.66.1-1 .47-.35.38-1.32 1.29-1.32 3.14s1.35 3.64 1.54 3.89c.19.25 2.66 4.06 6.44 5.7.9.39 1.6.62 2.14.8.9.29 1.71.25 2.35.15.72-.11 2.23-.91 2.54-1.79.31-.88.31-1.63.22-1.79-.1-.16-.35-.25-.73-.44Z"/></svg></a>`:'—'}</td></tr>`}).join('')||`<tr><td colspan="7" style="text-align:center;padding:28px;color:#8299a6">لا توجد طالبات أو سجلات في الفترة المحددة</td></tr>`}</tbody></table></div>`;
+  document.getElementById('reportExcel').onclick=()=>exportPeriodReportExcel(rows,classId,periodLabel,dateLabel);
+  document.getElementById('reportPdf').onclick=()=>exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period);
+}
+function exportPeriodReportExcel(rows,classId,periodLabel,dateLabel){
+  if(typeof XLSX==='undefined'){toast('تعذر تحميل مكتبة Excel',true);return;}
+  const cls=store.classes.find(c=>String(c.id)===String(classId)); const wb=XLSX.utils.book_new();
+  const data=[[SCHOOL_NAME],['تقرير الحضور والغياب '+periodLabel],['الفصل: '+(cls?.name||'')],['الفترة: '+dateLabel],[],['التاريخ','رقم الطالبة','اسم الطالبة','رقم ولي الأمر','الحالة'],...rows.map(r=>[r.date,r.number,r.name,r.phone,r.status])];
+  const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:14},{wch:16},{wch:30},{wch:20},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,ws,'تقرير الحضور');
+  XLSX.writeFile(wb,`تقرير_${periodLabel}_${(cls?.name||'الفصل').replace(/[\\/:*?"<>|]/g,'_')}_${dateLabel.replace(/[^0-9-]/g,'_')}.xlsx`);
+}
+function exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period){
+  const cls=store.classes.find(c=>String(c.id)===String(classId));
+  const body=rows.map((r,i)=>`<tr><td>${i+1}</td>${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td>${esc(r.status)}</td></tr>`).join('');
+  const dateHead=period==='daily'?'':'<th>التاريخ</th>';
+  const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${dateHead}<th>رقم الطالبة</th><th>اسم الطالبة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</b></p>`;
+  printElement(html,`تقرير ${periodLabel} ${cls?.name||''} ${dateLabel}`);
+}
+async function printAllClassesAbsenceReport(){
+  const date=document.getElementById('reportDate')?.value||todayStr(), classes=visibleClasses();
+  if(!classes.length){toast('لا توجد فصول للطباعة',true);return;}
+  toast('جاري تجهيز التقرير الشامل…');
+  const guardianMap={}; (store.guardians||[]).forEach(g=>{guardianMap[String(g.studentId||g.id||'').trim()]=g.phone;guardianMap[normalizeNameClient(g.name)]=g.phone;});
+  // طلب واحد لكل الفصول بدل طلب لكل فصل (وبدون إعادة تحميل كل البيانات قبله)
+  let all=null;
+  try{ const res=await pushToServer('absenceReportAll',{date}); if(res&&res.ok&&res.classes) all=res.classes; }catch(e){ console.warn('absenceReportAll failed',e); }
+  let sections='', totalAbsent=0;
+  classes.forEach(cls=>{
+    let rows=all&&Array.isArray(all[String(cls.id)])?all[String(cls.id)].map(r=>Object.assign({},r,{phone:r.phone||guardianMap[String(r.studentId||'').trim()]||guardianMap[normalizeNameClient(r.name)]||''})):[];
+    if(!rows.length){const students=studentsOfClass(cls.id),att=attendanceOf(cls.id,date);rows=students.map(st=>{const rec=att?.records?.find(r=>String(r.studentId)===String(st.id)||normalizeNameClient(r.studentName||'')===normalizeNameClient(st.name));const raw=rec?rec.status:'لم يُرصد';return{name:st.name,phone:guardianMap[String(st.id||'').trim()]||guardianMap[normalizeNameClient(st.name)]||guardianPhoneForStudent(st)||'',status:(raw==='غائب'||raw==='absent')?'غائبة':(raw==='حاضر'||raw==='present')?'حاضرة':raw};});}
+    rows=sortAbsentFirst(rows);
+    const absentCount=rows.filter(r=>statusRank(r.status)===0).length; totalAbsent+=absentCount;
+    const color=st=>statusRank(st)===0?'#dc2626':statusRank(st)===1?'#16a34a':'#8299a6';
+    sections+=`<section style="page-break-after:always;margin-bottom:25px;"><h2>${esc(cls.name)}</h2><p>${esc(SCHOOL_NAME)} — التاريخ: ${esc(date)} — الغائبات: <b>${absentCount}</b> من ${rows.length}</p><table style="width:100%;border-collapse:collapse;" border="1" cellpadding="7"><thead><tr><th>#</th><th>اسم الطالبة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${rows.map((r,j)=>`<tr><td>${j+1}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td style="color:${color(r.status)};font-weight:700;">${esc(r.status)}</td></tr>`).join('')}</tbody></table></section>`;
+  });
+  printElement(`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain;"><div><h1 style="color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2>تقرير الغياب — جميع الفصول</h2><p>التاريخ: ${esc(date)} — إجمالي الغائبات: <b>${totalAbsent}</b></p></div></header>${sections}`,`تقرير غياب جميع الفصول — ${date}`);
+}
+
+function bindAbsenceReport(){document.getElementById('loadReport').onclick=loadAbsenceReport;document.getElementById('reportRefresh').onclick=loadAbsenceReport;document.getElementById('allClassesReport').onclick=printAllClassesAbsenceReport;loadAbsenceReport();}
+
+/* ==========================================================================
+   إدارة الإداريات (Staff)
+   ========================================================================== */
+function viewStaff(){
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>إدارة الإداريات والمعلمات</h2><p>إضافة حسابات وإسناد الفصول لكل إدارية</p></div>
+      <button class="btn btn-gold" id="addStaffBtn">+ إضافة إدارية</button>
+    </div>
+    <div id="staffList">
+      ${store.staff.map(s=>`
+        <div class="list-row" style="padding:16px;">
+          <div class="info">
+            <b>${esc(s.name)} <span style="color:var(--teal); font-weight:600; font-size:.78rem;">(${esc(s.role||'إدارية')})</span></b>
+            <span>المستخدم: ${esc(s.username)} — الفصول: ${(s.classes||[]).map(id=>{ const c=store.classes.find(x=>x.id===id); return c?c.name:''; }).filter(Boolean).join('، ') || 'لا يوجد'}</span>
+          </div>
+          <div class="row-actions">
+            <button class="icon-btn" data-edit-staff="${s.id}">✎</button>
+            <button class="icon-btn del" data-del-staff="${s.id}">🗑</button>
+          </div>
+        </div>`).join('') || `<div class="empty"><b>لا توجد إداريات مضافة</b></div>`}
+    </div>
+
+    <div class="page-title" style="margin-top:34px;">
+      <div><h2>أسماء المعلمات لصفحة الرصد</h2><p>أسماء بسيطة (بدون حساب دخول) تظهر كاقتراحات عند رصد الغياب</p></div>
+    </div>
+    <div class="field" style="max-width:420px; display:flex; gap:8px; align-items:flex-end;">
+      <div style="flex:1;"><label>اسم المعلمة</label><input id="quickTeacherName" placeholder="اكتبي الاسم ثم اضغطي إضافة"></div>
+      <button class="btn btn-primary" id="addQuickTeacherBtn">+ إضافة</button>
+    </div>
+    <div class="chip-list" id="teacherNamesChips" style="margin-top:12px;">
+      ${(store.teacherNames||[]).length ? store.teacherNames.map(n=>`<span class="chip" data-teacher-name="${esc(n)}">${esc(n)} ✕</span>`).join('') : '<span style="color:#8299a6; font-size:.85rem;">لا توجد أسماء مضافة بعد</span>'}
+    </div>
+  </div>`;
+}
+function bindStaff(){
+  document.getElementById('addStaffBtn').onclick = ()=> openStaffModal();
+  document.querySelectorAll('[data-edit-staff]').forEach(b=> b.onclick = ()=> openStaffModal(store.staff.find(s=>s.id===b.dataset.editStaff)));
+  document.querySelectorAll('[data-del-staff]').forEach(b=> b.onclick = async ()=>{
+    if(!confirm('حذف هذه الإدارية؟')) return;
+    store.staff = store.staff.filter(s=>s.id!==b.dataset.delStaff); saveStore();
+    await pushToServer('deleteStaff', {id:b.dataset.delStaff});
+    render();
+  });
+  const addQuickBtn = document.getElementById('addQuickTeacherBtn');
+  const quickInput = document.getElementById('quickTeacherName');
+  const addQuickName = async ()=>{
+    const name = (quickInput.value||'').trim();
+    if(!name) return;
+    if(!store.teacherNames) store.teacherNames = [];
+    if(store.teacherNames.includes(name)){ toast('هذا الاسم موجود بالفعل', true); return; }
+    store.teacherNames.push(name); saveStore();
+    // اسم محلي للقائمة السريعة فقط؛ code.gs الحالي لا يحتاج تخزينه على الخادم.
+    render();
+  };
+  if(addQuickBtn) addQuickBtn.onclick = addQuickName;
+  if(quickInput) quickInput.addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addQuickName(); } });
+  document.querySelectorAll('[data-teacher-name]').forEach(chip=> chip.onclick = async ()=>{
+    const name = chip.dataset.teacherName;
+    if(!confirm(`حذف "${name}" من قائمة أسماء المعلمات؟`)) return;
+    store.teacherNames = (store.teacherNames||[]).filter(n=>n!==name); saveStore();
+    // حذف محلي فقط.
+    render();
+  });
+}
+function openStaffModal(existing){
+  const host = document.getElementById('modalHost') || (()=>{ const d=document.createElement('div'); d.id='modalHost'; document.body.appendChild(d); return d; })();
+  let selected = new Set(existing ? (existing.classes||[]) : []);
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal">
+      <div class="modal-head"><h3>${existing?'تعديل بيانات الإدارية':'إضافة إدارية'}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div class="two-col">
+          <div class="field"><label>الاسم</label><input id="stName" value="${existing?esc(existing.name):''}"></div>
+          <div class="field"><label>الصفة</label><input id="stRole" value="${existing?esc(existing.role||''):''}" placeholder="معلمة / وكيلة..."></div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>اسم المستخدم</label><input id="stUser" value="${existing?esc(existing.username):''}"></div>
+          <div class="field"><label>الرقم السري</label><input id="stPass" value="${existing&&existing.password!==undefined?esc(existing.password):''}" placeholder="${existing&&existing.password===undefined?'اتركيه فارغاً للإبقاء على الرقم السري الحالي':''}"></div>
+        </div>
+        <div class="field">
+          <label>الفصول المسندة</label>
+          <div class="chip-list" id="classChips">
+            ${store.classes.map(c=>`<span class="chip ${selected.has(c.id)?'selected':''}" data-chip="${c.id}">${esc(c.name)}</span>`).join('') || 'لا توجد فصول بعد'}
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn btn-outline" id="cancel">إلغاء</button><button class="btn btn-primary" id="save">حفظ</button></div>
+    </div>
+  </div>`;
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('cancel').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+  document.querySelectorAll('[data-chip]').forEach(chip=> chip.onclick = ()=>{
+    const id = chip.dataset.chip;
+    if(selected.has(id)){ selected.delete(id); chip.classList.remove('selected'); }
+    else{ selected.add(id); chip.classList.add('selected'); }
+  });
+  document.getElementById('save').onclick = async ()=>{
+    const name = document.getElementById('stName').value.trim();
+    const role = document.getElementById('stRole').value.trim();
+    const username = document.getElementById('stUser').value.trim();
+    const password = document.getElementById('stPass').value.trim();
+    if(!name || !username || (!password && !existing)){ toast('يرجى تعبئة جميع الحقول', true); return; }
+    if(existing){
+      const upd = {name, role, username, classes:[...selected]};
+      if(password) upd.password = password;
+      Object.assign(existing, upd);
+      saveStore(); await pushToServer('saveStaff', Object.assign({}, existing, {password: password || existing.password || ''}));
+      toast('تم تحديث بيانات الإدارية');
+    }else{
+      const st = { id: uid(), name, role, username, password, classes:[...selected] };
+      store.staff.push(st); saveStore();
+      await pushToServer('saveStaff', st);
+      toast('تمت إضافة الإدارية');
+    }
+    close(); render();
+  };
+}
+
+/* ==========================================================================
+   التصدير: Excel و PDF
+   ========================================================================== */
+function exportClassExcel(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const students = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+  const att = attendanceOf(classId);
+  const rows = sortAbsentFirst(students, s=>{ const rec = att ? att.records.find(r=>r.studentId===s.id) : null; return rec ? rec.status : 'لم يُرصد'; }).map(s=>{
+    const rec = att ? att.records.find(r=>r.studentId===s.id) : null;
+    return {
+      'رقم الطالبة': s.number,
+      'اسم الطالبة': s.name,
+      'رقم ولي الأمر': guardianPhoneForStudent(s),
+      'الحالة': rec ? rec.status : 'لم يُرصد',
+      'المعلمة': att ? att.teacher : '',
+      'وقت الرصد': att ? att.time : '',
+      'التاريخ': todayStr()
+    };
+  });
+  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+cls.name],['التاريخ: '+todayStr()],[],['رقم الطالبة','اسم الطالبة','رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r['رقم الطالبة'],r['اسم الطالبة'],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']])]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'الغياب');
+  XLSX.writeFile(wb, `تقرير_غياب_${cls.name}_${todayStr()}.xlsx`);
+}
+function exportClassPDF(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const students = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+  const att = attendanceOf(classId);
+  const statusOf = s=>{ const rec = att ? att.records.find(r=>r.studentId===s.id) : null; return rec ? rec.status : 'لم يُرصد'; };
+  const sortedStudents = sortAbsentFirst(students, statusOf);
+  const rowsHtml = sortedStudents.map(s=>{
+    const status = statusOf(s);
+    const color = statusRank(status)===0 ? '#dc2626' : (statusRank(status)===1 ? '#16a34a' : '#8299a6');
+    const guardianPhone = guardianPhoneForStudent(s);
+    return `<tr><td>${esc(s.number)}</td><td>${esc(s.name)}</td><td>${guardianPhone?`<span class="guardian-phone">${esc(guardianPhone)}</span>`:'—'}</td><td style="color:${color}; font-weight:700;">${esc(status)}</td></tr>`;
+  }).join('');
+  const html = `
+  <div style="font-family:'Cairo',sans-serif; direction:rtl; padding:10px;">
+    <header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain;"><div><h1 style="font-size:22px;color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2 style="color:#102a43;margin:5px 0;">تقرير غياب — ${esc(cls.name)}</h2></div></header>
+    <p style="color:#555; font-size:13px;">${esc(SCHOOL_NAME)} — التاريخ: ${todayStr()} ${att? '— المعلمة: '+esc(att.teacher)+' — الساعة: '+esc(att.time):''}</p>
+    <table style="width:100%; border-collapse:collapse; margin-top:14px;" border="1" cellpadding="8">
+      <thead style="background:#102a43; color:#fff;"><tr><th>رقم الطالبة</th><th>اسم الطالبة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  </div>`;
+  printElement(html, `تقرير غياب ${cls.name}`);
+}
+
+/* ==========================================================================
+   بدء التشغيل + التعامل مع رابط ?class=
+   ========================================================================== */
+function init(){
+  const params = new URLSearchParams(window.location.search);
+  const cid = params.get('class');
+  if(cid){
+    route = { name:'scanDeep', classId:cid };
+    pullFromServer(false).finally(render);
+  }else{
+    if(session) startAutoSync();
+    render();
+  }
+}
+window.navigate = navigate;
+init();
+</script>
+</body>
+</html>
