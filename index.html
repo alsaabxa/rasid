@@ -688,14 +688,11 @@ function viewSchoolSettings(){
         <div class="field">
           <label for="schoolTypeSelect">اختر نوع المدرسة</label>
           <select id="schoolTypeSelect">
-            <option value="boys" ${type==='boys'?'selected':''}>مدرسة بنين — مذكر</option>
-            <option value="girls" ${type==='girls'?'selected':''}>مدرسة بنات — مؤنث</option>
+            <option value="boys" ${type==='boys'?'selected':''}>مدرسة بنين</option>
+            <option value="girls" ${type==='girls'?'selected':''}>مدرسة بنات</option>
           </select>
         </div>
-        <div style="background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0">
-          <div style="font-weight:800;margin-bottom:8px">معاينة العبارات</div>
-          <div id="genderPreview" style="line-height:2">${type==='boys'?'المعلم — الإداري — اسحب — حاضر — غائب':'المعلمة — الإدارية — اسحبي — حاضرة — غائبة'}</div>
-        </div>
+
         <div style="border-top:1px solid var(--line);margin:22px 0 16px;padding-top:18px">
           <h3 style="font-size:1rem;color:var(--navy);margin-bottom:12px">الأسماء أسفل التقارير المصدّرة</h3>
           <div class="two-col">
@@ -711,15 +708,9 @@ function viewSchoolSettings(){
 }
 function bindSchoolSettings(){
   const select = document.getElementById('schoolTypeSelect');
-  const preview = document.getElementById('genderPreview');
   const saved = document.getElementById('schoolTypeSaved');
   if(!select) return;
-  select.onchange = ()=>{
-    preview.textContent = select.value === 'boys'
-      ? 'المعلم — الإداري — اسحب — حاضر — غائب'
-      : 'المعلمة — الإدارية — اسحبي — حاضرة — غائبة';
-    saved.textContent = '';
-  };
+  select.onchange = ()=>{ saved.textContent = ''; };
   document.getElementById('saveSchoolType').onclick = ()=>{
     store.schoolType = select.value === 'boys' ? 'boys' : 'girls';
     store.reportSignatures = {
