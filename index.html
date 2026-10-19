@@ -507,7 +507,31 @@ if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)retu
    ========================================================================== */
 let syncTimer = null;
 let guardianImportBusy = false;
-async function pushToServer(){ return {ok:false,offline:true}; }
+async function pushToServer(action, payload){
+  if(!db || !activeSchoolId || !session || !session.approved) return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  try{
+    if(action==='saveStudent' && payload){
+      const student=Object.assign({},payload); delete student.oldName;
+      const index=(store.students||[]).findIndex(x=>x.id===student.id);
+      if(index>=0) store.students[index]=Object.assign({},store.students[index],student);
+      else store.students.push(student);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+    }
+    if(action==='saveGuardian' && payload){
+      const id=normalizeNameClient(payload.name), phone=normalizePhoneClient(payload.phone);
+      const guardian={id,name:String(payload.name||'').trim(),phone};
+      store.guardians=(store.guardians||[]).filter(g=>g.id!==id); store.guardians.push(guardian);
+      store.students=(store.students||[]).map(st=>normalizeNameClient(st.name)===id?Object.assign({},st,{guardianPhone:phone}):st);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+    }
+    const ref=db.collection('schools').doc(activeSchoolId).collection('private').doc('appData');
+    await ref.set({store,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    return {ok:true,phone:action==='saveGuardian'?normalizePhoneClient(payload&&payload.phone):undefined,added:action==='importGuardians'&&payload&&Array.isArray(payload.guardians)?payload.guardians.length:undefined,updated:0};
+  }catch(e){
+    console.error('Firebase sync failed:',action,e);
+    return {ok:false,error:e&&e.message?e.message:'تعذر حفظ البيانات في Firebase'};
+  }
+}
 async function pullFromServer(silent){
  if(!db || !activeSchoolId) return false;
  try{const snap=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get(); if(snap.exists && snap.data().store){store=snap.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); if(!silent)render();return true;}}catch(e){console.error('Cloud load failed',e);} return false;
@@ -1291,15 +1315,15 @@ function openStudentFormModal(classId, existing, onDone){
       const oldName = existing.name;
       const updated = Object.assign({}, existing, {name, number, classId:clsId, guardianPhone, oldName});
       const result = await pushToServer('saveStudent', updated);
-      if(!result.ok) { toast('تعذر حفظ التعديل في Google Sheets — لم يتم اعتماده محلياً', true); return; }
+      if(!result.ok) { toast('تعذر حفظ التعديل في قاعدة البيانات — لم يتم اعتماده محلياً', true); return; }
       Object.assign(existing, updated); delete existing.oldName; saveStore();
-      toast('تم تحديث بيانات الطالب/ة ورقم ولي الأمر ومزامنتها');
+      toast('تم تحديث بيانات الطالب/ة ورقم ولي الأمر وحفظها في قاعدة البيانات');
     }else{
       const st = { id: uid(), classId: clsId, number, name, guardianPhone };
       const result = await pushToServer('saveStudent', st);
-      if(!result.ok) { toast('تعذر حفظ الطالب/ة في Google Sheets', true); return; }
+      if(!result.ok) { toast('تعذر حفظ الطالب/ة في قاعدة البيانات', true); return; }
       store.students.push(st); saveStore();
-      toast('تمت إضافة الطالب/ة ورقم ولي الأمر ومزامنتهما');
+      toast('تمت إضافة الطالب/ة ورقم ولي الأمر وحفظهما في قاعدة البيانات');
     }
     close(); onDone && onDone(); renderTopnav();
   };
@@ -1454,8 +1478,8 @@ async function submitScan(){
   const saveResult = await pushToServer('saveAttendance', session_);
   const absentCount = records.filter(r=>r.status==='غائب').length;
   playAttendanceBell(absentCount);
-  if(saveResult.ok) toast('تم حفظ الرصد ومزامنته مع Google Sheets');
-  else { console.warn('saveAttendance failed:', saveResult); toast('تعذر تأكيد مزامنة الرصد مع Google Sheets — لم يُعتبر محفوظاً على الخادم', true); }
+  if(saveResult.ok) toast('تم حفظ الرصد في قاعدة البيانات');
+  else { console.warn('saveAttendance failed:', saveResult); toast('تعذر حفظ الرصد في قاعدة البيانات — تحقق من الاتصال', true); }
   speakThanks(teacher, absentCount);
   route.editing = false;
   render();
@@ -1636,7 +1660,7 @@ function openGuardianImportModal(){
     store.students=store.students.map(st=>{const g=map[normalizeNameClient(st.name)]; return g?Object.assign({},st,{guardianPhone:g.phone}):st;});
     saveStore(); render();
     const result=await pushToServer('importGuardians',{guardians:rows});
-    if(!result.ok){ guardianImportBusy=false; toast('تم تحميل الأرقام في الصفحة، لكن تعذر حفظها في Google Sheets. تأكدي من نشر code.gs كنسخة جديدة.',true); btn.disabled=false; return; }
+    if(!result.ok){ guardianImportBusy=false; toast('تم تحميل الأرقام في الصفحة، لكن تعذر حفظها في قاعدة البيانات. تحققي من الاتصال وصلاحيات Firebase.',true); btn.disabled=false; return; }
     guardianImportBusy = false;
     close(); toast(`تم الاستيراد: ${result.added||0} إضافة، ${result.updated||0} تحديث`);
   };
