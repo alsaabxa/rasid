@@ -458,7 +458,7 @@ function notificationTodayList(){
   (store.attendance||[]).filter(a=>String(a.date)===today).forEach(a=>{
     const key=String(a.classId||a.className||''); if(!key)return;
     const cls=store.classes.find(c=>String(c.id)===String(a.classId)), old=map.get(key);
-    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?.name||a.className||a.classId,time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>r.status==='غائب'||r.status==='absent').length});
+    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?classDisplayName(cls):(a.className||a.classId),time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>r.status==='غائب'||r.status==='absent').length});
   });
   return [...map.values()].sort((a,b)=>String(b.time).localeCompare(String(a.time)));
 }
@@ -713,7 +713,7 @@ function classCardHtml(c){
     <div class="cc-top"></div>
     <div class="cc-body">
       <div class="cc-head">
-        <h3>${esc(c.name)}</h3>
+        <h3>${esc(classDisplayName(c))}</h3>
         ${session.type==='admin' ? `
         <div class="cc-menu">
           <button class="cc-menu-btn" data-menu="${c.id}">⋮</button>
@@ -835,7 +835,7 @@ function openAbsentModal(classId){
   host.innerHTML = `
   <div class="overlay" id="ov">
     <div class="modal">
-      <div class="modal-head"><h3>الغائبون/الغائبات في فصل ${esc(cls.name)} — ${todayStr()}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-head"><h3>الغائبون/الغائبات في فصل ${esc(classDisplayName(cls))} — ${todayStr()}</h3><button class="modal-close" id="cl">✕</button></div>
       <div class="modal-body">
         ${absentees.length ? absentees.map(a=>`<div class="list-row"><div class="info"><b>${esc(a.studentName)}</b></div><span style="color:var(--danger); font-weight:700; font-size:.8rem;">غائبة</span></div>`).join('') : `<div class="empty"><b>لا يوجد غياب مسجّل اليوم</b></div>`}
       </div>
@@ -871,8 +871,26 @@ async function deleteTodayAttendance(classId){
 }
 
 /* ---------- إضافة / تعديل فصل ---------- */
-function nextClassNumber(){
-  const numbers = (store.classes || []).map(c=>{
+function cleanClassName(name, number){
+  let value=String(name || '').trim();
+  const num=String(number == null ? '' : number).trim();
+  if(num){
+    const escaped=num.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+    value=value.replace(new RegExp('\\s*[-/–—]?\\s*'+escaped+'$'), '').trim();
+  }
+  return value;
+}
+function classDisplayName(c){
+  const name=cleanClassName(c && c.name, c && c.number);
+  const number=String(c && c.number != null ? c.number : '').trim();
+  return number ? (name ? name+' '+number : number) : String(c && c.name || '');
+}
+function nextClassNumber(className, excludeId){
+  const target=String(className || '').trim().toLocaleLowerCase();
+  const numbers=(store.classes || []).filter(c=>{
+    if(excludeId && c.id===excludeId) return false;
+    return cleanClassName(c && c.name, c && c.number).toLocaleLowerCase()===target;
+  }).map(c=>{
     const value=String(c && c.number != null ? c.number : '').trim();
     if(!/^\d+$/.test(value)) return null;
     const n=Number(value);
@@ -888,8 +906,8 @@ function openClassModal(existing){
       <div class="modal-head"><h3>${existing? 'تعديل فصل':'إضافة فصل جديد وإدارة الطلاب والطالبات'}</h3><button class="modal-close" id="cl">✕</button></div>
       <div class="modal-body">
         <div class="two-col">
-          <div class="field"><label>اسم الفصل</label><input id="cName" value="${existing? esc(existing.name):''}" placeholder="مثال: أول متوسط"></div>
-          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):nextClassNumber()}" inputmode="numeric" placeholder="مثال: 1 أو 2"></div>
+          <div class="field"><label>اسم الصف</label><input id="cName" value="${existing? esc(cleanClassName(existing.name, existing.number)):''}" placeholder="مثال: أول متوسط"></div>
+          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):''}" inputmode="numeric" placeholder="يُحدَّد تلقائيًا"></div>
         </div>
         ${existing ? `
         <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
@@ -1029,17 +1047,34 @@ function openClassModal(existing){
     }
   }
 
+  const classNameInput=document.getElementById('cName');
+  const classNumberInput=document.getElementById('cNum');
+  let numberManuallyEdited=false;
+  classNumberInput.addEventListener('input', ()=>{ numberManuallyEdited=true; });
+  classNameInput.addEventListener('input', ()=>{
+    if(!numberManuallyEdited && classNameInput.value.trim()){
+      classNumberInput.value=nextClassNumber(classNameInput.value.trim(), existing && existing.id);
+    } else if(!classNameInput.value.trim() && !numberManuallyEdited){
+      classNumberInput.value='';
+    }
+  });
+  if(existing) classNameInput.value=cleanClassName(existing.name, existing.number);
+  if(existing) classNumberInput.value=existing.number;
   document.getElementById('save').onclick = async ()=>{
-    const number = document.getElementById('cNum').value.trim();
-    const name = document.getElementById('cName').value.trim();
-    if(!name){ toast('يرجى إدخال اسم الفصل', true); return; }
+    const name = classNameInput.value.trim();
+    let number = classNumberInput.value.trim();
+    if(!name){ toast('يرجى إدخال اسم الصف', true); return; }
+    if(!number) number=nextClassNumber(name, existing && existing.id);
+    if(!/^\d+$/.test(number)){ toast('رقم الفصل يجب أن يكون رقمًا صحيحًا', true); return; }
+    const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && String(c.number).trim()===number);
+    if(duplicate){ toast('هذا الصف ورقم الفصل موجودان مسبقًا', true); return; }
     if(existing){
       existing.number = number; existing.name = name;
       saveStore(); await pushToServer('saveClass', existing);
       toast('تم تحديث الفصل');
     }else{
       const classId = uid();
-      const classObj = { id: classId, number: number || name, name };
+      const classObj = { id: classId, number, name };
       const newStudents = tempStudents.map((n,i)=>({ id: uid(), classId, number: String(i+1), name: n }));
       store.classes.push(classObj);
       store.students.push(...newStudents);
@@ -1217,7 +1252,7 @@ function nextStudentNumber(classId, excludeId){
 function openStudentFormModal(classId, existing, onDone){
   const host = document.getElementById('modalHost');
   const prevHTML = host.innerHTML;
-  const classOptions = store.classes.map(c=>`<option value="${c.id}" ${existing&&existing.classId===c.id?'selected':(c.id===classId?'selected':'')}>${esc(c.name)}</option>`).join('');
+  const classOptions = store.classes.map(c=>`<option value="${c.id}" ${existing&&existing.classId===c.id?'selected':(c.id===classId?'selected':'')}>${esc(classDisplayName(c))}</option>`).join('');
   const wrap = document.createElement('div');
   wrap.innerHTML = `
   <div class="overlay" id="ov2" style="z-index:110;">
@@ -1456,7 +1491,7 @@ function viewQR(){
       ${classes.map(c=>`
       <div class="qr-card" id="qrcard-${c.id}">
         <div class="qr-school">${esc(SCHOOL_NAME)}</div>
-        <div class="qr-class">${esc(c.name)}</div>
+        <div class="qr-class">${esc(classDisplayName(c))}</div>
         <div class="qr-box" id="qrbox-${c.id}"></div>
         <div class="qr-hint">امسحي الكود لبدء رصد الغياب</div>
         <div class="qr-actions">
@@ -1732,7 +1767,7 @@ function viewStaff(){
         <div class="list-row" style="padding:16px;">
           <div class="info">
             <b>${esc(s.name)} <span style="color:var(--teal); font-weight:600; font-size:.78rem;">(${esc(s.role||'إدارية')})</span></b>
-            <span>المستخدم: ${esc(s.username)} — الفصول: ${(s.classes||[]).map(id=>{ const c=store.classes.find(x=>x.id===id); return c?c.name:''; }).filter(Boolean).join('، ') || 'لا يوجد'}</span>
+            <span>المستخدم: ${esc(s.username)} — الفصول: ${(s.classes||[]).map(id=>{ const c=store.classes.find(x=>x.id===id); return c?classDisplayName(c):''; }).filter(Boolean).join('، ') || 'لا يوجد'}</span>
           </div>
           <div class="row-actions">
             <button class="icon-btn" data-edit-staff="${s.id}">✎</button>
@@ -1802,7 +1837,7 @@ function openStaffModal(existing){
         <div class="field">
           <label>الفصول المسندة</label>
           <div class="chip-list" id="classChips">
-            ${store.classes.map(c=>`<span class="chip ${selected.has(c.id)?'selected':''}" data-chip="${c.id}">${esc(c.name)}</span>`).join('') || 'لا توجد فصول بعد'}
+            ${store.classes.map(c=>`<span class="chip ${selected.has(c.id)?'selected':''}" data-chip="${c.id}" >${esc(classDisplayName(c))}</span>`).join('') || 'لا توجد فصول بعد'}
           </div>
         </div>
       </div>
