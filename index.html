@@ -493,10 +493,10 @@ function tickClock(){
   const time = now.toLocaleTimeString('ar-SA-u-nu-latn', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true});
   let hijri = '—', greg = '—';
   try{
-    hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now) + ' هـ';
+    hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
   }catch(e){}
   try{
-    greg = new Intl.DateTimeFormat('ar-SA-u-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now) + ' م';
+    greg = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
   }catch(e){}
   document.getElementById('clockTime').textContent = time;
   document.getElementById('clockHijri').textContent = hijri;
@@ -1650,8 +1650,8 @@ function statusRank(s){ s=String(s||''); if(s==='غائبة'||s==='غائب'||s=
 function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); return rows.map((r,i)=>[r,i]).sort((a,b)=>statusRank(getStatus(a[0]))-statusRank(getStatus(b[0]))||a[1]-b[1]).map(x=>x[0]); }
 function reportDateLabels(date=new Date()){
   let hijri='—', greg='—';
-  try{hijri=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date)+' هـ';}catch(e){}
-  try{greg=new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date)+' م';}catch(e){}
+  try{hijri=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
+  try{greg=new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
   return {hijri,greg};
 }
 function reportHijriForDate(dateStr){
