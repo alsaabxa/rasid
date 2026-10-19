@@ -432,7 +432,7 @@ let localRevision = 0;
 const CLOUD_ARRAY_FIELDS = ['classes','students','staff','attendance','guardians'];
 function cloudRecordId(kind,item,index){
   const raw=item&&item.id!=null?String(item.id):'legacy_'+index;
-  return 'v2_'+kind+'_'+encodeURIComponent(raw).replace(/%/g,'~');
+  return 'v2_'+kind+'_'+encodeURIComponent(raw);
 }
 function cloudRecordsFor(value){
   const out=new Map();
