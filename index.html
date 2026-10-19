@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 <style>
 :root{
   --navy:#102a43;
@@ -1001,26 +1003,22 @@ function openClassModal(existing){
     });
     document.getElementById('fileInput').onchange = (e)=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
 
-    function handleFile(file){
-      const isExcel = /\.(xlsx|xls)$/i.test(file.name);
-      const reader = new FileReader();
-      reader.onload = (ev)=>{
-        try{
-          if(isExcel){
-            const wb = XLSX.read(ev.target.result, {type:'binary'});
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(ws, {header:1});
-            const names = rows.filter(r=>r.length && r[0]!=='').map(r=> String(r.length>=2? r[1] : r[0]).trim()).filter(Boolean);
-            addNames(names);
-          }else{
-            const text = ev.target.result;
-            const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-            addNames(lines);
-          }
-          toast(`تم استيراد الأسماء من "${file.name}"`);
-        }catch(err){ toast('تعذّرت قراءة الملف', true); }
-      };
-      if(isExcel) reader.readAsBinaryString(file); else reader.readAsText(file);
+    async function handleFile(file){
+      try{
+        const imported = await readNamesImportFile(file);
+        let names = [];
+        if(imported.kind === 'excel'){
+          const rows = imported.rows;
+          names = rows.filter(r=>r && r.some(v=>String(v??'').trim()!==''))
+            .map(r=>String(r.length>=2 ? (r[1] || r[0] || '') : (r[0] || '')).trim())
+            .filter(Boolean);
+        }else{
+          names = imported.text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+        }
+        if(!names.length){ toast('لم يتم العثور على أسماء في الملف', true); return; }
+        addNames(names);
+        toast(`تم استيراد الأسماء من "${file.name}"`);
+      }catch(err){ toast(err && err.message ? err.message : 'تعذّرت قراءة الملف', true); }
     }
   }
 
@@ -1044,6 +1042,50 @@ function openClassModal(existing){
     }
     close(); render();
   };
+}
+
+
+/* قراءة ملفات الاستيراد حسب نوعها، لتجنب عرض محتوى PDF وWord الثنائي كرموز */
+async function readNamesImportFile(file){
+  const name = String(file && file.name || '');
+  const ext = (name.match(/\.([^.]+)$/) || [,''])[1].toLowerCase();
+  if (['xlsx','xls'].includes(ext)) {
+    if (!window.XLSX) throw new Error('مكتبة Excel غير متاحة');
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return {kind:'excel', rows:XLSX.utils.sheet_to_json(ws,{header:1,defval:''})};
+  }
+  if (ext === 'docx') {
+    if (!window.mammoth) throw new Error('تعذر تحميل قارئ Word');
+    const result = await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return {kind:'text', text:result.value || ''};
+  }
+  if (ext === 'pdf') {
+    if (!window.pdfjsLib) throw new Error('تعذر تحميل قارئ PDF');
+    const pdf = await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    const lines = [];
+    for (let pageNo=1; pageNo<=pdf.numPages; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      const groups = new Map();
+      for (const item of content.items) {
+        if (!item.str || !item.str.trim()) continue;
+        const y = Math.round(item.transform[5]);
+        if (!groups.has(y)) groups.set(y, []);
+        groups.get(y).push({x:item.transform[4], text:item.str.trim()});
+      }
+      [...groups.keys()].sort((a,b)=>b-a).forEach(y=>{
+        const line = groups.get(y).sort((a,b)=>b.x-a.x).map(x=>x.text).join(' ').trim();
+        if (line) lines.push(line);
+      });
+    }
+    const text = lines.join('\n');
+    if (!text.trim()) throw new Error('ملف PDF مصوّر ولا يحتوي على نص قابل للاستخراج. استخدمي Excel أو Word أو ملف PDF قابلًا لتحديد النص.');
+    return {kind:'text', text};
+  }
+  if (['txt','csv'].includes(ext)) return {kind:'text', text:await file.text()};
+  throw new Error('نوع الملف غير مدعوم. استخدمي PDF أو Excel أو Word بصيغة DOCX أو TXT أو CSV.');
 }
 
 /* ---------- إدارة الطالبات ---------- */
@@ -1462,20 +1504,21 @@ function openGuardianImportModal(){
   </div><div class="modal-foot"><button class="btn btn-outline" id="icancel">إلغاء</button><button class="btn btn-primary" id="gimportSave" disabled>استيراد</button></div></div></div>`;
   let rows=[]; const close=()=>host.innerHTML=''; document.getElementById('icl').onclick=close; document.getElementById('icancel').onclick=close; document.getElementById('iov').onclick=e=>{if(e.target.id==='iov')close()};
   const dz=document.getElementById('gdz'), file=document.getElementById('gfile'); dz.onclick=()=>file.click();
-  const read=f=>{const rd=new FileReader(); const excel=/\.(xlsx|xls)$/i.test(f.name); rd.onload=e=>{try{
-    if(excel){
-      const wb=XLSX.read(e.target.result,{type:'binary'}), ws=wb.Sheets[wb.SheetNames[0]], data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  const read=async f=>{try{
+    const imported=await readNamesImportFile(f);
+    if(imported.kind==='excel'){
+      const data=imported.rows;
       const headers=(data[0]||[]).map(x=>String(x).trim());
       let ni=headers.findIndex(h=>h.includes('اسم الطالبة')||h==='الطالبة'||h.includes('اسم'));
       let pi=headers.findIndex(h=>h.includes('رقم')||h.includes('جوال')||h.includes('هاتف')||h.includes('ولي'));
       if(ni<0) ni=0; if(pi<0) pi=1;
       rows=data.slice(1).map(r=>({name:String(r[ni]??'').trim(),phone:normalizePhoneClient(r[pi])})).filter(x=>x.name&&x.phone);
     }else{
-      rows=String(e.target.result).split(/\r?\n/).slice(1).map(l=>l.split(/[,;\t]/)).map(r=>({name:String(r[0]||'').trim(),phone:normalizePhoneClient(r[1])})).filter(x=>x.name&&x.phone);
+      rows=String(imported.text).split(/\r?\n/).slice(1).map(l=>l.split(/[,;\t]/)).map(r=>({name:String(r[0]||'').trim(),phone:normalizePhoneClient(r[1])})).filter(x=>x.name&&x.phone);
     }
     document.getElementById('gimportPreview').innerHTML=`<div class="list-row"><div class="info"><b>جاهز للاستيراد</b><span>${rows.length} سجل</span></div></div>`;
     document.getElementById('gimportSave').disabled=!rows.length;
-  }catch(err){toast('تعذر قراءة الملف',true)}}; excel?rd.readAsBinaryString(f):rd.readAsText(f)};
+  }catch(err){toast(err&&err.message?err.message:'تعذر قراءة الملف',true)}};
   file.onchange=e=>{if(e.target.files[0])read(e.target.files[0])}; dz.ondragover=e=>{e.preventDefault();dz.classList.add('drag')}; dz.ondragleave=()=>dz.classList.remove('drag'); dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])read(e.dataTransfer.files[0])};
   document.getElementById('gimportSave').onclick=async()=>{
     const btn=document.getElementById('gimportSave'); btn.disabled=true;
