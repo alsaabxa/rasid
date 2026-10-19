@@ -1433,18 +1433,17 @@ function openStudentFormModal(classId, existing, onDone){
     const number = existing && clsId===existing.classId ? existing.number : nextStudentNumber(clsId, existing&&existing.id);
     const guardianPhone = wrap.querySelector('#sGuardian').value.trim();
     if(!name){ toast('أدخلي اسم الطالب/ة', true); return; }
+    const snapshot=cloneStoreSnapshot();
     if(existing){
       const oldName = existing.name;
       const updated = Object.assign({}, existing, {name, number, classId:clsId, guardianPhone, oldName});
-      const result = await pushToServer('saveStudent', updated);
-      if(!result.ok) { toast('تعذر حفظ التعديل في قاعدة البيانات — لم يتم اعتماده محلياً', true); return; }
-      Object.assign(existing, updated); delete existing.oldName; saveStore();
+      const result = await persistStoreMutation('saveStudent', updated,snapshot);
+      if(!result.ok) { toast('تعذر حفظ التعديل في قاعدة البيانات؛ أُعيدت البيانات كما كانت', true); return; }
       toast('تم تحديث بيانات الطالب/ة ورقم ولي الأمر وحفظها في قاعدة البيانات');
     }else{
       const st = { id: uid(), classId: clsId, number, name, guardianPhone };
-      const result = await pushToServer('saveStudent', st);
-      if(!result.ok) { toast('تعذر حفظ الطالب/ة في قاعدة البيانات', true); return; }
-      store.students.push(st); saveStore();
+      const result = await persistStoreMutation('saveStudent', st,snapshot);
+      if(!result.ok) { toast('تعذر حفظ الطالب/ة في قاعدة البيانات؛ أُعيدت البيانات كما كانت', true); return; }
       toast('تمت إضافة الطالب/ة ورقم ولي الأمر وحفظهما في قاعدة البيانات');
     }
     close(); onDone && onDone(); renderTopnav();
