@@ -1002,10 +1002,12 @@ async function deleteClass(classId){
 }
 async function deleteTodayAttendance(classId){
   if(!confirm('حذف رصد اليوم لهذا الفصل؟')) return;
+  const snapshot=cloneStoreSnapshot();
   store.attendance = store.attendance.filter(a=>!(a.classId===classId && a.date===todayStr()));
-  saveStore(); render();
-  await pushToServer('deleteToday', {classId, date:todayStr()});
-  toast('تم حذف رصد اليوم');
+  saveStore();
+  const result=await persistStoreMutation('deleteToday', {classId, date:todayStr()},snapshot);
+  if(!result.ok){render();toast('تعذر حذف الرصد من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+  render(); toast('تم حذف رصد اليوم');
 }
 
 /* ---------- إضافة / تعديل فصل ---------- */
