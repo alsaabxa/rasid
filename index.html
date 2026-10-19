@@ -411,24 +411,100 @@ function loadStore(){
   }catch(e){}
   return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[], schoolType:'girls', reportSignatures:{manager:'',attendance:''} };
 }
+function emptyCloudStore(){
+  return {classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[],schoolType:'girls',reportSignatures:{manager:'',attendance:''}};
+}
+function normalizeCloudStore(value){
+  const out=Object.assign(emptyCloudStore(),value||{});
+  ['classes','students','staff','attendance','teacherNames','guardians'].forEach(k=>{if(!Array.isArray(out[k]))out[k]=[];});
+  if(!out.reportSignatures||typeof out.reportSignatures!=='object')out.reportSignatures={manager:'',attendance:''};
+  if(typeof out.reportSignatures.manager!=='string')out.reportSignatures.manager='';
+  if(typeof out.reportSignatures.attendance!=='string')out.reportSignatures.attendance='';
+  if(!['boys','girls'].includes(out.schoolType))out.schoolType='girls';
+  return out;
+}
+let cloudBaseline = null;
+let cloudDirty = false;
+let cloudWriteQueue = Promise.resolve();
+let localRevision = 0;
+const CLOUD_ARRAY_FIELDS = ['classes','students','staff','attendance','guardians'];
+function cloudRecordId(kind,item,index){
+  const raw=item&&item.id!=null?String(item.id):'legacy_'+index;
+  return 'v2_'+kind+'_'+encodeURIComponent(raw).replace(/%/g,'~');
+}
+function cloudRecordsFor(value){
+  const out=new Map();
+  CLOUD_ARRAY_FIELDS.forEach(kind=>{
+    (value[kind]||[]).forEach((item,index)=>{
+      const id=cloudRecordId(kind,item,index);
+      out.set(id,{kind,record:item});
+    });
+  });
+  return out;
+}
+function cloudMetaFor(value){
+  return {kind:'meta',schemaVersion:2,schoolType:value.schoolType,teacherNames:value.teacherNames||[],reportSignatures:value.reportSignatures||{manager:'',attendance:''}};
+}
+function stableCloudJson(value){
+  try{return JSON.stringify(value===undefined?null:value);}catch(e){return String(value);}
+}
 function saveStore(){
-  if(!['boys','girls'].includes(store.schoolType)) store.schoolType = 'girls';
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  if(db && activeSchoolId && session && session.approved){
+  if(!['boys','girls'].includes(store.schoolType))store.schoolType='girls';
+  store=normalizeCloudStore(store);
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+  localRevision++; cloudDirty=true;
+  if(db&&activeSchoolId&&session&&session.approved){
     clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').set({store,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.error('Cloud save failed',e)),450);
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud save failed',e)),450);
   }
 }
-function cloneStoreSnapshot(){ return JSON.parse(JSON.stringify(store)); }
+function cloneStoreSnapshot(){return JSON.parse(JSON.stringify(store));}
 function restoreStoreSnapshot(snapshot){
-  clearTimeout(saveTimer); saveTimer=null;
-  store=snapshot;
-  try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); }catch(e){ console.error('Local rollback failed',e); }
+  clearTimeout(saveTimer);saveTimer=null;
+  store=normalizeCloudStore(snapshot);localRevision++;cloudDirty=true;
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Local rollback failed',e);}
+}
+async function syncStoreToCloud(){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  const run=async()=>{
+    const target=normalizeCloudStore(cloneStoreSnapshot());
+    const revision=localRevision;
+    const privateRef=db.collection('schools').doc(activeSchoolId).collection('private');
+    const base=normalizeCloudStore(cloudBaseline||emptyCloudStore());
+    const oldRecords=cloudRecordsFor(base),newRecords=cloudRecordsFor(target);
+    const writes=[];
+    newRecords.forEach((value,id)=>{
+      const old=oldRecords.get(id);
+      if(!old||stableCloudJson(old.record)!==stableCloudJson(value.record)||old.kind!==value.kind){
+        writes.push({type:'set',id,data:{kind:'record',record:value.record,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
+      }
+    });
+    oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
+    const oldMeta=cloudMetaFor(base),newMeta=cloudMetaFor(target);
+    if(stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudBaseline){
+      writes.push({type:'set',id:'appMeta',data:Object.assign({},newMeta,{updatedAt:firebase.firestore.FieldValue.serverTimestamp()})});
+    }
+    // Use multiple small batches; Firestore permits at most 500 writes per batch.
+    for(let offset=0;offset<writes.length;offset+=400){
+      const batch=db.batch();
+      writes.slice(offset,offset+400).forEach(w=>{
+        const ref=privateRef.doc(w.id);
+        if(w.type==='delete')batch.delete(ref);else batch.set(ref,w.data);
+      });
+      await batch.commit();
+    }
+    cloudBaseline=target;
+    cloudDirty=(localRevision!==revision);
+    return {ok:true};
+  };
+  const queued=cloudWriteQueue.then(run,run);
+  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
+  return queued;
 }
 async function persistStoreMutation(action,payload,snapshot){
-  clearTimeout(saveTimer); saveTimer=null;
+  clearTimeout(saveTimer);saveTimer=null;
   const result=await pushToServer(action,payload);
-  if(!result.ok) restoreStoreSnapshot(snapshot);
+  if(!result.ok)restoreStoreSnapshot(snapshot);
   return result;
 }
 function loadSession(){
@@ -523,25 +599,24 @@ if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)retu
    ========================================================================== */
 let syncTimer = null;
 let guardianImportBusy = false;
-async function pushToServer(action, payload){
-  if(!db || !activeSchoolId || !session || !session.approved) return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+async function pushToServer(action,payload){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
   try{
-    if(action==='saveStudent' && payload){
-      const student=Object.assign({},payload); delete student.oldName;
+    if(action==='saveStudent'&&payload){
+      const student=Object.assign({},payload);delete student.oldName;
       const index=(store.students||[]).findIndex(x=>x.id===student.id);
-      if(index>=0) store.students[index]=Object.assign({},store.students[index],student);
-      else store.students.push(student);
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      if(index>=0)store.students[index]=Object.assign({},store.students[index],student);else store.students.push(student);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
     }
-    if(action==='saveGuardian' && payload){
-      const id=normalizeNameClient(payload.name), phone=normalizePhoneClient(payload.phone);
+    if(action==='saveGuardian'&&payload){
+      const id=normalizeNameClient(payload.name),phone=normalizePhoneClient(payload.phone);
       const guardian={id,name:String(payload.name||'').trim(),phone};
-      store.guardians=(store.guardians||[]).filter(g=>g.id!==id); store.guardians.push(guardian);
+      store.guardians=(store.guardians||[]).filter(g=>g.id!==id);store.guardians.push(guardian);
       store.students=(store.students||[]).map(st=>normalizeNameClient(st.name)===id?Object.assign({},st,{guardianPhone:phone}):st);
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
     }
-    const ref=db.collection('schools').doc(activeSchoolId).collection('private').doc('appData');
-    await ref.set({store,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    const result=await syncStoreToCloud();
+    if(!result.ok)return result;
     return {ok:true,phone:action==='saveGuardian'?normalizePhoneClient(payload&&payload.phone):undefined,added:action==='importGuardians'&&payload&&Array.isArray(payload.guardians)?payload.guardians.length:undefined,updated:0};
   }catch(e){
     console.error('Firebase sync failed:',action,e);
@@ -549,8 +624,56 @@ async function pushToServer(action, payload){
   }
 }
 async function pullFromServer(silent){
- if(!db || !activeSchoolId) return false;
- try{const snap=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get(); if(snap.exists && snap.data().store){store=snap.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); if(!silent)render();return true;}}catch(e){console.error('Cloud load failed',e);} return false;
+  if(!db||!activeSchoolId)return false;
+  // Never replace unsaved local edits with a polling response.
+  if(cloudDirty)return false;
+  const revisionAtStart=localRevision;
+  try{
+    const snap=await db.collection('schools').doc(activeSchoolId).collection('private').get();
+    if(localRevision!==revisionAtStart||cloudDirty)return false;
+    const docs=snap.docs||[];
+    const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
+    const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
+    if(metaDoc||recordDocs.length){
+      const meta=metaDoc?metaDoc.data():{};
+      const next=emptyCloudStore();
+      next.schoolType=meta.schoolType||'girls';
+      next.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
+      next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')next[kind].push(record);
+      });
+      next.classes.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+      next.students.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+      next.staff.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+      next.attendance.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+      next.guardians.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudDirty=false;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      if(!silent)render();
+      return true;
+    }
+    // One-time, backward-compatible migration from the previous appData document.
+    const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
+    if(legacy){
+      store=normalizeCloudStore(legacy.data().store);
+      cloudBaseline=emptyCloudStore();cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // No cloud data yet: keep this school's local data and upload it in the new format.
+    cloudBaseline=emptyCloudStore();
+    const local=normalizeCloudStore(store);
+    const hasLocalData=CLOUD_ARRAY_FIELDS.some(k=>local[k].length)||local.teacherNames.length||
+      local.reportSignatures.manager||local.reportSignatures.attendance;
+    if(hasLocalData){cloudDirty=true;await syncStoreToCloud();}
+    else {cloudDirty=false;await syncStoreToCloud();}
+    if(!silent)render();
+    return false;
+  }catch(e){console.error('Cloud load failed',e);return false;}
 }
 let syncListenersBound = false;
 function startAutoSync(){
