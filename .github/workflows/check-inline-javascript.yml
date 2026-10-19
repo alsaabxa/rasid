@@ -1,4 +1,5 @@
 name: Validate inline JavaScript
+# Checks the latest branch revision without deploying to production.
 on:
   push:
     branches:
