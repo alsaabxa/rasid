@@ -66,14 +66,14 @@ a{color:inherit; text-decoration:none;}
 .brand-text h1{font-size:1.05rem; font-weight:800; letter-spacing:.2px;}
 .brand-text p{font-size:.75rem; color:#c7d7e0; font-weight:500;}
 .clock{
-  display:flex; align-items:center; gap:14px;
-  background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.14);
-  padding:8px 16px; border-radius:12px;
-  font-size:.85rem;
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.10);
+  padding:5px 10px; border-radius:10px;
+  font-size:.76rem;
 }
-.clock .time{font-size:1.15rem; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums;}
-.clock .dates{display:flex; flex-direction:column; gap:2px; color:#dce9ee; line-height:1.3;}
+.clock .time{font-size:.98rem; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums; white-space:nowrap;}
+.clock .dates{display:flex; flex-direction:column; gap:1px; color:#dce9ee; line-height:1.2;}
 .topnav{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
 .nav-btn{
   color:#e7eff3; padding:8px 14px; border-radius:10px; font-weight:600; font-size:.9rem;
@@ -328,7 +328,7 @@ input,select,.btn{min-height:42px;}
 .notification-bell .bell-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:99px;background:#dc2626;color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:800;padding:0 4px;}
 .notification-bell.ring{animation:bellRing .55s ease-in-out 3;}
 @keyframes bellRing{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
-@media(max-width:900px){.topbar{padding:10px 12px;gap:8px}.brand-text h1{font-size:1rem}.brand-text p{font-size:.68rem}.clock{display:flex;order:3;width:100%;justify-content:space-between;padding:6px 10px;font-size:.75rem;gap:8px}.clock .time{font-size:1rem}.clock .dates{flex:1;flex-direction:row;flex-wrap:wrap;justify-content:space-between;gap:4px 10px}.topnav{order:4;width:100%;overflow-x:auto;flex-wrap:nowrap;padding:2px 0 5px;scrollbar-width:thin}.topnav .nav-btn{white-space:nowrap;flex-shrink:0}.notification-bell{flex-shrink:0}.page-title{align-items:flex-start;gap:10px}.cc-actions{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.topbar{padding:8px 10px;gap:7px}.brand-text h1{font-size:.96rem}.brand-text p{font-size:.65rem}.clock{order:3;width:auto;max-width:100%;justify-content:flex-start;padding:4px 8px;font-size:.68rem;gap:7px;flex:0 1 auto}.clock .time{font-size:.88rem}.clock .dates{flex:0 1 auto;flex-direction:column;gap:1px}.topnav{order:4;width:100%;overflow-x:auto;flex-wrap:nowrap;padding:2px 0 5px;scrollbar-width:thin}.topnav .nav-btn{white-space:nowrap;flex-shrink:0}.notification-bell{flex-shrink:0}.page-title{align-items:flex-start;gap:10px}.cc-actions{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.container,.scan-wrap{width:calc(100% - 16px)}.page-title{flex-direction:column}.page-title>div:last-child{width:100%}.page-title .btn{width:100%}.stats-grid{grid-template-columns:repeat(2,1fr);gap:8px}.stat-card{padding:12px 8px}.stat-card .num{font-size:1.35rem}.class-card{border-radius:14px}.cc-body{padding:12px}.cc-actions{gap:6px}.cc-actions button{font-size:.75rem;padding:9px 5px}.scan-wrap{padding-bottom:12px}.student-item{padding:10px 8px}.student-item .s-name{font-size:.88rem}.report-table{min-width:620px}.report-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.report-filters{gap:8px}.confirm-wrap{padding:24px 14px}.toast{width:calc(100% - 24px);text-align:center;justify-content:center}.notification-bell{width:40px;height:40px}}
 @media(min-width:601px) and (max-width:1024px){.container,.scan-wrap{width:calc(100% - 32px)}.classes-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.cc-actions{grid-template-columns:repeat(3,1fr);}}
 
