@@ -955,7 +955,7 @@ function bindLogin(){
    } else {
     const cred=await auth.signInWithEmailAndPassword(email,password); const snap=await db.collection('users').doc(cred.user.uid).get(); const profile=snap.data();
     if(!profile || profile.status!=='approved' || !profile.schoolId){await auth.signOut();throw new Error('طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.');}
-    activeSchoolId=profile.schoolId; STORAGE_KEY='zahra_store_v1_'+activeSchoolId; store=loadStore(); SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
+    activeSchoolId=profile.schoolId; resetCloudSyncState(activeSchoolId); STORAGE_KEY='zahra_store_v1_'+activeSchoolId; store=loadStore(); SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
     await pullFromServer(true);
     startAutoSync(); navigate('dashboard');
    }
