@@ -403,12 +403,14 @@ function loadStore(){
       const parsed = JSON.parse(raw);
       if(!Array.isArray(parsed.teacherNames)) parsed.teacherNames = [];
       if(!Array.isArray(parsed.guardians)) parsed.guardians = [];
+      if(!['boys','girls'].includes(parsed.schoolType)) parsed.schoolType = 'girls';
       return parsed;
     }
   }catch(e){}
-  return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[] };
+  return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[], schoolType:'girls' };
 }
 function saveStore(){
+  if(!['boys','girls'].includes(store.schoolType)) store.schoolType = 'girls';
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   if(db && activeSchoolId && session && session.approved){
     clearTimeout(saveTimer);
@@ -633,9 +635,12 @@ function render(){
       case 'staff': app.innerHTML = viewStaff(); bindStaff(); break;
       case 'guardians': app.innerHTML = viewGuardians(); bindGuardians(); break;
       case 'absenceReport': app.innerHTML = viewAbsenceReport(); bindAbsenceReport(); break;
+      case 'settings': app.innerHTML = viewSchoolSettings(); bindSchoolSettings(); break;
       default: app.innerHTML = viewDashboard(); bindDashboard();
     }
   }
+  applyGenderLanguage(document.getElementById('topnav'));
+  applyGenderLanguage(app);
   if(focusInfo){
     const el = document.getElementById(focusInfo.id);
     if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
@@ -654,6 +659,7 @@ function renderTopnav(){
     links += `<a class="nav-btn ${route.name==='staff'?'active':''}" data-nav="staff">الإداريات</a>`;
     links += `<a class="nav-btn ${route.name==='guardians'?'active':''}" data-nav="guardians">أولياء الأمور</a>`;
     links += `<a class="nav-btn ${route.name==='absenceReport'?'active':''}" data-nav="absenceReport">تقرير الغياب</a>`;
+    links += `<a class="nav-btn ${route.name==='settings'?'active':''}" data-nav="settings">إعدادات المدرسة</a>`;
   }
   nav.innerHTML = `
     ${links}
@@ -663,6 +669,95 @@ function renderTopnav(){
   nav.querySelectorAll('[data-nav]').forEach(el=> el.onclick = ()=> navigate(el.dataset.nav));
   document.getElementById('logoutBtn').onclick = logout;
   bindNotificationBell();
+}
+
+/* ==========================================================================
+   إعدادات المدرسة واللغة
+   ========================================================================== */
+function viewSchoolSettings(){
+  const type = store.schoolType === 'boys' ? 'boys' : 'girls';
+  return `<div class="container">
+    <div class="page-title"><div><h2>إعدادات المدرسة</h2><p>تخصيص العبارات والضمائر حسب نوع المدرسة</p></div></div>
+    <div class="modal wide" style="position:relative;margin:0 auto;max-width:720px">
+      <div class="modal-head"><h3>نوع المدرسة</h3></div>
+      <div class="modal-body">
+        <p style="color:#5b7382;margin-bottom:18px">يتغير أسلوب العبارات الظاهرة في المنصة تلقائيًا حسب اختيارك. لا يتم تعديل أسماء الطلاب أو سجلات الحضور والغياب.</p>
+        <div class="field">
+          <label for="schoolTypeSelect">اختر نوع المدرسة</label>
+          <select id="schoolTypeSelect">
+            <option value="boys" ${type==='boys'?'selected':''}>مدرسة بنين — مذكر</option>
+            <option value="girls" ${type==='girls'?'selected':''}>مدرسة بنات — مؤنث</option>
+          </select>
+        </div>
+        <div style="background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0">
+          <div style="font-weight:800;margin-bottom:8px">معاينة العبارات</div>
+          <div id="genderPreview" style="line-height:2">${type==='boys'?'المعلم — الإداري — اسحب — حاضر — غائب':'المعلمة — الإدارية — اسحبي — حاضرة — غائبة'}</div>
+        </div>
+        <button class="btn btn-primary" id="saveSchoolType">حفظ الإعدادات</button>
+        <span id="schoolTypeSaved" style="margin-right:10px;color:var(--success);font-weight:700"></span>
+      </div>
+    </div>
+  </div>`;
+}
+function bindSchoolSettings(){
+  const select = document.getElementById('schoolTypeSelect');
+  const preview = document.getElementById('genderPreview');
+  const saved = document.getElementById('schoolTypeSaved');
+  if(!select) return;
+  select.onchange = ()=>{
+    preview.textContent = select.value === 'boys'
+      ? 'المعلم — الإداري — اسحب — حاضر — غائب'
+      : 'المعلمة — الإدارية — اسحبي — حاضرة — غائبة';
+    saved.textContent = '';
+  };
+  document.getElementById('saveSchoolType').onclick = ()=>{
+    store.schoolType = select.value === 'boys' ? 'boys' : 'girls';
+    saveStore();
+    saved.textContent = 'تم حفظ الإعدادات';
+    render();
+  };
+}
+function applyGenderLanguage(root){
+  if(!root || store.schoolType !== 'boys') return;
+  const pairs = [
+    ['الطلاب والطالبات','الطلاب'],
+    ['الطالبات','الطلاب'],
+    ['الطالبة','الطالب'],
+    ['الطالب/ة','الطالب'],
+    ['ابنتكم','ابنكم'],
+    ['المعلمات','المعلمين'],
+    ['المعلمة','المعلم'],
+    ['الإداريات','الإداريين'],
+    ['الإدارية','الإداري'],
+    ['اسحبي','اسحب'],
+    ['امسحي','امسح'],
+    ['اكتبي','اكتب'],
+    ['حاضرات','حاضرون'],
+    ['غائبات','غائبون'],
+    ['حاضرة','حاضر'],
+    ['غائبة','غائب'],
+    ['غائبات:','غائبون:'],
+    ['امسحي الكود','امسح الكود'],
+    ['أضيفي','أضف'],
+    ['اختاري','اختر'],
+    ['أدخلي','أدخل'],
+    ['اكتبي','اكتب']
+  ];
+  const translate = value => {
+    let out = value;
+    for(const [from,to] of pairs) out = out.split(from).join(to);
+    return out;
+  };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while(walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node=>{ node.nodeValue = translate(node.nodeValue); });
+  root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el=>{
+    ['placeholder','title','aria-label'].forEach(attr=>{
+      const val=el.getAttribute(attr);
+      if(val) el.setAttribute(attr,translate(val));
+    });
+  });
 }
 
 /* ==========================================================================
