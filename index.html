@@ -744,7 +744,7 @@ function filteredDashboardClasses(){
   const classes = visibleClasses();
   if(!q) return classes;
   return classes.filter(c=>{
-    if(c.name.includes(q) || String(c.number||'').includes(q)) return true;
+    if(classDisplayName(c).toLocaleLowerCase().includes(q.toLocaleLowerCase())) return true;
     return studentsOfClass(c.id).some(s=> s.name.includes(q) || String(s.number||'').includes(q));
   });
 }
@@ -1213,7 +1213,7 @@ function openStudentsModal(classId){
   host.innerHTML = `
   <div class="overlay" id="ov">
     <div class="modal wide">
-      <div class="modal-head"><h3>طالبات فصل ${esc(cls.name)}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-head"><h3>الطلاب والطالبات في فصل ${esc(classDisplayName(cls))}</h3><button class="modal-close" id="cl">✕</button></div>
       <div class="modal-body">
         <div style="display:flex; gap:10px; margin-bottom:14px;">
           <input class="searchbox" style="margin:0;" id="searchS" placeholder="بحث بالاسم أو الرقم...">
@@ -1645,7 +1645,7 @@ function openGuardianImportModal(){
 function viewAbsenceReport(){
   const classes=visibleClasses(); const selected=route.classId||classes[0]?.id||''; const date=route.date||todayStr();
   return `<div class="container"><div class="page-title"><div><h2>تقارير الحضور والغياب</h2><p>تقارير يومية وأسبوعية وشهرية</p></div><button class="btn btn-outline" id="reportRefresh">↻ تحديث البيانات</button></div>
-  <div class="report-filters"><div class="field"><label>الفصل</label><select id="reportClass">${classes.map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="field"><label>نوع التقرير</label><select id="reportPeriod"><option value="daily">يومي</option><option value="weekly">أسبوعي</option><option value="monthly">شهري</option></select></div><div class="field"><label>التاريخ المرجعي</label><input id="reportDate" type="date" value="${esc(date)}"></div><button class="btn btn-primary" id="loadReport">عرض التقرير</button><button class="btn btn-outline" id="allClassesReport">🖨 تقرير اليوم لجميع الفصول</button></div>
+  <div class="report-filters"><div class="field"><label>الفصل</label><select id="reportClass">${classes.map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(classDisplayName(c))}</option>`).join('')}</select></div><div class="field"><label>نوع التقرير</label><select id="reportPeriod"><option value="daily">يومي</option><option value="weekly">أسبوعي</option><option value="monthly">شهري</option></select></div><div class="field"><label>التاريخ المرجعي</label><input id="reportDate" type="date" value="${esc(date)}"></div><button class="btn btn-primary" id="loadReport">عرض التقرير</button><button class="btn btn-outline" id="allClassesReport">🖨 تقرير اليوم لجميع الفصول</button></div>
   <div id="reportHost"></div></div>`;
 }
 async function fetchReportBootstrap(){
