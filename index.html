@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>منصة راصد للغياب</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -38,7 +38,7 @@ body{
   direction:rtl;
 }
 button, input, select{font-family:inherit; font-size:1rem;}
-button{cursor:pointer; border:none; background:none;}
+button{cursor:pointer; border:none; background:none; touch-action:manipulation;}
 a{color:inherit; text-decoration:none;}
 ::selection{background:var(--gold); color:var(--navy);}
 
@@ -210,7 +210,7 @@ a{color:inherit; text-decoration:none;}
 .list-row .info b{display:block; color:var(--navy); font-size:.92rem;}
 .list-row .info span{color:#5b7382; font-size:.78rem;}
 .row-actions{display:flex; gap:6px;}
-.icon-btn{width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#5b7382; background:var(--bg1);}
+.icon-btn{width:44px; min-width:44px; height:44px; min-height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#5b7382; background:var(--bg1); touch-action:manipulation;}
 .icon-btn:hover{background:#e4f1ee; color:var(--teal);}
 .icon-btn.del:hover{background:var(--danger-bg); color:var(--danger);}
 .searchbox{
@@ -323,7 +323,7 @@ button,input,select{font:inherit;}
 .cc-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
 .cc-actions button{min-height:44px;}
 .container,.scan-wrap{width:min(1180px,calc(100% - 24px));}
-input,select,.btn{min-height:42px;}
+input,select,.btn{min-height:44px; touch-action:manipulation;}
 .notification-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;font-size:1.2rem;}
 .notification-bell .bell-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:99px;background:#dc2626;color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:800;padding:0 4px;}
 .notification-bell.ring{animation:bellRing .55s ease-in-out 3;}
