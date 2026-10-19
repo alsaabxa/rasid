@@ -419,6 +419,18 @@ function saveStore(){
     saveTimer=setTimeout(()=>db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').set({store,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.error('Cloud save failed',e)),450);
   }
 }
+function cloneStoreSnapshot(){ return JSON.parse(JSON.stringify(store)); }
+function restoreStoreSnapshot(snapshot){
+  clearTimeout(saveTimer); saveTimer=null;
+  store=snapshot;
+  try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); }catch(e){ console.error('Local rollback failed',e); }
+}
+async function persistStoreMutation(action,payload,snapshot){
+  clearTimeout(saveTimer); saveTimer=null;
+  const result=await pushToServer(action,payload);
+  if(!result.ok) restoreStoreSnapshot(snapshot);
+  return result;
+}
 function loadSession(){
   try{ const raw = sessionStorage.getItem(SESSION_KEY); if(raw) return JSON.parse(raw); }catch(e){}
   return null;
@@ -975,15 +987,18 @@ async function deleteClass(classId){
     ? `سيتم حذف فصل "${cls?cls.name:''}" مع جميع طالباته (${count}) وسجلات غيابه نهائياً. متابعة؟`
     : 'تأكيد حذف الفصل؟';
   if(!confirm(msg)) return;
-  const pass = prompt('لتأكيد الحذف، يرجى إدخال كلمة مرور المشرفة:');
-  if(pass===null) return; // ألغت العملية
-  if(!(await verifyAdminPassword(pass))){ toast('كلمة المرور غير صحيحة — لم يتم حذف الفصل', true); return; }
+  if(!auth || !auth.currentUser || !activeSchoolId || !session || !session.approved){
+    toast('انتهت جلسة الدخول أو لا توجد صلاحية للحذف؛ سجلي الدخول مجددًا',true); return;
+  }
+  if(!confirm('تأكيد نهائي: سيتم حذف الفصل وبياناته من قاعدة البيانات. هل تريد المتابعة؟')) return;
+  const snapshot=cloneStoreSnapshot();
   store.classes = store.classes.filter(c=>c.id!==classId);
   store.students = store.students.filter(s=>s.classId!==classId);
   store.attendance = store.attendance.filter(a=>a.classId!==classId);
-  saveStore(); render();
-  await pushToServer('deleteClass', {id:classId});
-  toast('تم حذف الفصل وجميع طالباته');
+  saveStore();
+  const result=await persistStoreMutation('deleteClass', {id:classId},snapshot);
+  if(!result.ok){render();toast('تعذر حذف الفصل من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+  render(); toast('تم حذف الفصل وجميع طالباته');
 }
 async function deleteTodayAttendance(classId){
   if(!confirm('حذف رصد اليوم لهذا الفصل؟')) return;
@@ -1101,9 +1116,11 @@ function openClassModal(existing){
       document.querySelectorAll('[data-edit-student-inline]').forEach(b=> b.onclick = ()=> openStudentFormModal(existing.id, store.students.find(s=>s.id===b.dataset.editStudentInline), ()=> drawEditStudents(document.getElementById('editSearchS').value.trim())));
       document.querySelectorAll('[data-del-student-inline]').forEach(b=> b.onclick = async ()=>{
         if(!confirm('حذف هذا الطالب/ة؟')) return;
+        const snapshot=cloneStoreSnapshot();
         store.students = store.students.filter(s=>s.id!==b.dataset.delStudentInline); saveStore();
-        await pushToServer('deleteStudent', {id:b.dataset.delStudentInline});
+        const result=await persistStoreMutation('deleteStudent', {id:b.dataset.delStudentInline},snapshot);
         drawEditStudents(document.getElementById('editSearchS').value.trim());
+        if(!result.ok){toast('تعذر حذف الطالب/ة من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
         toast('تم حذف الطالب/ة');
       });
     };
@@ -1190,10 +1207,13 @@ function openClassModal(existing){
     if(!/^\d+$/.test(number)){ toast('رقم الفصل يجب أن يكون رقمًا صحيحًا', true); return; }
     const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && String(c.number).trim()===number);
     if(duplicate){ toast('هذا الصف ورقم الفصل موجودان مسبقًا', true); return; }
+    const snapshot=cloneStoreSnapshot();
     if(existing){
       existing.number = number; existing.name = name;
-      saveStore(); await pushToServer('saveClass', existing);
-      toast('تم تحديث الفصل');
+      saveStore();
+      const result=await persistStoreMutation('saveClass', existing,snapshot);
+      if(!result.ok){close();render();toast('تعذر حفظ تعديل الفصل في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      toast('تم تحديث الفصل وحفظه في قاعدة البيانات');
     }else{
       const classId = uid();
       const classObj = { id: classId, number, name };
@@ -1201,8 +1221,9 @@ function openClassModal(existing){
       store.classes.push(classObj);
       store.students.push(...newStudents);
       saveStore();
-      await pushToServer('saveClassWithStudents', { classObj, students: newStudents });
-      toast('تم حفظ الفصل والطالبات بنجاح');
+      const result=await persistStoreMutation('saveClassWithStudents', { classObj, students: newStudents },snapshot);
+      if(!result.ok){close();render();toast('تعذر حفظ الفصل والطلاب في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      toast('تم حفظ الفصل والطالبات في قاعدة البيانات');
     }
     close(); render();
   };
@@ -1354,10 +1375,12 @@ function openStudentsModal(classId){
     document.querySelectorAll('[data-edit-student]').forEach(b=> b.onclick = ()=> openStudentFormModal(classId, store.students.find(s=>s.id===b.dataset.editStudent), ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); }));
     document.querySelectorAll('[data-del-student]').forEach(b=> b.onclick = async ()=>{
       if(!confirm('حذف هذا الطالب/ة؟')) return;
+      const snapshot=cloneStoreSnapshot();
       store.students = store.students.filter(s=>s.id!==b.dataset.delStudent); saveStore();
-      await pushToServer('deleteStudent', {id:b.dataset.delStudent});
+      const result=await persistStoreMutation('deleteStudent', {id:b.dataset.delStudent},snapshot);
       document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents();
-      renderTopnav();
+      if(!result.ok){toast('تعذر حذف الطالب/ة من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      renderTopnav(); toast('تم حذف الطالب/ة');
     });
   }
   bindStudentRowEvents();
