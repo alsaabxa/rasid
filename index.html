@@ -690,7 +690,17 @@ async function pullFromServer(silent){
     // One-time, backward-compatible migration from the previous appData document.
     if(legacy){
       store=normalizeCloudStore(legacy.data().store);
-      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      // Treat any partial V2 records as the previous cloud snapshot so stale partial records are deleted.
+      const partial=emptyCloudStore();
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')partial[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:partial[kind].length,__record:record});
+      });
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        partial[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        partial[kind]=partial[kind].map(x=>x.__record);
+      });
+      cloudBaseline=normalizeCloudStore(partial);cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       await syncStoreToCloud();
       if(!silent)render();
