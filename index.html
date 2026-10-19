@@ -654,8 +654,8 @@ async function pullFromServer(silent){
     const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
     const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
     const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
-    // If migration was interrupted before appMeta was written, resume from the legacy source.
-    if(metaDoc||(recordDocs.length&&!legacy)){
+    // Only appMeta marks a complete V2 snapshot. Without it, reconcile partial writes below.
+    if(metaDoc){
       const meta=metaDoc?metaDoc.data():{};
       const next=emptyCloudStore();
       next.schoolType=meta.schoolType||'girls';
@@ -677,6 +677,31 @@ async function pullFromServer(silent){
     // One-time, backward-compatible migration from the previous appData document.
     if(legacy){
       store=normalizeCloudStore(legacy.data().store);
+      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // Recover an interrupted first-time upload when records exist but appMeta does not.
+    if(recordDocs.length){
+      const merged=normalizeCloudStore(store);
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        const docsForKind=recordDocs.filter(d=>d.data().kind===kind).sort((a,b)=>{
+          const ao=Number.isFinite(a.data().order)?a.data().order:0;
+          const bo=Number.isFinite(b.data().order)?b.data().order:0;
+          return ao-bo;
+        });
+        const known=new Set(merged[kind].map((item,index)=>cloudRecordId(kind,item,index)));
+        docsForKind.forEach(d=>{
+          const data=d.data(),record=data.record;
+          if(record&&typeof record==='object'&&!known.has(d.id)){
+            merged[kind].push(record);
+            known.add(d.id);
+          }
+        });
+      });
+      store=normalizeCloudStore(merged);
       cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       await syncStoreToCloud();
