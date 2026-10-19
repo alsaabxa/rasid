@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>منصة راصد لرصد الغياب — متوسطة آبي شعيب بمكة المكرمة</title>
+<title>منصة راصد للغياب</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -344,8 +344,8 @@ input,select,.btn{min-height:42px;}
   <div class="brand">
     <div class="brand-mark">ر</div>
     <div class="brand-text">
-      <h1>منصة راصد لرصد الغياب</h1>
-      <p>متوسطة آبي شعيب — مكة المكرمة</p>
+      <h1>منصة راصد للغياب</h1>
+      <p id="brandSchoolName">إدارة المدارس بحساب معتمد</p>
     </div>
   </div>
   <div class="clock" id="clock">
@@ -366,7 +366,7 @@ input,select,.btn{min-height:42px;}
 <script src="./firebase-config.js"></script>
 <script>
 /* ==========================================================================
-   منصة راصد لرصد الغياب — تطبيق صفحة واحدة (SPA)
+   منصة راصد للغياب — تطبيق صفحة واحدة (SPA)
    ملاحظة: ضع رابط Google Apps Script (بعد نشره كـ Web App) هنا للمزامنة.
    بدون هذا الرابط يعمل التطبيق محلياً بالكامل عبر LocalStorage.
    ========================================================================== */
@@ -586,6 +586,9 @@ function visibleClasses(){
    العرض الرئيسي
    ========================================================================== */
 function render(){
+  document.title = session ? `منصة راصد للغياب — ${SCHOOL_NAME}` : 'منصة راصد للغياب';
+  const brandSchoolName = document.getElementById('brandSchoolName');
+  if(brandSchoolName) brandSchoolName.textContent = session ? SCHOOL_NAME : 'إدارة المدارس بحساب معتمد';
   const active = document.activeElement;
   let focusInfo = null;
   if(active && active.id && (active.tagName==='INPUT' || active.tagName==='TEXTAREA')){
@@ -639,7 +642,7 @@ function renderTopnav(){
    شاشة الدخول
    ========================================================================== */
 function viewLogin(){
-  return `<div class="login-wrap"><div class="login-card"><div class="brand-mark">ر</div><h2>منصة راصد لرصد الغياب</h2><p class="sub">إدارة المدارس بحساب معتمد</p>
+  return `<div class="login-wrap"><div class="login-card"><div class="brand-mark">ر</div><h2>منصة راصد للغياب</h2><p class="sub">إدارة المدارس بحساب معتمد</p>
   <div class="login-tabs"><button id="loginTab" class="active">تسجيل الدخول</button><button id="registerTab">تسجيل مدرسة جديدة</button></div>
   <div class="login-error" id="loginErr"></div><form id="loginForm">
    <div class="field" id="schoolField" style="display:none"><label>اسم المدرسة</label><input id="schoolName" autocomplete="organization"></div>
