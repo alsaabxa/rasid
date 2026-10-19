@@ -1065,7 +1065,7 @@ function extractNamesFromExcel(sheets){
     let headerRow = -1, nameCol = -1;
     for(let ri=0;ri<Math.min(rows.length,30);ri++){
       const row = rows[ri] || [];
-      const ci = row.findIndex(v => /اسم\s*(الطالب/ة|الطالب|الاسم)|student\s*name|^name$/i.test(String(v ?? '').trim()));
+      const ci = row.findIndex(v => /اسم\s*(الطالبة|الطالب|الاسم)|student\s*name|^name$/i.test(String(v ?? '').trim()));
       if(ci>=0){headerRow=ri;nameCol=ci;break;}
     }
     if(nameCol>=0){
@@ -1081,14 +1081,14 @@ function extractNamesFromExcel(sheets){
       let score=0;
       for(const row of rows){
         const v=String((row||[])[ci] ?? '').replace(/\s+/g,' ').trim();
-        if(isName(v) && !/^(الفصل|اسم الطالب/ة|رقم الطالب/ة|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(v)) score++;
+        if(isName(v) && !/^(الفصل|اسم الطالب\/ة|اسم الطالبة|اسم الطالب|رقم الطالب\/ة|رقم الطالبة|رقم الطالب|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(v)) score++;
       }
       if(score>bestScore){bestScore=score;bestCol=ci;}
     }
     if(bestCol>=0){
       for(const row of rows){
         const value=String((row||[])[bestCol] ?? '').replace(/\s+/g,' ').trim();
-        if(isName(value) && !/^(الفصل|اسم الطالب/ة|رقم الطالب/ة|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(value) && !seen.has(value)){
+        if(isName(value) && !/^(الفصل|اسم الطالب\/ة|اسم الطالبة|اسم الطالب|رقم الطالب\/ة|رقم الطالبة|رقم الطالب|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(value) && !seen.has(value)){
           seen.add(value);found.push(value);
         }
       }
@@ -1580,7 +1580,7 @@ function openGuardianImportModal(){
     if(imported.kind==='excel'){
       const data=imported.rows;
       const headers=(data[0]||[]).map(x=>String(x).trim());
-      let ni=headers.findIndex(h=>h.includes('اسم الطالب/ة')||h==='الطالب/ة'||h.includes('اسم'));
+      let ni=headers.findIndex(h=>h.includes('اسم الطالب/ة')||h.includes('اسم الطالبة')||h.includes('اسم الطالب')||h==='الطالب/ة'||h==='الطالبة'||h==='الطالب'||h.includes('اسم'));
       let pi=headers.findIndex(h=>h.includes('رقم')||h.includes('جوال')||h.includes('هاتف')||h.includes('ولي'));
       if(ni<0) ni=0; if(pi<0) pi=1;
       rows=data.slice(1).map(r=>({name:String(r[ni]??'').trim(),phone:normalizePhoneClient(r[pi])})).filter(x=>x.name&&x.phone);
