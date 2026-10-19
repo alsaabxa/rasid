@@ -871,6 +871,15 @@ async function deleteTodayAttendance(classId){
 }
 
 /* ---------- إضافة / تعديل فصل ---------- */
+function nextClassNumber(){
+  const numbers = (store.classes || []).map(c=>{
+    const value=String(c && c.number != null ? c.number : '').trim();
+    if(!/^\d+$/.test(value)) return null;
+    const n=Number(value);
+    return Number.isSafeInteger(n) && n>=0 ? n : null;
+  }).filter(n=>n!==null);
+  return String((numbers.length ? Math.max(...numbers) : 0)+1);
+}
 function openClassModal(existing){
   const host = document.getElementById('modalHost');
   host.innerHTML = `
@@ -879,7 +888,7 @@ function openClassModal(existing){
       <div class="modal-head"><h3>${existing? 'تعديل فصل':'إضافة فصل جديد وإدارة الطالبات'}</h3><button class="modal-close" id="cl">✕</button></div>
       <div class="modal-body">
         <div class="two-col">
-          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):''}" placeholder="مثال: 1"></div>
+          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):nextClassNumber()}" placeholder="مثال: 1"></div>
           <div class="field"><label>اسم / رقم الفصل</label><input id="cName" value="${existing? esc(existing.name):''}" placeholder="مثال: أول متوسط / 1"></div>
         </div>
         ${existing ? `
