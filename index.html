@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{
   --navy:#102a43;
@@ -1008,16 +1009,13 @@ function openClassModal(existing){
         const imported = await readNamesImportFile(file);
         let names = [];
         if(imported.kind === 'excel'){
-          const rows = imported.rows;
-          names = rows.filter(r=>r && r.some(v=>String(v??'').trim()!==''))
-            .map(r=>String(r.length>=2 ? (r[1] || r[0] || '') : (r[0] || '')).trim())
-            .filter(Boolean);
+          names = extractNamesFromExcel(imported.sheets || [imported.rows || []]);
         }else{
           names = imported.text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
         }
-        if(!names.length){ toast('لم يتم العثور على أسماء في الملف', true); return; }
+        if(!names.length){ toast('لم يتم العثور على أسماء. تأكدي من أن ملف Excel يحتوي على عمود أسماء واضح.', true); return; }
         addNames(names);
-        toast(`تم استيراد الأسماء من "${file.name}"`);
+        toast(`تم استيراد ${names.length} اسمًا من "${file.name}"`);
       }catch(err){ toast(err && err.message ? err.message : 'تعذّرت قراءة الملف', true); }
     }
   }
@@ -1046,6 +1044,50 @@ function openClassModal(existing){
 
 
 /* قراءة ملفات الاستيراد حسب نوعها، لتجنب عرض محتوى PDF وWord الثنائي كرموز */
+function extractNamesFromExcel(sheets){
+  const found = [];
+  const seen = new Set();
+  const isName = value => {
+    const v = String(value ?? '').replace(/\s+/g,' ').trim();
+    return v.length >= 2 && /[\u0600-\u06FFa-zA-Z]/.test(v) && !/^\d+$/.test(v);
+  };
+  for(const rows of sheets){
+    if(!Array.isArray(rows) || !rows.length) continue;
+    let headerRow = -1, nameCol = -1;
+    for(let ri=0;ri<Math.min(rows.length,30);ri++){
+      const row = rows[ri] || [];
+      const ci = row.findIndex(v => /اسم\s*(الطالبة|الطالب|الاسم)|student\s*name|^name$/i.test(String(v ?? '').trim()));
+      if(ci>=0){headerRow=ri;nameCol=ci;break;}
+    }
+    if(nameCol>=0){
+      for(let ri=headerRow+1;ri<rows.length;ri++){
+        const value=String((rows[ri]||[])[nameCol] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(value) && !seen.has(value)){seen.add(value);found.push(value);}
+      }
+      continue;
+    }
+    const maxCols=Math.max(0,...rows.map(row=>(row||[]).length));
+    let bestCol=-1,bestScore=0;
+    for(let ci=0;ci<maxCols;ci++){
+      let score=0;
+      for(const row of rows){
+        const v=String((row||[])[ci] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(v) && !/^(الفصل|اسم الطالبة|رقم الطالبة|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(v)) score++;
+      }
+      if(score>bestScore){bestScore=score;bestCol=ci;}
+    }
+    if(bestCol>=0){
+      for(const row of rows){
+        const value=String((row||[])[bestCol] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(value) && !/^(الفصل|اسم الطالبة|رقم الطالبة|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(value) && !seen.has(value)){
+          seen.add(value);found.push(value);
+        }
+      }
+    }
+  }
+  return found;
+}
+
 async function readNamesImportFile(file){
   const name = String(file && file.name || '');
   const ext = (name.match(/\.([^.]+)$/) || [,''])[1].toLowerCase();
@@ -1053,8 +1095,8 @@ async function readNamesImportFile(file){
     if (!window.XLSX) throw new Error('مكتبة Excel غير متاحة');
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, {type:'array'});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    return {kind:'excel', rows:XLSX.utils.sheet_to_json(ws,{header:1,defval:''})};
+    const sheets = wb.SheetNames.map(sheetName => XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''}));
+    return {kind:'excel', sheets};
   }
   if (ext === 'docx') {
     if (!window.mammoth) throw new Error('تعذر تحميل قارئ Word');
@@ -1081,8 +1123,27 @@ async function readNamesImportFile(file){
         if (line) lines.push(line);
       });
     }
-    const text = lines.join('\n');
-    if (!text.trim()) throw new Error('ملف PDF مصوّر ولا يحتوي على نص قابل للاستخراج. استخدمي Excel أو Word أو ملف PDF قابلًا لتحديد النص.');
+    let text = lines.join('\n');
+    if (!text.trim()) {
+      if(!window.Tesseract) throw new Error('هذا PDF عبارة عن صور. تعذّر تحميل قارئ OCR؛ جرّبي نسخة PDF نصية أو ملف Word.');
+      const worker = await Tesseract.createWorker('ara');
+      try{
+        const ocrLines=[];
+        for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+          const page=await pdf.getPage(pageNo);
+          const viewport=page.getViewport({scale:2});
+          const canvas=document.createElement('canvas');
+          canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
+          const ctx=canvas.getContext('2d');
+          await page.render({canvasContext:ctx,viewport}).promise;
+          const result=await worker.recognize(canvas);
+          if(result && result.data && result.data.text) ocrLines.push(result.data.text);
+          canvas.width=canvas.height=1;
+        }
+        text=ocrLines.join('\n');
+      }finally{ await worker.terminate(); }
+      if(!text.trim()) throw new Error('لم يتمكن OCR من قراءة أسماء من هذا الملف. جرّبي نسخة أوضح أو ملف Excel/Word.');
+    }
     return {kind:'text', text};
   }
   if (['txt','csv'].includes(ext)) return {kind:'text', text:await file.text()};
