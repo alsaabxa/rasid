@@ -403,7 +403,7 @@ function loadStore(){
       const parsed = JSON.parse(raw);
       if(!Array.isArray(parsed.teacherNames)) parsed.teacherNames = [];
       if(!Array.isArray(parsed.guardians)) parsed.guardians = [];
-      if(!parsed.reportSignatures || typeof parsed.reportSignatures !== 'object') parsed.reportSignatures = {manager:'', attendance:' ' .trim()};
+      if(!parsed.reportSignatures || typeof parsed.reportSignatures !== 'object') parsed.reportSignatures = {manager:'', attendance:''};
       if(typeof parsed.reportSignatures.manager !== 'string') parsed.reportSignatures.manager = '';
       if(typeof parsed.reportSignatures.attendance !== 'string') parsed.reportSignatures.attendance = '';
       if(!['boys','girls'].includes(parsed.schoolType)) parsed.schoolType = 'girls';
@@ -1861,7 +1861,8 @@ async function loadAbsenceReport(){
 function exportPeriodReportExcel(rows,classId,periodLabel,dateLabel){
   if(typeof XLSX==='undefined'){toast('تعذر تحميل مكتبة Excel',true);return;}
   const cls=store.classes.find(c=>String(c.id)===String(classId)); const wb=XLSX.utils.book_new();
-  const data=[[SCHOOL_NAME],['تقرير الحضور والغياب '+periodLabel],['الفصل: '+(cls?.name||'')],['الفترة: '+dateLabel],[],['التاريخ','رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة'],...rows.map(r=>[r.date,r.number,r.name,r.phone,r.status])];
+  const sign=store.reportSignatures||{};
+  const data=[[SCHOOL_NAME],['تقرير الحضور والغياب '+periodLabel],['الفصل: '+(cls?.name||'')],['الفترة: '+dateLabel],['التاريخ الهجري: '+reportDateLabels().hijri],['التاريخ الميلادي: '+reportDateLabels().greg],['الساعة: '+nowTimeStr()],[],['التاريخ','رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة'],...rows.map(r=>[r.date,r.number,r.name,r.phone,r.status]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']];
   const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:14},{wch:16},{wch:30},{wch:20},{wch:18}];
   XLSX.utils.book_append_sheet(wb,ws,'تقرير الحضور');
   XLSX.writeFile(wb,`تقرير_${periodLabel}_${(cls?.name||'الفصل').replace(/[\\/:*?"<>|]/g,'_')}_${dateLabel.replace(/[^0-9-]/g,'_')}.xlsx`);
@@ -2037,7 +2038,8 @@ function exportClassExcel(classId){
       'التاريخ': todayStr()
     };
   });
-  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+cls.name],['التاريخ: '+todayStr()],[],['رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r['رقم الطالب/ة'],r['اسم الطالب/ة'],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']])]);
+  const sign=store.reportSignatures||{};
+  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+cls.name],['التاريخ الميلادي: '+reportDateLabels().greg],['التاريخ الهجري: '+reportDateLabels().hijri],['الساعة: '+nowTimeStr()],[],['رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r['رقم الطالب/ة'],r['اسم الطالب/ة'],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'الغياب');
   XLSX.writeFile(wb, `تقرير_غياب_${cls.name}_${todayStr()}.xlsx`);
