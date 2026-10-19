@@ -424,6 +424,7 @@ function normalizeCloudStore(value){
   return out;
 }
 let cloudBaseline = null;
+let cloudMetaExists = false;
 let cloudDirty = false;
 let cloudWriteQueue = Promise.resolve();
 let localRevision = 0;
@@ -481,7 +482,7 @@ async function syncStoreToCloud(){
     });
     oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
     const oldMeta=cloudMetaFor(base),newMeta=cloudMetaFor(target);
-    if(stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudBaseline){
+    if(stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudMetaExists){
       writes.push({type:'set',id:'appMeta',data:Object.assign({},newMeta,{updatedAt:firebase.firestore.FieldValue.serverTimestamp()})});
     }
     // Use multiple small batches; Firestore permits at most 500 writes per batch.
@@ -494,6 +495,7 @@ async function syncStoreToCloud(){
       await batch.commit();
     }
     cloudBaseline=target;
+    cloudMetaExists=true;
     cloudDirty=(localRevision!==revision);
     if(cloudDirty){clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);}
     return {ok:true};
@@ -649,7 +651,7 @@ async function pullFromServer(silent){
         next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
         next[kind]=next[kind].map(x=>x.__record);
       });
-      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudDirty=false;
+      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudDirty=false;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       if(!silent)render();
       return true;
@@ -658,14 +660,14 @@ async function pullFromServer(silent){
     const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
     if(legacy){
       store=normalizeCloudStore(legacy.data().store);
-      cloudBaseline=emptyCloudStore();cloudDirty=true;
+      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudDirty=true;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       await syncStoreToCloud();
       if(!silent)render();
       return true;
     }
     // No cloud data yet: keep this school's local data and upload it in the new format.
-    cloudBaseline=emptyCloudStore();
+    cloudBaseline=emptyCloudStore();cloudMetaExists=false;
     const local=normalizeCloudStore(store);
     const hasLocalData=CLOUD_ARRAY_FIELDS.some(k=>local[k].length)||local.teacherNames.length||
       local.reportSignatures.manager||local.reportSignatures.attendance;
