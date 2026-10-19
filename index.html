@@ -1063,6 +1063,7 @@ async function readNamesImportFile(file){
   }
   if (ext === 'pdf') {
     if (!window.pdfjsLib) throw new Error('تعذر تحميل قارئ PDF');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const pdf = await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
     const lines = [];
     for (let pageNo=1; pageNo<=pdf.numPages; pageNo++) {
