@@ -437,7 +437,7 @@ function cloudRecordsFor(value){
   CLOUD_ARRAY_FIELDS.forEach(kind=>{
     (value[kind]||[]).forEach((item,index)=>{
       const id=cloudRecordId(kind,item,index);
-      out.set(id,{kind,record:item});
+      out.set(id,{kind,record:item,order:index});
     });
   });
   return out;
@@ -475,8 +475,8 @@ async function syncStoreToCloud(){
     const writes=[];
     newRecords.forEach((value,id)=>{
       const old=oldRecords.get(id);
-      if(!old||stableCloudJson(old.record)!==stableCloudJson(value.record)||old.kind!==value.kind){
-        writes.push({type:'set',id,data:{kind:'record',record:value.record,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
+      if(!old||stableCloudJson(old.record)!==stableCloudJson(value.record)||old.kind!==value.kind||old.order!==value.order){
+        writes.push({type:'set',id,data:{kind:'record',record:value.record,order:value.order,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
       }
     });
     oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
@@ -495,6 +495,7 @@ async function syncStoreToCloud(){
     }
     cloudBaseline=target;
     cloudDirty=(localRevision!==revision);
+    if(cloudDirty){clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);}
     return {ok:true};
   };
   const queued=cloudWriteQueue.then(run,run);
@@ -642,13 +643,12 @@ async function pullFromServer(silent){
       next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
       recordDocs.forEach(d=>{
         const data=d.data(),kind=data.kind,record=data.record;
-        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')next[kind].push(record);
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')next[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:next[kind].length,__record:record});
       });
-      next.classes.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
-      next.students.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
-      next.staff.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
-      next.attendance.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
-      next.guardians.sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')));
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        next[kind]=next[kind].map(x=>x.__record);
+      });
       store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudDirty=false;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       if(!silent)render();
