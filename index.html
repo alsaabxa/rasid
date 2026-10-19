@@ -328,7 +328,7 @@ input,select,.btn{min-height:42px;}
 .notification-bell .bell-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:99px;background:#dc2626;color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:800;padding:0 4px;}
 .notification-bell.ring{animation:bellRing .55s ease-in-out 3;}
 @keyframes bellRing{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
-@media(max-width:900px){.topbar{padding:10px 12px}.brand-text h1{font-size:1rem}.brand-text p{font-size:.68rem}.clock{display:none}.topnav{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.topnav .nav-btn{white-space:nowrap}.page-title{align-items:flex-start;gap:10px}.cc-actions{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.topbar{padding:10px 12px;gap:8px}.brand-text h1{font-size:1rem}.brand-text p{font-size:.68rem}.clock{display:flex;order:3;width:100%;justify-content:space-between;padding:6px 10px;font-size:.75rem;gap:8px}.clock .time{font-size:1rem}.clock .dates{flex:1;flex-direction:row;flex-wrap:wrap;justify-content:space-between;gap:4px 10px}.topnav{order:4;width:100%;overflow-x:auto;flex-wrap:nowrap;padding:2px 0 5px;scrollbar-width:thin}.topnav .nav-btn{white-space:nowrap;flex-shrink:0}.notification-bell{flex-shrink:0}.page-title{align-items:flex-start;gap:10px}.cc-actions{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.container,.scan-wrap{width:calc(100% - 16px)}.page-title{flex-direction:column}.page-title>div:last-child{width:100%}.page-title .btn{width:100%}.stats-grid{grid-template-columns:repeat(2,1fr);gap:8px}.stat-card{padding:12px 8px}.stat-card .num{font-size:1.35rem}.class-card{border-radius:14px}.cc-body{padding:12px}.cc-actions{gap:6px}.cc-actions button{font-size:.75rem;padding:9px 5px}.scan-wrap{padding-bottom:12px}.student-item{padding:10px 8px}.student-item .s-name{font-size:.88rem}.report-table{min-width:620px}.report-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.report-filters{gap:8px}.confirm-wrap{padding:24px 14px}.toast{width:calc(100% - 24px);text-align:center;justify-content:center}.notification-bell{width:40px;height:40px}}
 @media(min-width:601px) and (max-width:1024px){.container,.scan-wrap{width:calc(100% - 32px)}.classes-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.cc-actions{grid-template-columns:repeat(3,1fr);}}
 
@@ -403,11 +403,14 @@ function loadStore(){
       const parsed = JSON.parse(raw);
       if(!Array.isArray(parsed.teacherNames)) parsed.teacherNames = [];
       if(!Array.isArray(parsed.guardians)) parsed.guardians = [];
+      if(!parsed.reportSignatures || typeof parsed.reportSignatures !== 'object') parsed.reportSignatures = {manager:'', attendance:' ' .trim()};
+      if(typeof parsed.reportSignatures.manager !== 'string') parsed.reportSignatures.manager = '';
+      if(typeof parsed.reportSignatures.attendance !== 'string') parsed.reportSignatures.attendance = '';
       if(!['boys','girls'].includes(parsed.schoolType)) parsed.schoolType = 'girls';
       return parsed;
     }
   }catch(e){}
-  return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[], schoolType:'girls' };
+  return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[], schoolType:'girls', reportSignatures:{manager:'',attendance:''} };
 }
 function saveStore(){
   if(!['boys','girls'].includes(store.schoolType)) store.schoolType = 'girls';
@@ -653,17 +656,17 @@ function renderTopnav(){
   const nav = document.getElementById('topnav');
   if(!session){ nav.innerHTML=''; return; }
   let links = `<a class="nav-btn ${route.name==='dashboard'?'active':''}" data-nav="dashboard">لوحة التحكم</a>`;
-  links += `<button class="notification-bell no-print" id="notificationBell" title="تنبيهات الرصد" aria-label="تنبيهات الرصد">🔔<span class="bell-count" id="bellCount">0</span></button>`;
   links += `<a class="nav-btn ${route.name==='qr'?'active':''}" data-nav="qr">أكواد QR</a>`;
   if(session.type==='admin'){
     links += `<a class="nav-btn ${route.name==='staff'?'active':''}" data-nav="staff">الإداريات</a>`;
     links += `<a class="nav-btn ${route.name==='guardians'?'active':''}" data-nav="guardians">أولياء الأمور</a>`;
     links += `<a class="nav-btn ${route.name==='absenceReport'?'active':''}" data-nav="absenceReport">تقرير الغياب</a>`;
-    links += `<a class="nav-btn ${route.name==='settings'?'active':''}" data-nav="settings">إعدادات المدرسة</a>`;
+    links += `<a class="nav-btn ${route.name==='settings'?'active':''}" data-nav="settings">الإعدادات</a>`;
   }
   nav.innerHTML = `
     ${links}
     <div class="user-chip"><span class="dot"></span> ${esc(session.name)}</div>
+    <button class="notification-bell no-print" id="notificationBell" title="تنبيهات الرصد" aria-label="تنبيهات الرصد">🔔<span class="bell-count" id="bellCount">0</span></button>
     <button class="nav-btn logout-btn" id="logoutBtn">خروج</button>
   `;
   nav.querySelectorAll('[data-nav]').forEach(el=> el.onclick = ()=> navigate(el.dataset.nav));
@@ -677,9 +680,9 @@ function renderTopnav(){
 function viewSchoolSettings(){
   const type = store.schoolType === 'boys' ? 'boys' : 'girls';
   return `<div class="container">
-    <div class="page-title"><div><h2>إعدادات المدرسة</h2><p>تخصيص العبارات والضمائر حسب نوع المدرسة</p></div></div>
+    <div class="page-title"><div><h2>الإعدادات</h2><p>تخصيص نوع المدرسة وأسماء التوقيع أسفل التقارير المصدّرة</p></div></div>
     <div class="modal wide" style="position:relative;margin:0 auto;max-width:720px">
-      <div class="modal-head"><h3>نوع المدرسة</h3></div>
+      <div class="modal-head"><h3>إعدادات المدرسة والتقارير</h3></div>
       <div class="modal-body">
         <p style="color:#5b7382;margin-bottom:18px">يتغير أسلوب العبارات الظاهرة في المنصة تلقائيًا حسب اختيارك. لا يتم تعديل أسماء الطلاب أو سجلات الحضور والغياب.</p>
         <div class="field">
@@ -692,6 +695,13 @@ function viewSchoolSettings(){
         <div style="background:var(--bg1);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0">
           <div style="font-weight:800;margin-bottom:8px">معاينة العبارات</div>
           <div id="genderPreview" style="line-height:2">${type==='boys'?'المعلم — الإداري — اسحب — حاضر — غائب':'المعلمة — الإدارية — اسحبي — حاضرة — غائبة'}</div>
+        </div>
+        <div style="border-top:1px solid var(--line);margin:22px 0 16px;padding-top:18px">
+          <h3 style="font-size:1rem;color:var(--navy);margin-bottom:12px">الأسماء أسفل التقارير المصدّرة</h3>
+          <div class="two-col">
+            <div class="field"><label for="reportManagerName">مدير / ة المدرسة</label><input id="reportManagerName" maxlength="120" value="${esc(store.reportSignatures?.manager||'')}" placeholder="اسم مدير/ة المدرسة"></div>
+            <div class="field"><label for="reportAttendanceName">مسؤول / ة الرصد</label><input id="reportAttendanceName" maxlength="120" value="${esc(store.reportSignatures?.attendance||'')}" placeholder="اسم مسؤول/ة الرصد"></div>
+          </div>
         </div>
         <button class="btn btn-primary" id="saveSchoolType">حفظ الإعدادات</button>
         <span id="schoolTypeSaved" style="margin-right:10px;color:var(--success);font-weight:700"></span>
@@ -712,6 +722,10 @@ function bindSchoolSettings(){
   };
   document.getElementById('saveSchoolType').onclick = ()=>{
     store.schoolType = select.value === 'boys' ? 'boys' : 'girls';
+    store.reportSignatures = {
+      manager: (document.getElementById('reportManagerName')?.value||'').trim(),
+      attendance: (document.getElementById('reportAttendanceName')?.value||'').trim()
+    };
     saveStore();
     saved.textContent = 'تم حفظ الإعدادات';
     render();
@@ -1644,6 +1658,17 @@ function bindQR(){
 function statusRank(s){ s=String(s||''); if(s==='غائبة'||s==='غائب'||s==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s==='present') return 1; return 2; }
 // الغائبات أولاً ثم الحاضرات ثم غير المرصودات (مع الحفاظ على الترتيب الأصلي داخل كل مجموعة)
 function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); return rows.map((r,i)=>[r,i]).sort((a,b)=>statusRank(getStatus(a[0]))-statusRank(getStatus(b[0]))||a[1]-b[1]).map(x=>x[0]); }
+function reportDateLabels(date=new Date()){
+  let hijri='—', greg='—';
+  try{hijri=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date)+' هـ';}catch(e){}
+  try{greg=new Intl.DateTimeFormat('ar-SA-u-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date)+' م';}catch(e){}
+  return {hijri,greg};
+}
+function reportSignatureFooter(){
+  const names=store.reportSignatures||{};
+  return `<footer style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-top:36px;padding-top:14px;border-top:1px solid #b8c8d0;color:#102a43;font-size:13px;page-break-inside:avoid"><div style="min-width:220px;text-align:center">مدير / ة المدرسة<br><strong>${esc(names.manager||'')}</strong><br>التوقيع: ........................</div><div style="min-width:220px;text-align:center">مسؤول / ة الرصد<br><strong>${esc(names.attendance||'')}</strong><br>التوقيع: ........................</div></footer>`;
+}
+
 function printElement(html, title){
   const w = window.open('', '_blank');
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
@@ -1845,7 +1870,7 @@ function exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period){
   const cls=store.classes.find(c=>String(c.id)===String(classId));
   const body=rows.map((r,i)=>`<tr><td>${i+1}</td>${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td>${esc(r.status)}</td></tr>`).join('');
   const dateHead=period==='daily'?'':'<th>التاريخ</th>';
-  const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${dateHead}<th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</b></p>`;
+  const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p><p style="margin:4px 0 0">التاريخ الهجري: ${reportDateLabels().hijri} — الميلادي: ${reportDateLabels().greg} — الساعة: ${nowTimeStr()}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${dateHead}<th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</b></p>${reportSignatureFooter()}`;
   printElement(html,`تقرير ${periodLabel} ${cls?.name||''} ${dateLabel}`);
 }
 async function printAllClassesAbsenceReport(){
@@ -1865,7 +1890,7 @@ async function printAllClassesAbsenceReport(){
     const color=st=>statusRank(st)===0?'#dc2626':statusRank(st)===1?'#16a34a':'#8299a6';
     sections+=`<section style="page-break-after:always;margin-bottom:25px;"><h2>${esc(cls.name)}</h2><p>${esc(SCHOOL_NAME)} — التاريخ: ${esc(date)} — الغائبات: <b>${absentCount}</b> من ${rows.length}</p><table style="width:100%;border-collapse:collapse;" border="1" cellpadding="7"><thead><tr><th>#</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${rows.map((r,j)=>`<tr><td>${j+1}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td style="color:${color(r.status)};font-weight:700;">${esc(r.status)}</td></tr>`).join('')}</tbody></table></section>`;
   });
-  printElement(`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain;"><div><h1 style="color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2>تقرير الغياب — جميع الفصول</h2><p>التاريخ: ${esc(date)} — إجمالي الغائبات: <b>${totalAbsent}</b></p></div></header>${sections}`,`تقرير غياب جميع الفصول — ${date}`);
+  printElement(`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain;"><div><h1 style="color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2>تقرير الغياب — جميع الفصول</h2><p>التاريخ الميلادي: ${reportDateLabels().greg} — التاريخ الهجري: ${reportDateLabels().hijri} — الساعة: ${nowTimeStr()}</p><p>التاريخ: ${esc(date)} — إجمالي الغائبات: <b>${totalAbsent}</b></p></div></header>${sections}${reportSignatureFooter()}`,`تقرير غياب جميع الفصول — ${date}`);
 }
 
 function bindAbsenceReport(){document.getElementById('loadReport').onclick=loadAbsenceReport;document.getElementById('reportRefresh').onclick=loadAbsenceReport;document.getElementById('allClassesReport').onclick=printAllClassesAbsenceReport;loadAbsenceReport();}
@@ -2032,11 +2057,12 @@ function exportClassPDF(classId){
   const html = `
   <div style="font-family:'Cairo',sans-serif; direction:rtl; padding:10px;">
     <header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain;"><div><h1 style="font-size:22px;color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2 style="color:#102a43;margin:5px 0;">تقرير غياب — ${esc(cls.name)}</h2></div></header>
-    <p style="color:#555; font-size:13px;">${esc(SCHOOL_NAME)} — التاريخ: ${todayStr()} ${att? '— المعلمة: '+esc(att.teacher)+' — الساعة: '+esc(att.time):''}</p>
+    <p style="color:#555; font-size:13px;">${esc(SCHOOL_NAME)} — التاريخ الميلادي: ${reportDateLabels().greg} — التاريخ الهجري: ${reportDateLabels().hijri} — الساعة: ${nowTimeStr()} ${att? '— المعلمة: '+esc(att.teacher)+' — وقت الرصد: '+esc(att.time):''}</p>
     <table style="width:100%; border-collapse:collapse; margin-top:14px;" border="1" cellpadding="8">
       <thead style="background:#102a43; color:#fff;"><tr><th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>
+    ${reportSignatureFooter()}
   </div>`;
   printElement(html, `تقرير غياب ${cls.name}`);
 }
