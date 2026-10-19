@@ -466,6 +466,9 @@ function restoreStoreSnapshot(snapshot){
   clearTimeout(saveTimer);saveTimer=null;
   store=normalizeCloudStore(snapshot);localRevision++;cloudDirty=true;
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Local rollback failed',e);}
+  if(db&&activeSchoolId&&session&&session.approved){
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud rollback sync failed',e)),3000);
+  }
 }
 async function syncStoreToCloud(){
   if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
