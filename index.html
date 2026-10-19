@@ -1651,7 +1651,7 @@ function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); r
 function reportDateLabels(date=new Date()){
   let hijri='—', greg='—';
   try{hijri=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date)+' هـ';}catch(e){}
-  try{greg=new Intl.DateTimeFormat('ar-SA-u-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date)+' م';}catch(e){}
+  try{greg=new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date)+' م';}catch(e){}
   return {hijri,greg};
 }
 function reportHijriForDate(dateStr){
