@@ -431,7 +431,8 @@ let cloudWriteQueue = Promise.resolve();
 let localRevision = 0;
 const CLOUD_ARRAY_FIELDS = ['classes','students','staff','attendance','guardians'];
 function cloudRecordId(kind,item,index){
-  const raw=item&&item.id!=null?String(item.id):'legacy_'+index;
+  // Attendance is keyed by class and date in this app, so keep its document ID stable even without a legacy record ID.
+  const raw=item&&item.id!=null?String(item.id):(kind==='attendance'&&item?String(item.classId||'')+'_'+String(item.date||''):'legacy_'+index);
   return 'v2_'+kind+'_'+encodeURIComponent(raw);
 }
 function cloudRecordsFor(value){
