@@ -508,7 +508,12 @@ async function syncStoreToCloud(){
   };
   const queued=cloudWriteQueue.then(run,run);
   cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
-  return queued;
+  return queued.catch(e=>{
+    cloudDirty=true;
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(err=>console.error('Cloud retry failed',err)),3000);
+    throw e;
+  });
 }
 async function persistStoreMutation(action,payload,snapshot){
   clearTimeout(saveTimer);saveTimer=null;
