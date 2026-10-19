@@ -425,6 +425,7 @@ function normalizeCloudStore(value){
 }
 let cloudBaseline = null;
 let cloudMetaExists = false;
+let cloudRevision = 0;
 let cloudDirty = false;
 let cloudWriteQueue = Promise.resolve();
 let localRevision = 0;
@@ -460,7 +461,7 @@ function saveStore(){
   }
 }
 function cloneStoreSnapshot(){return JSON.parse(JSON.stringify(store));}
-function resetCloudSyncState(schoolId){clearTimeout(saveTimer);saveTimer=null;cloudBaseline=null;cloudMetaExists=false;cloudDirty=false;localRevision++;}
+function resetCloudSyncState(schoolId){clearTimeout(saveTimer);saveTimer=null;cloudBaseline=null;cloudMetaExists=false;cloudRevision=0;cloudDirty=false;localRevision++;}
 function restoreStoreSnapshot(snapshot){
   clearTimeout(saveTimer);saveTimer=null;
   store=normalizeCloudStore(snapshot);localRevision++;cloudDirty=true;
@@ -475,6 +476,7 @@ async function syncStoreToCloud(){
     const revision=localRevision;
     const privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
     const base=normalizeCloudStore(cloudBaseline||emptyCloudStore());
+    const baseRevision=Number(cloudRevision)||0;
     const oldRecords=cloudRecordsFor(base),newRecords=cloudRecordsFor(target);
     const writes=[];
     newRecords.forEach((value,id)=>{
@@ -485,19 +487,20 @@ async function syncStoreToCloud(){
     });
     oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
     const oldMeta=cloudMetaFor(base),newMeta=cloudMetaFor(target);
-    if(stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudMetaExists){
-      writes.push({type:'set',id:'appMeta',data:Object.assign({},newMeta,{updatedAt:firebase.firestore.FieldValue.serverTimestamp()})});
+    if(writes.length||stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudMetaExists){
+      writes.push({type:'set',id:'appMeta',merge:true,data:Object.assign({},newMeta,{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()})});
     }
     // Use multiple small batches; Firestore permits at most 500 writes per batch.
     for(let offset=0;offset<writes.length;offset+=400){
       const batch=db.batch();
       writes.slice(offset,offset+400).forEach(w=>{
         const ref=privateRef.doc(w.id);
-        if(w.type==='delete')batch.delete(ref);else batch.set(ref,w.data);
+        if(w.type==='delete')batch.delete(ref);else if(w.merge)batch.set(ref,w.data,{merge:true});else batch.set(ref,w.data);
       });
       await batch.commit();
     }
     cloudBaseline=target;
+    if(writes.some(w=>w.id==='appMeta'))cloudRevision=baseRevision+1;
     cloudMetaExists=true;
     cloudDirty=(localRevision!==revision);
     if(cloudDirty){clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);}
@@ -655,7 +658,7 @@ async function pullFromServer(silent){
         next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
         next[kind]=next[kind].map(x=>x.__record);
       });
-      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudDirty=false;
+      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       if(!silent)render();
       return true;
@@ -664,14 +667,14 @@ async function pullFromServer(silent){
     const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
     if(legacy){
       store=normalizeCloudStore(legacy.data().store);
-      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudDirty=true;
+      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       await syncStoreToCloud();
       if(!silent)render();
       return true;
     }
     // No cloud data yet: keep this school's local data and upload it in the new format.
-    cloudBaseline=emptyCloudStore();cloudMetaExists=false;
+    cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;
     const local=normalizeCloudStore(store);
     const hasLocalData=CLOUD_ARRAY_FIELDS.some(k=>local[k].length)||local.teacherNames.length||
       local.reportSignatures.manager||local.reportSignatures.attendance;
@@ -682,15 +685,25 @@ async function pullFromServer(silent){
   }catch(e){console.error('Cloud load failed',e);return false;}
 }
 let syncListenersBound = false;
+async function checkCloudMetaAndPull(){
+  if(!db||!activeSchoolId||cloudDirty)return false;
+  const requestedSchoolId=activeSchoolId;
+  try{
+    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').doc('appMeta').get();
+    if(activeSchoolId!==requestedSchoolId||cloudDirty||!snap.exists)return false;
+    const data=snap.data()||{},revision=Number(data.revision)||0;
+    if(revision!==cloudRevision)return pullFromServer(true);
+  }catch(e){console.error('Cloud revision check failed',e);}
+  return false;
+}
 function startAutoSync(){
   if(syncTimer) clearInterval(syncTimer);
   if(!db || !activeSchoolId) return;
-  pullFromServer(true);
-  syncTimer = setInterval(()=>pullFromServer(true), 4000);
+  syncTimer = setInterval(()=>checkCloudMetaAndPull(), 4000);
   if(!syncListenersBound){
     syncListenersBound = true;
-    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pullFromServer(true); });
-    window.addEventListener('focus', ()=> pullFromServer(true));
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkCloudMetaAndPull(); });
+    window.addEventListener('focus', ()=> checkCloudMetaAndPull());
   }
 }
 
