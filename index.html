@@ -370,10 +370,9 @@ input,select,.btn{min-height:42px;}
 <script>
 /* ==========================================================================
    منصة راصد للغياب — تطبيق صفحة واحدة (SPA)
-   ملاحظة: ضع رابط Google Apps Script (بعد نشره كـ Web App) هنا للمزامنة.
-   بدون هذا الرابط يعمل التطبيق محلياً بالكامل عبر LocalStorage.
+   مصدر البيانات السحابي: Firebase Authentication + Cloud Firestore.
+   يحتفظ التطبيق بنسخة محلية مؤقتة لدعم الاستمرارية عند ضعف الاتصال.
    ========================================================================== */
-const SCRIPT_URL = ""; // Firebase replaces the school-specific Google Apps Script endpoint.
 let SCHOOL_NAME = "منصة راصد للمدارس";
 const firebaseConfig = window.ZAHRA_FIREBASE_CONFIG || {};
 let auth = null, db = null, activeSchoolId = null, firebaseReady = false, saveTimer = null, pendingRegistration = false;
@@ -508,7 +507,7 @@ if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)retu
 
 
 /* ==========================================================================
-   المزامنة مع Google Sheets
+   المزامنة مع Firebase Cloud Firestore
    ========================================================================== */
 let syncTimer = null;
 let guardianImportBusy = false;
@@ -1783,19 +1782,14 @@ function viewAbsenceReport(){
   <div id="reportHost"></div></div>`;
 }
 async function fetchReportBootstrap(){
-  try{
-    const res=await fetch(SCRIPT_URL+'?action=bootstrap&_report='+Date.now(),{cache:'no-store'});
-    const data=await res.json();
-    if(data && data.ok){
-      return {
-        classes:Array.isArray(data.classes)?data.classes:[],
-        students:Array.isArray(data.students)?data.students:[],
-        attendance:Array.isArray(data.attendance)?data.attendance:[],
-        guardians:Array.isArray(data.guardians)?data.guardians:[]
-      };
-    }
-  }catch(e){}
-  return null;
+  // التقارير تقرأ من نفس مخزن Firebase المستخدم في بقية المنصة، دون أي endpoint خارجي.
+  await pullFromServer(true);
+  return {
+    classes:Array.isArray(store.classes)?store.classes:[],
+    students:Array.isArray(store.students)?store.students:[],
+    attendance:Array.isArray(store.attendance)?store.attendance:[],
+    guardians:Array.isArray(store.guardians)?store.guardians:[]
+  };
 }
 // يزيل عمود واتساب من نسخة الطباعة
 function stripWaColumn(html){ return String(html).replace(/<(th|td) class="wa-col">[\s\S]*?<\/\1>/g,''); }
