@@ -652,7 +652,9 @@ async function pullFromServer(silent){
     const docs=snap.docs||[];
     const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
     const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
-    if(metaDoc||recordDocs.length){
+    const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
+    // If migration was interrupted before appMeta was written, resume from the legacy source.
+    if(metaDoc||(recordDocs.length&&!legacy)){
       const meta=metaDoc?metaDoc.data():{};
       const next=emptyCloudStore();
       next.schoolType=meta.schoolType||'girls';
@@ -672,7 +674,6 @@ async function pullFromServer(silent){
       return true;
     }
     // One-time, backward-compatible migration from the previous appData document.
-    const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
     if(legacy){
       store=normalizeCloudStore(legacy.data().store);
       cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
