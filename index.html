@@ -460,6 +460,7 @@ function saveStore(){
   }
 }
 function cloneStoreSnapshot(){return JSON.parse(JSON.stringify(store));}
+function resetCloudSyncState(schoolId){clearTimeout(saveTimer);saveTimer=null;cloudBaseline=null;cloudMetaExists=false;cloudDirty=false;localRevision++;}
 function restoreStoreSnapshot(snapshot){
   clearTimeout(saveTimer);saveTimer=null;
   store=normalizeCloudStore(snapshot);localRevision++;cloudDirty=true;
@@ -467,10 +468,12 @@ function restoreStoreSnapshot(snapshot){
 }
 async function syncStoreToCloud(){
   if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  const requestedSchoolId=activeSchoolId;
   const run=async()=>{
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
     const target=normalizeCloudStore(cloneStoreSnapshot());
     const revision=localRevision;
-    const privateRef=db.collection('schools').doc(activeSchoolId).collection('private');
+    const privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
     const base=normalizeCloudStore(cloudBaseline||emptyCloudStore());
     const oldRecords=cloudRecordsFor(base),newRecords=cloudRecordsFor(target);
     const writes=[];
@@ -594,7 +597,7 @@ function tickClock(){
   document.getElementById('clockGregorian').textContent = greg;
 }
 setInterval(tickClock, 1000); tickClock();
-if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)return;try{const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();if(!p||p.status!=='approved'){await auth.signOut();session=null;render();return;}activeSchoolId=p.schoolId;STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();await pullFromServer(true);startAutoSync();render();}catch(e){console.error(e);}});}
+if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)return;try{const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();if(!p||p.status!=='approved'){await auth.signOut();session=null;render();return;}activeSchoolId=p.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();await pullFromServer(true);startAutoSync();render();}catch(e){console.error(e);}});}
 
 
 /* ==========================================================================
@@ -630,10 +633,11 @@ async function pullFromServer(silent){
   if(!db||!activeSchoolId)return false;
   // Never replace unsaved local edits with a polling response.
   if(cloudDirty)return false;
+  const requestedSchoolId=activeSchoolId;
   const revisionAtStart=localRevision;
   try{
-    const snap=await db.collection('schools').doc(activeSchoolId).collection('private').get();
-    if(localRevision!==revisionAtStart||cloudDirty)return false;
+    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').get();
+    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||cloudDirty)return false;
     const docs=snap.docs||[];
     const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
     const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
@@ -933,9 +937,8 @@ function bindLogin(){
     await auth.signOut();pendingRegistration=false;document.getElementById('loginErr').textContent='تم إرسال طلب التسجيل. سيعمل الحساب بعد اعتماد المدرسة.';
    }else{
     if(!profile||profile.status!=='approved'||!profile.schoolId){await auth.signOut();pendingRegistration=false;throw new Error(profile?'طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.':'اختر «تسجيل مدرسة جديدة» أولاً لإرسال طلب الاعتماد.');}
-    activeSchoolId=profile.schoolId;STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=profile.schoolName||'مدرستي';session={type:'admin',id:uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
-    const data=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get();
-    if(data.exists&&data.data().store){store=data.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}else{store={classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[]};saveStore();}
+    activeSchoolId=profile.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=profile.schoolName||'مدرستي';session={type:'admin',id:uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);
     pendingRegistration=false;startAutoSync();navigate('dashboard');
    }
   }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/popup-closed-by-user'?'أُغلق تسجيل الدخول قبل اكتماله.':(err.message||'تعذر تسجيل الدخول باستخدام Google.');}
@@ -953,9 +956,7 @@ function bindLogin(){
     const cred=await auth.signInWithEmailAndPassword(email,password); const snap=await db.collection('users').doc(cred.user.uid).get(); const profile=snap.data();
     if(!profile || profile.status!=='approved' || !profile.schoolId){await auth.signOut();throw new Error('طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.');}
     activeSchoolId=profile.schoolId; STORAGE_KEY='zahra_store_v1_'+activeSchoolId; store=loadStore(); SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
-    const data=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get();
-    if(data.exists && data.data().store){store=data.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}
-    else {store={classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[]};saveStore();}
+    await pullFromServer(true);
     startAutoSync(); navigate('dashboard');
    }
   }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/email-already-in-use'?'هذا البريد مسجل مسبقًا.':err.code==='auth/invalid-credential'?'البريد أو كلمة المرور غير صحيحة.':err.code==='auth/weak-password'?'كلمة المرور يجب أن تكون 6 أحرف على الأقل.':(err.message||'تعذر إتمام الطلب.');}
