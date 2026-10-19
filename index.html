@@ -874,9 +874,8 @@ async function deleteTodayAttendance(classId){
 function cleanClassName(name, number){
   let value=String(name || '').trim();
   const num=String(number == null ? '' : number).trim();
-  if(num){
-    const escaped=num.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-    value=value.replace(new RegExp('\\s*[-/–—]?\\s*'+escaped+'$'), '').trim();
+  if(num && /^\\d+$/.test(num)){
+    value=value.replace(new RegExp('\\\\s*(?:[-/–—]\\\\s*|\\\\s+)'+num+'$'), '').trim();
   }
   return value;
 }
