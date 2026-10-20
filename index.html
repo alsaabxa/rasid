@@ -289,7 +289,9 @@ a{color:inherit; text-decoration:none;}
 .qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;}
 .qr-card{background:#fff; border-radius:18px; box-shadow:var(--shadow); padding:20px; text-align:center;}
 .qr-card .qr-school{font-size:.72rem; color:#5b7382; font-weight:700;}
-.qr-card .qr-class{font-size:1.05rem; font-weight:800; color:var(--navy); margin:4px 0 12px;}
+.qr-card .qr-class{font-size:1.05rem; font-weight:800; color:var(--navy); margin:4px 0 8px;}
+.qr-card .qr-brand{display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; color:var(--navy); font-size:.82rem; font-weight:800;}
+.qr-card .qr-brand-mark{display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:var(--teal); color:#fff; font-size:1rem; font-weight:900;}
 .qr-card .qr-box{display:flex; justify-content:center; margin-bottom:12px;}
 .qr-card .qr-hint{font-size:.72rem; color:var(--teal); font-weight:700; margin-bottom:12px;}
 .qr-card .qr-actions{display:flex; gap:6px; justify-content:center;}
@@ -1844,6 +1846,7 @@ function viewQR(){
       <div class="qr-card" id="qrcard-${c.id}">
         <div class="qr-school">${esc(SCHOOL_NAME)}</div>
         <div class="qr-class">${esc(classDisplayName(c))}</div>
+        <div class="qr-brand" aria-label="شعار منصة راصد"><span class="qr-brand-mark" aria-hidden="true">ر</span><span>منصة راصد للغياب</span></div>
         <div class="qr-box" id="qrbox-${c.id}"></div>
         <div class="qr-hint">امسحي الكود لبدء رصد الغياب</div>
         <div class="qr-actions">
@@ -1905,7 +1908,9 @@ function printElement(html, title){
     .qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:20px;}
     .qr-card{border:2px solid #102a43; border-radius:14px; padding:18px; text-align:center; page-break-inside:avoid;}
     .qr-school{font-size:11px; color:#555;}
-    .qr-class{font-size:18px; font-weight:800; color:#102a43; margin:6px 0 12px;}
+    .qr-class{font-size:18px; font-weight:800; color:#102a43; margin:6px 0 8px;}
+    .qr-brand{display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; color:#102a43; font-size:12px; font-weight:800;}
+    .qr-brand-mark{display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:#0f766e; color:#fff; font-size:14px; font-weight:900;}
     .qr-box{display:flex; justify-content:center; margin-bottom:10px;}
     .qr-hint{font-size:11px; color:#0f766e; font-weight:700;}
     .qr-actions{display:none;}
