@@ -411,24 +411,131 @@ function loadStore(){
   }catch(e){}
   return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[], schoolType:'girls', reportSignatures:{manager:'',attendance:''} };
 }
+function emptyCloudStore(){
+  return {classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[],schoolType:'girls',reportSignatures:{manager:'',attendance:''}};
+}
+function normalizeCloudStore(value){
+  const out=Object.assign(emptyCloudStore(),value||{});
+  ['classes','students','staff','attendance','teacherNames','guardians'].forEach(k=>{if(!Array.isArray(out[k]))out[k]=[];});
+  if(!out.reportSignatures||typeof out.reportSignatures!=='object')out.reportSignatures={manager:'',attendance:''};
+  if(typeof out.reportSignatures.manager!=='string')out.reportSignatures.manager='';
+  if(typeof out.reportSignatures.attendance!=='string')out.reportSignatures.attendance='';
+  if(!['boys','girls'].includes(out.schoolType))out.schoolType='girls';
+  return out;
+}
+let cloudBaseline = null;
+let cloudMetaExists = false;
+let cloudRevision = 0;
+let cloudDirty = false;
+let cloudWriteQueue = Promise.resolve();
+let localRevision = 0;
+const CLOUD_ARRAY_FIELDS = ['classes','students','staff','attendance','guardians'];
+function cloudRecordId(kind,item,index){
+  // Attendance is keyed by class and date in this app, so keep its document ID stable even without a legacy record ID.
+  const raw=item&&item.id!=null?String(item.id):(kind==='attendance'&&item?String(item.classId||'')+'_'+String(item.date||''):'legacy_'+index);
+  return 'v2_'+kind+'_'+encodeURIComponent(raw);
+}
+function cloudRecordsFor(value){
+  const out=new Map();
+  CLOUD_ARRAY_FIELDS.forEach(kind=>{
+    (value[kind]||[]).forEach((item,index)=>{
+      const id=cloudRecordId(kind,item,index);
+      out.set(id,{kind,record:item,order:index});
+    });
+  });
+  return out;
+}
+function cloudMetaFor(value){
+  return {kind:'meta',schemaVersion:2,schoolType:value.schoolType,teacherNames:value.teacherNames||[],reportSignatures:value.reportSignatures||{manager:'',attendance:''}};
+}
+function stableCloudJson(value){
+  try{return JSON.stringify(value===undefined?null:value);}catch(e){return String(value);}
+}
 function saveStore(){
-  if(!['boys','girls'].includes(store.schoolType)) store.schoolType = 'girls';
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  if(db && activeSchoolId && session && session.approved){
+  if(!['boys','girls'].includes(store.schoolType))store.schoolType='girls';
+  store=normalizeCloudStore(store);
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+  localRevision++; cloudDirty=true;
+  if(db&&activeSchoolId&&session&&session.approved){
     clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').set({store,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.error('Cloud save failed',e)),450);
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud save failed',e)),450);
   }
 }
-function cloneStoreSnapshot(){ return JSON.parse(JSON.stringify(store)); }
+function cloneStoreSnapshot(){return JSON.parse(JSON.stringify(store));}
+function resetCloudSyncState(schoolId){clearTimeout(saveTimer);saveTimer=null;cloudBaseline=null;cloudMetaExists=false;cloudRevision=0;cloudDirty=false;localRevision++;}
 function restoreStoreSnapshot(snapshot){
-  clearTimeout(saveTimer); saveTimer=null;
-  store=snapshot;
-  try{ localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); }catch(e){ console.error('Local rollback failed',e); }
+  clearTimeout(saveTimer);saveTimer=null;
+  store=normalizeCloudStore(snapshot);localRevision++;cloudDirty=true;
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Local rollback failed',e);}
+  if(db&&activeSchoolId&&session&&session.approved){
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud rollback sync failed',e)),3000);
+  }
+}
+async function syncStoreToCloud(){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  const requestedSchoolId=activeSchoolId;
+  const run=async()=>{
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    const target=normalizeCloudStore(cloneStoreSnapshot());
+    const revision=localRevision;
+    const privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
+    const base=normalizeCloudStore(cloudBaseline||emptyCloudStore());
+    const baseRevision=Number(cloudRevision)||0;
+    const oldRecords=cloudRecordsFor(base),newRecords=cloudRecordsFor(target);
+    const writes=[];
+    newRecords.forEach((value,id)=>{
+      const old=oldRecords.get(id);
+      if(!old||stableCloudJson(old.record)!==stableCloudJson(value.record)||old.kind!==value.kind||old.order!==value.order){
+        writes.push({type:'set',id,data:{kind:'record',recordType:value.kind,record:value.record,order:value.order,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
+      }
+    });
+    oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
+    const oldMeta=cloudMetaFor(base),newMeta=cloudMetaFor(target);
+    if(writes.length||stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudMetaExists){
+      writes.push({type:'set',id:'appMeta',merge:true,data:Object.assign({},newMeta,{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()})});
+    }
+    // Use multiple small batches; Firestore permits at most 500 writes per batch.
+    for(let offset=0;offset<writes.length;offset+=400){
+      const batch=db.batch();
+      writes.slice(offset,offset+400).forEach(w=>{
+        const ref=privateRef.doc(w.id);
+        if(w.type==='delete')batch.delete(ref);else if(w.merge)batch.set(ref,w.data,{merge:true});else batch.set(ref,w.data);
+      });
+      await batch.commit();
+    }
+    cloudBaseline=target;
+    const wroteMeta=writes.some(w=>w.id==='appMeta');
+    if(wroteMeta)cloudRevision=baseRevision+1;
+    cloudMetaExists=true;
+    cloudDirty=(localRevision!==revision);
+    if(cloudDirty){
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+    }else if(wroteMeta){
+      // Read the committed revision back: another device may have written concurrently.
+      try{
+        const latestMeta=await privateRef.doc('appMeta').get();
+        if(activeSchoolId===requestedSchoolId&&!cloudDirty&&latestMeta.exists){
+          const actualRevision=Number((latestMeta.data()||{}).revision)||0;
+          cloudRevision=actualRevision;
+          if(actualRevision!==baseRevision+1)await pullFromServer(true);
+        }
+      }catch(revisionError){console.error('Cloud revision confirmation failed',revisionError);}
+    }
+    return {ok:true};
+  };
+  const queued=cloudWriteQueue.then(run,run);
+  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
+  return queued.catch(e=>{
+    cloudDirty=true;
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(err=>console.error('Cloud retry failed',err)),3000);
+    throw e;
+  });
 }
 async function persistStoreMutation(action,payload,snapshot){
-  clearTimeout(saveTimer); saveTimer=null;
+  clearTimeout(saveTimer);saveTimer=null;
   const result=await pushToServer(action,payload);
-  if(!result.ok) restoreStoreSnapshot(snapshot);
+  if(!result.ok)restoreStoreSnapshot(snapshot);
   return result;
 }
 function loadSession(){
@@ -515,7 +622,7 @@ function tickClock(){
   document.getElementById('clockGregorian').textContent = greg;
 }
 setInterval(tickClock, 1000); tickClock();
-if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)return;try{const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();if(!p||p.status!=='approved'){await auth.signOut();session=null;render();return;}activeSchoolId=p.schoolId;STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();await pullFromServer(true);startAutoSync();render();}catch(e){console.error(e);}});}
+if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)return;try{const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();if(!p||p.status!=='approved'){await auth.signOut();session=null;render();return;}activeSchoolId=p.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();await pullFromServer(true);startAutoSync();render();}catch(e){console.error(e);}});}
 
 
 /* ==========================================================================
@@ -523,25 +630,24 @@ if(auth){auth.onAuthStateChanged(async user=>{if(!user||pendingRegistration)retu
    ========================================================================== */
 let syncTimer = null;
 let guardianImportBusy = false;
-async function pushToServer(action, payload){
-  if(!db || !activeSchoolId || !session || !session.approved) return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+async function pushToServer(action,payload){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
   try{
-    if(action==='saveStudent' && payload){
-      const student=Object.assign({},payload); delete student.oldName;
+    if(action==='saveStudent'&&payload){
+      const student=Object.assign({},payload);delete student.oldName;
       const index=(store.students||[]).findIndex(x=>x.id===student.id);
-      if(index>=0) store.students[index]=Object.assign({},store.students[index],student);
-      else store.students.push(student);
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      if(index>=0)store.students[index]=Object.assign({},store.students[index],student);else store.students.push(student);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
     }
-    if(action==='saveGuardian' && payload){
-      const id=normalizeNameClient(payload.name), phone=normalizePhoneClient(payload.phone);
+    if(action==='saveGuardian'&&payload){
+      const id=normalizeNameClient(payload.name),phone=normalizePhoneClient(payload.phone);
       const guardian={id,name:String(payload.name||'').trim(),phone};
-      store.guardians=(store.guardians||[]).filter(g=>g.id!==id); store.guardians.push(guardian);
+      store.guardians=(store.guardians||[]).filter(g=>g.id!==id);store.guardians.push(guardian);
       store.students=(store.students||[]).map(st=>normalizeNameClient(st.name)===id?Object.assign({},st,{guardianPhone:phone}):st);
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
     }
-    const ref=db.collection('schools').doc(activeSchoolId).collection('private').doc('appData');
-    await ref.set({store,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    const result=await syncStoreToCloud();
+    if(!result.ok)return result;
     return {ok:true,phone:action==='saveGuardian'?normalizePhoneClient(payload&&payload.phone):undefined,added:action==='importGuardians'&&payload&&Array.isArray(payload.guardians)?payload.guardians.length:undefined,updated:0};
   }catch(e){
     console.error('Firebase sync failed:',action,e);
@@ -549,19 +655,122 @@ async function pushToServer(action, payload){
   }
 }
 async function pullFromServer(silent){
- if(!db || !activeSchoolId) return false;
- try{const snap=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get(); if(snap.exists && snap.data().store){store=snap.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store)); if(!silent)render();return true;}}catch(e){console.error('Cloud load failed',e);} return false;
+  if(!db||!activeSchoolId)return false;
+  // Never replace unsaved local edits with a polling response.
+  if(cloudDirty)return false;
+  const requestedSchoolId=activeSchoolId;
+  const revisionAtStart=localRevision;
+  try{
+    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').get();
+    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||cloudDirty)return false;
+    const docs=snap.docs||[];
+    const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
+    const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
+    const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
+    // Only appMeta marks a complete V2 snapshot. Without it, reconcile partial writes below.
+    if(metaDoc){
+      const meta=metaDoc?metaDoc.data():{};
+      const next=emptyCloudStore();
+      next.schoolType=meta.schoolType||'girls';
+      next.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
+      next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')next[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:next[kind].length,__record:record});
+      });
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        next[kind]=next[kind].map(x=>x.__record);
+      });
+      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      if(!silent)render();
+      return true;
+    }
+    // One-time, backward-compatible migration from the previous appData document.
+    if(legacy){
+      store=normalizeCloudStore(legacy.data().store);
+      // Treat any partial V2 records as the previous cloud snapshot so stale partial records are deleted.
+      const partial=emptyCloudStore();
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')partial[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:partial[kind].length,__record:record});
+      });
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        partial[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        partial[kind]=partial[kind].map(x=>x.__record);
+      });
+      cloudBaseline=normalizeCloudStore(partial);cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // Recover an interrupted first-time upload when records exist but appMeta does not.
+    if(recordDocs.length){
+      const merged=normalizeCloudStore(store);
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        const docsForKind=recordDocs.filter(d=>(d.data().recordType||d.data().kind)===kind).sort((a,b)=>{
+          const ao=Number.isFinite(a.data().order)?a.data().order:0;
+          const bo=Number.isFinite(b.data().order)?b.data().order:0;
+          return ao-bo;
+        });
+        const known=new Set(merged[kind].map((item,index)=>cloudRecordId(kind,item,index)));
+        docsForKind.forEach(d=>{
+          const data=d.data(),record=data.record;
+          if(record&&typeof record==='object'&&!known.has(d.id)){
+            merged[kind].push(record);
+            known.add(d.id);
+          }
+        });
+      });
+      store=normalizeCloudStore(merged);
+      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // No cloud data yet: keep this school's local data and upload it in the new format.
+    cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;
+    const local=normalizeCloudStore(store);
+    const hasLocalData=CLOUD_ARRAY_FIELDS.some(k=>local[k].length)||local.teacherNames.length||
+      local.reportSignatures.manager||local.reportSignatures.attendance;
+    if(hasLocalData){cloudDirty=true;await syncStoreToCloud();}
+    else {cloudDirty=false;await syncStoreToCloud();}
+    if(!silent)render();
+    return false;
+  }catch(e){console.error('Cloud load failed',e);return false;}
 }
 let syncListenersBound = false;
+async function checkCloudMetaAndPull(){
+  if(!db||!activeSchoolId||cloudDirty)return false;
+  const requestedSchoolId=activeSchoolId;
+  try{
+    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').doc('appMeta').get();
+    if(activeSchoolId!==requestedSchoolId||cloudDirty||!snap.exists)return false;
+    const data=snap.data()||{},revision=Number(data.revision)||0;
+    if(revision!==cloudRevision){
+      const pulled=await pullFromServer(true);
+      // Pulling silently updates the in-memory store, but the current view also
+      // needs a repaint to show changes made in another device/session. Avoid
+      // interrupting a form or modal the user is currently editing.
+      const active=document.activeElement;
+      const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
+      if(pulled&&!editing&&!document.querySelector('.overlay'))render();
+      return pulled;
+    }
+  }catch(e){console.error('Cloud revision check failed',e);}
+  return false;
+}
 function startAutoSync(){
   if(syncTimer) clearInterval(syncTimer);
   if(!db || !activeSchoolId) return;
-  pullFromServer(true);
-  syncTimer = setInterval(()=>pullFromServer(true), 4000);
+  syncTimer = setInterval(()=>checkCloudMetaAndPull(), 4000);
   if(!syncListenersBound){
     syncListenersBound = true;
-    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pullFromServer(true); });
-    window.addEventListener('focus', ()=> pullFromServer(true));
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkCloudMetaAndPull(); });
+    window.addEventListener('focus', ()=> checkCloudMetaAndPull());
   }
 }
 
@@ -808,9 +1017,8 @@ function bindLogin(){
     await auth.signOut();pendingRegistration=false;document.getElementById('loginErr').textContent='تم إرسال طلب التسجيل. سيعمل الحساب بعد اعتماد المدرسة.';
    }else{
     if(!profile||profile.status!=='approved'||!profile.schoolId){await auth.signOut();pendingRegistration=false;throw new Error(profile?'طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.':'اختر «تسجيل مدرسة جديدة» أولاً لإرسال طلب الاعتماد.');}
-    activeSchoolId=profile.schoolId;STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=profile.schoolName||'مدرستي';session={type:'admin',id:uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
-    const data=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get();
-    if(data.exists&&data.data().store){store=data.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}else{store={classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[]};saveStore();}
+    activeSchoolId=profile.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=profile.schoolName||'مدرستي';session={type:'admin',id:uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);
     pendingRegistration=false;startAutoSync();navigate('dashboard');
    }
   }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/popup-closed-by-user'?'أُغلق تسجيل الدخول قبل اكتماله.':(err.message||'تعذر تسجيل الدخول باستخدام Google.');}
@@ -827,10 +1035,8 @@ function bindLogin(){
    } else {
     const cred=await auth.signInWithEmailAndPassword(email,password); const snap=await db.collection('users').doc(cred.user.uid).get(); const profile=snap.data();
     if(!profile || profile.status!=='approved' || !profile.schoolId){await auth.signOut();throw new Error('طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.');}
-    activeSchoolId=profile.schoolId; STORAGE_KEY='zahra_store_v1_'+activeSchoolId; store=loadStore(); SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
-    const data=await db.collection('schools').doc(activeSchoolId).collection('private').doc('appData').get();
-    if(data.exists && data.data().store){store=data.data().store;localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}
-    else {store={classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[]};saveStore();}
+    activeSchoolId=profile.schoolId; resetCloudSyncState(activeSchoolId); STORAGE_KEY='zahra_store_v1_'+activeSchoolId; store=loadStore(); SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);
     startAutoSync(); navigate('dashboard');
    }
   }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/email-already-in-use'?'هذا البريد مسجل مسبقًا.':err.code==='auth/invalid-credential'?'البريد أو كلمة المرور غير صحيحة.':err.code==='auth/weak-password'?'كلمة المرور يجب أن تكون 6 أحرف على الأقل.':(err.message||'تعذر إتمام الطلب.');}

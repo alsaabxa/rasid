@@ -1,0 +1,61 @@
+name: Validate inline JavaScript
+# Checks the latest branch revision without deploying to production.
+on:
+  push:
+    branches:
+      - feature/firestore-multi-document-storage
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Extract inline scripts and check syntax
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=False)
+                  self.inline = []
+                  self.current = None
+                  self.external = False
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == "script":
+                      self.current = []
+                      self.external = any(k.lower() == "src" for k, _ in attrs)
+              def handle_data(self, data):
+                  if self.current is not None:
+                      self.current.append(data)
+              def handle_endtag(self, tag):
+                  if tag.lower() == "script" and self.current is not None:
+                      code = "".join(self.current)
+                      if not self.external and code.strip():
+                          self.inline.append(code)
+                      self.current = None
+                      self.external = False
+
+          parser = Scripts()
+          parser.feed(Path("index.html").read_text(encoding="utf-8"))
+          if not parser.inline:
+              raise SystemExit("No inline JavaScript blocks were found.")
+          out = Path("/tmp/inline-js")
+          out.mkdir(exist_ok=True)
+          for i, code in enumerate(parser.inline):
+              (out / f"script-{i}.js").write_text(code, encoding="utf-8")
+          print(f"Extracted {len(parser.inline)} inline script blocks.")
+          PY
+          for file in /tmp/inline-js/*.js; do
+            echo "Checking $file"
+            node --check "$file"
+          done
