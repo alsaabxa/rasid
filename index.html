@@ -486,7 +486,7 @@ async function syncStoreToCloud(){
     newRecords.forEach((value,id)=>{
       const old=oldRecords.get(id);
       if(!old||stableCloudJson(old.record)!==stableCloudJson(value.record)||old.kind!==value.kind||old.order!==value.order){
-        writes.push({type:'set',id,data:{kind:'record',record:value.record,order:value.order,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
+        writes.push({type:'set',id,data:{kind:'record',recordType:value.kind,record:value.record,order:value.order,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
       }
     });
     oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
@@ -675,7 +675,7 @@ async function pullFromServer(silent){
       next.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
       next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
       recordDocs.forEach(d=>{
-        const data=d.data(),kind=data.kind,record=data.record;
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
         if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')next[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:next[kind].length,__record:record});
       });
       ['classes','students','staff','attendance','guardians'].forEach(kind=>{
@@ -693,7 +693,7 @@ async function pullFromServer(silent){
       // Treat any partial V2 records as the previous cloud snapshot so stale partial records are deleted.
       const partial=emptyCloudStore();
       recordDocs.forEach(d=>{
-        const data=d.data(),kind=data.kind,record=data.record;
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
         if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')partial[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:partial[kind].length,__record:record});
       });
       ['classes','students','staff','attendance','guardians'].forEach(kind=>{
@@ -710,7 +710,7 @@ async function pullFromServer(silent){
     if(recordDocs.length){
       const merged=normalizeCloudStore(store);
       ['classes','students','staff','attendance','guardians'].forEach(kind=>{
-        const docsForKind=recordDocs.filter(d=>d.data().kind===kind).sort((a,b)=>{
+        const docsForKind=recordDocs.filter(d=>(d.data().recordType||d.data().kind)===kind).sort((a,b)=>{
           const ao=Number.isFinite(a.data().order)?a.data().order:0;
           const bo=Number.isFinite(b.data().order)?b.data().order:0;
           return ao-bo;
@@ -750,7 +750,16 @@ async function checkCloudMetaAndPull(){
     const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').doc('appMeta').get();
     if(activeSchoolId!==requestedSchoolId||cloudDirty||!snap.exists)return false;
     const data=snap.data()||{},revision=Number(data.revision)||0;
-    if(revision!==cloudRevision)return pullFromServer(true);
+    if(revision!==cloudRevision){
+      const pulled=await pullFromServer(true);
+      // Pulling silently updates the in-memory store, but the current view also
+      // needs a repaint to show changes made in another device/session. Avoid
+      // interrupting a form or modal the user is currently editing.
+      const active=document.activeElement;
+      const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
+      if(pulled&&!editing&&!document.querySelector('.overlay'))render();
+      return pulled;
+    }
   }catch(e){console.error('Cloud revision check failed',e);}
   return false;
 }
