@@ -2057,13 +2057,11 @@ async function loadAbsenceReport(){
   const classId=document.getElementById('reportClass').value, date=document.getElementById('reportDate').value||todayStr(), period=document.getElementById('reportPeriod').value;
   route.classId=classId;route.date=date;
   const host=document.getElementById('reportHost'); host.innerHTML='<div class="empty"><b>جارٍ تحميل التقرير...</b></div>';
-  const fresh=await fetchReportBootstrap();
-  if(fresh){
-    store.students=dedupeStudents(fresh.students.map(s=>({id:s.id,classId:s.classId,number:s.number,name:s.name})));
-    store.guardians=fresh.guardians.map(g=>({id:String(g.id||''),name:String(g.name||''),phone:String(g.phone||'')}));
-    const amap={}; fresh.attendance.forEach(r=>{const k=String(r.classId)+'|'+String(r.date); if(!amap[k]) amap[k]={id:k,classId:r.classId,date:r.date,teacher:r.teacher,time:r.time,records:[]}; amap[k].records.push({studentId:r.studentId,studentName:r.studentName,status:r.status});});
-    store.attendance=Object.values(amap); saveStore();
-  }
+  // fetchReportBootstrap already refreshes the shared store from Firestore.
+  // Attendance is stored as one session per class/date with a nested records array.
+  // Do not reinterpret those sessions as flat student rows or call saveStore here:
+  // that would replace valid attendance with empty sessions and sync the empty result.
+  await fetchReportBootstrap();
   const bounds=reportPeriodBounds(period,date), guardianMap={};
   (store.guardians||[]).forEach(g=>guardianMap[normalizeNameClient(g.name)]=g.phone);
   const students=studentsOfClass(classId).slice().sort((a,b)=>(a.number||'').localeCompare(b.number||'','ar',{numeric:true}));
