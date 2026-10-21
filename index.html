@@ -688,8 +688,9 @@ async function pullFromServer(silent){
       // is missing it or has an empty records array. This prevents a stale/incomplete
       // cloud snapshot from making today's attendance counter drop to zero.
       const cloudSnapshot=normalizeCloudStore(next);
+      const serverAttendance=cloudSnapshot.attendance.slice();
+      const incomingAttendance=serverAttendance.slice();
       const protectedAttendance=[];
-      const incomingAttendance=cloudSnapshot.attendance;
       (store.attendance||[]).forEach(localSession=>{
         if(!localSession||!Array.isArray(localSession.records)||localSession.records.length===0)return;
         const matchingIndex=incomingAttendance.findIndex(remoteSession=>
@@ -707,17 +708,10 @@ async function pullFromServer(silent){
           }
         }
       });
-      store=normalizeCloudStore(cloudSnapshot);
-      // Compare against the actual server snapshot, not the protected local view,
-      // so the follow-up sync writes the recovered attendance back to Firestore.
-      cloudBaseline=cloudSnapshot.attendance===incomingAttendance
-        ? normalizeCloudStore(Object.assign({},cloudSnapshot,{attendance:cloudSnapshot.attendance.filter(remoteSession=>
-            !protectedAttendance.some(localSession=>
-              (localSession.classId===remoteSession.classId&&localSession.date===remoteSession.date)||
-              (localSession.id!=null&&remoteSession.id!=null&&String(localSession.id)===String(remoteSession.id))
-            )
-          )}))
-        : cloudSnapshot;
+      store=normalizeCloudStore(Object.assign({},cloudSnapshot,{attendance:incomingAttendance}));
+      // Keep the baseline equal to the actual server snapshot so the follow-up
+      // sync detects and repairs any missing/empty attendance records.
+      cloudBaseline=normalizeCloudStore(Object.assign({},cloudSnapshot,{attendance:serverAttendance}));
       cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=protectedAttendance.length>0;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       if(cloudDirty){
