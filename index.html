@@ -484,11 +484,14 @@ async function syncStoreToCloud(){
     // Rebase local changes if another device committed after our last cloud snapshot.
     // Without this check, a stale whole-store snapshot can overwrite a newer attendance
     // record or remove records changed on another device.
-    const latestSnap=await privateRef.get();
-    const latestMetaDoc=(latestSnap.docs||[]).find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
-    const latestRevision=latestMetaDoc?Number((latestMetaDoc.data()||{}).revision)||0:0;
+    const latestMetaCheck=await privateRef.doc('appMeta').get();
+    let latestMetaDoc=latestMetaCheck.exists&&latestMetaCheck.data()&&latestMetaCheck.data().schemaVersion===2?latestMetaCheck:null;
+    let latestRevision=latestMetaDoc?Number((latestMetaDoc.data()||{}).revision)||0:0;
     if(latestMetaDoc&&latestRevision!==baseRevision){
       const localTarget=target,localBase=base;
+      const latestSnap=await privateRef.get();
+      latestMetaDoc=(latestSnap.docs||[]).find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2)||latestMetaDoc;
+      latestRevision=Number((latestMetaDoc.data()||{}).revision)||0;
       const remote=emptyCloudStore(),meta=latestMetaDoc.data()||{};
       remote.schoolType=meta.schoolType||'girls';
       remote.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
