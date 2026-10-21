@@ -489,7 +489,9 @@ async function syncStoreToCloud(){
         writes.push({type:'set',id,data:{kind:'record',recordType:value.kind,record:value.record,order:value.order,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
       }
     });
-    oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
+    // Attendance must not be deleted just because a client has a stale/incomplete snapshot.
+    // This app updates attendance by class+date; explicit record replacement is handled by the set above.
+    oldRecords.forEach((value,id)=>{if(!newRecords.has(id)&&value.kind!=='attendance')writes.push({type:'delete',id});});
     const oldMeta=cloudMetaFor(base),newMeta=cloudMetaFor(target);
     if(writes.length||stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudMetaExists){
       writes.push({type:'set',id:'appMeta',merge:true,data:Object.assign({},newMeta,{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()})});
