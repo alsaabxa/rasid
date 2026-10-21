@@ -289,9 +289,7 @@ a{color:inherit; text-decoration:none;}
 .qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;}
 .qr-card{background:#fff; border-radius:18px; box-shadow:var(--shadow); padding:20px; text-align:center;}
 .qr-card .qr-school{font-size:.72rem; color:#5b7382; font-weight:700;}
-.qr-card .qr-class{font-size:1.05rem; font-weight:800; color:var(--navy); margin:4px 0 8px;}
-.qr-card .qr-brand{display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; color:var(--navy); font-size:.82rem; font-weight:800;}
-.qr-card .qr-brand-mark{display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:var(--teal); color:#fff; font-size:1rem; font-weight:900;}
+.qr-card .qr-class{font-size:1.05rem; font-weight:800; color:var(--navy); margin:4px 0 12px;}
 .qr-card .qr-box{display:flex; justify-content:center; margin-bottom:12px;}
 .qr-card .qr-hint{font-size:.72rem; color:var(--teal); font-weight:700; margin-bottom:12px;}
 .qr-card .qr-actions{display:flex; gap:6px; justify-content:center;}
@@ -534,84 +532,6 @@ async function syncStoreToCloud(){
     throw e;
   });
 }
-async function syncStudentRecordToCloud(studentId){
-  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
-  // Initial migration must still upload the complete store once.
-  if(!cloudMetaExists||!cloudBaseline)return syncStoreToCloud();
-  // If anything besides this student changed locally, flush the whole pending change set first.
-  const baseline=normalizeCloudStore(cloudBaseline),target=normalizeCloudStore(cloneStoreSnapshot());
-  baseline.students=baseline.students.filter(st=>String(st.id)!==String(studentId));
-  target.students=target.students.filter(st=>String(st.id)!==String(studentId));
-  if(stableCloudJson(baseline)!==stableCloudJson(target))return syncStoreToCloud();
-  const requestedSchoolId=activeSchoolId;
-  const run=async()=>{
-    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
-    if(!cloudMetaExists||!cloudBaseline)return {ok:false,error:'لم تكتمل مزامنة المدرسة الأولية'};
-    const index=(store.students||[]).findIndex(st=>String(st.id)===String(studentId));
-    if(index<0)return {ok:false,error:'تعذر العثور على الطالبة بعد التعديل'};
-    const revisionAtStart=localRevision,baseRevision=Number(cloudRevision)||0;
-    const student=store.students[index],privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
-    const batch=db.batch();
-    batch.set(privateRef.doc(cloudRecordId('students',student,index)),{kind:'record',recordType:'students',record:student,order:index,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-    batch.set(privateRef.doc('appMeta'),Object.assign({},cloudMetaFor(store),{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true});
-    await batch.commit();
-    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
-    if(localRevision!==revisionAtStart){
-      cloudDirty=true;
-      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
-      return {ok:true};
-    }
-    const nextBaseline=normalizeCloudStore(cloudBaseline);
-    const oldIndex=nextBaseline.students.findIndex(st=>String(st.id)===String(studentId));
-    if(oldIndex>=0)nextBaseline.students[oldIndex]=student;
-    else nextBaseline.students.splice(index,0,student);
-    cloudBaseline=nextBaseline;
-    cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=localRevision!==revisionAtStart;
-    if(cloudDirty){
-      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
-    }
-    return {ok:true};
-  };
-  const queued=cloudWriteQueue.then(run,run);
-  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
-  return queued.catch(e=>{
-    cloudDirty=true;
-    throw e;
-  });
-}
-async function syncAttendanceRecordToCloud(attendance){
-  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
-  if(!cloudMetaExists||!cloudBaseline)return syncStoreToCloud();
-  const baseline=normalizeCloudStore(cloudBaseline),target=normalizeCloudStore(cloneStoreSnapshot());
-  const sameSession=a=>String(a.classId)===String(attendance.classId)&&String(a.date)===String(attendance.date);
-  baseline.attendance=baseline.attendance.filter(a=>!sameSession(a));
-  target.attendance=target.attendance.filter(a=>!sameSession(a));
-  if(stableCloudJson(baseline)!==stableCloudJson(target))return syncStoreToCloud();
-  const requestedSchoolId=activeSchoolId;
-  const run=async()=>{
-    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
-    if(!cloudMetaExists||!cloudBaseline)return {ok:false,error:'لم تكتمل مزامنة المدرسة الأولية'};
-    const index=(store.attendance||[]).findIndex(sameSession);
-    if(index<0)return {ok:false,error:'تعذر العثور على الرصد بعد تسجيله'};
-    const revisionAtStart=localRevision,baseRevision=Number(cloudRevision)||0;
-    const record=store.attendance[index],privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
-    const batch=db.batch();
-    batch.set(privateRef.doc(cloudRecordId('attendance',record,index)),{kind:'record',recordType:'attendance',record,order:index,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-    batch.set(privateRef.doc('appMeta'),Object.assign({},cloudMetaFor(store),{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true});
-    await batch.commit();
-    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
-    const nextBaseline=normalizeCloudStore(cloudBaseline);
-    nextBaseline.attendance=normalizeCloudStore(cloneStoreSnapshot()).attendance;
-    cloudBaseline=nextBaseline;cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=localRevision!==revisionAtStart;
-    if(cloudDirty){
-      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
-    }
-    return {ok:true};
-  };
-  const queued=cloudWriteQueue.then(run,run);
-  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
-  return queued.catch(e=>{cloudDirty=true;throw e;});
-}
 async function persistStoreMutation(action,payload,snapshot){
   clearTimeout(saveTimer);saveTimer=null;
   const result=await pushToServer(action,payload);
@@ -661,7 +581,7 @@ function notificationTodayList(){
   (store.attendance||[]).filter(a=>String(a.date)===today).forEach(a=>{
     const key=String(a.classId||a.className||''); if(!key)return;
     const cls=store.classes.find(c=>String(c.id)===String(a.classId)), old=map.get(key);
-    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?classDisplayName(cls):(a.className||a.classId),time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>statusRank(r.status)===0).length});
+    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?classDisplayName(cls):(a.className||a.classId),time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>r.status==='غائب'||r.status==='absent').length});
   });
   return [...map.values()].sort((a,b)=>String(b.time).localeCompare(String(a.time)));
 }
@@ -713,18 +633,11 @@ let guardianImportBusy = false;
 async function pushToServer(action,payload){
   if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
   try{
-    if(action==='saveAttendance'&&payload){
-      clearTimeout(saveTimer);saveTimer=null;
-      return await syncAttendanceRecordToCloud(payload);
-    }
     if(action==='saveStudent'&&payload){
       const student=Object.assign({},payload);delete student.oldName;
       const index=(store.students||[]).findIndex(x=>x.id===student.id);
       if(index>=0)store.students[index]=Object.assign({},store.students[index],student);else store.students.push(student);
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
-      const result=await syncStudentRecordToCloud(student.id);
-      if(!result.ok)return result;
-      return {ok:true,updated:1};
     }
     if(action==='saveGuardian'&&payload){
       const id=normalizeNameClient(payload.name),phone=normalizePhoneClient(payload.phone);
@@ -910,7 +823,7 @@ function classStats(cls){
   const total = studentsOfClass(cls.id).length;
   const att = attendanceOf(cls.id);
   const marked = att ? att.records.length : 0;
-  const absent = att ? att.records.filter(r=>statusRank(r.status)===0).length : 0;
+  const absent = att ? att.records.filter(r=>r.status==='غائب').length : 0;
   const present = marked - absent;
   const pct = total ? Math.round((present/total)*100) : 0;
   return { total, marked, absent, present, pct };
@@ -1258,7 +1171,7 @@ function bindClassCardEvents(){
 function openAbsentModal(classId){
   const cls = store.classes.find(c=>c.id===classId);
   const att = attendanceOf(classId);
-  const absentees = att ? att.records.filter(r=>statusRank(r.status)===0) : [];
+  const absentees = att ? att.records.filter(r=>r.status==='غائب') : [];
   const host = document.getElementById('modalHost');
   host.innerHTML = `
   <div class="overlay" id="ov">
@@ -1794,7 +1707,7 @@ function viewScan(classId){
 }
 
 function viewScanConfirm(cls, att){
-  const absentees = att.records.filter(r=>statusRank(r.status)===0);
+  const absentees = att.records.filter(r=>r.status==='غائب');
   const present = att.records.length - absentees.length;
   return `
   <div class="scan-wrap">
@@ -1931,7 +1844,6 @@ function viewQR(){
       <div class="qr-card" id="qrcard-${c.id}">
         <div class="qr-school">${esc(SCHOOL_NAME)}</div>
         <div class="qr-class">${esc(classDisplayName(c))}</div>
-        <div class="qr-brand" aria-label="شعار منصة راصد"><span class="qr-brand-mark" aria-hidden="true">ر</span><span>منصة راصد للغياب</span></div>
         <div class="qr-box" id="qrbox-${c.id}"></div>
         <div class="qr-hint">امسحي الكود لبدء رصد الغياب</div>
         <div class="qr-actions">
@@ -1957,33 +1869,13 @@ function bindQR(){
     navigator.clipboard.writeText(classScanUrl(b.dataset.copy)).then(()=> toast('تم نسخ الرابط')).catch(()=> toast('تعذّر النسخ', true));
   });
   document.querySelectorAll('[data-print]').forEach(b=> b.onclick = ()=>{
-    const card = document.getElementById('qrcard-'+b.dataset.print);
-    const printable = qrPrintMarkup(card);
-    if(printable) printElement(printable, 'كود ' + b.dataset.print);
+    printElement(document.getElementById('qrcard-'+b.dataset.print).outerHTML, 'كود ' + b.dataset.print);
   });
   document.getElementById('printAll').onclick = ()=>{
-    const printable = qrPrintMarkup(document.getElementById('qrGrid'));
-    if(printable) printElement(printable, 'أكواد QR لكل الفصول');
+    printElement(document.getElementById('qrGrid').outerHTML, 'أكواد QR لكل الفصول');
   };
 }
-function qrPrintMarkup(source){
-  if(!source) return '';
-  const copy = source.cloneNode(true);
-  const sourceBoxes = source.matches('.qr-box') ? [source] : Array.from(source.querySelectorAll('.qr-box'));
-  const copyBoxes = copy.matches('.qr-box') ? [copy] : Array.from(copy.querySelectorAll('.qr-box'));
-  for(let i=0;i<copyBoxes.length;i++){
-    const sourceBox=sourceBoxes[i];
-    const canvas=sourceBox?.querySelector('canvas');
-    const image=sourceBox?.querySelector('img');
-    let dataUrl='';
-    try{if(canvas?.width && canvas?.height) dataUrl=canvas.toDataURL('image/png');}catch(e){}
-    if(!dataUrl && image?.src?.startsWith('data:image/')) dataUrl=image.src;
-    if(!dataUrl){toast('تعذّر تجهيز رمز QR للطباعة. حدّث الصفحة وحاول مرة أخرى.',true);return '';}
-    copyBoxes[i].innerHTML=`<img src="${dataUrl}" width="180" height="180" alt="رمز QR" style="display:block;width:180px;height:180px;max-width:100%;object-fit:contain;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact;">`;
-  }
-  return copy.outerHTML;
-}
-function statusRank(s){ s=String(s||'').trim(); if(s==='غائبة'||s==='غائب'||s.toLowerCase()==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s.toLowerCase()==='present') return 1; return 2; }
+function statusRank(s){ s=String(s||''); if(s==='غائبة'||s==='غائب'||s==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s==='present') return 1; return 2; }
 // الغائبات أولاً ثم الحاضرات ثم غير المرصودات (مع الحفاظ على الترتيب الأصلي داخل كل مجموعة)
 function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); return rows.map((r,i)=>[r,i]).sort((a,b)=>statusRank(getStatus(a[0]))-statusRank(getStatus(b[0]))||a[1]-b[1]).map(x=>x[0]); }
 function reportDateLabels(date=new Date()){
@@ -2006,7 +1898,6 @@ function reportSignatureFooter(){
 
 function printElement(html, title){
   const w = window.open('', '_blank');
-  if(!w){toast('اسمح بفتح النوافذ المنبثقة للطباعة ثم حاول مرة أخرى.',true);return;}
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
   <style>
@@ -2014,31 +1905,13 @@ function printElement(html, title){
     .qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:20px;}
     .qr-card{border:2px solid #102a43; border-radius:14px; padding:18px; text-align:center; page-break-inside:avoid;}
     .qr-school{font-size:11px; color:#555;}
-    .qr-class{font-size:18px; font-weight:800; color:#102a43; margin:6px 0 8px;}
-    .qr-brand{display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; color:#102a43; font-size:12px; font-weight:800;}
-    .qr-brand-mark{display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:#0f766e; color:#fff; font-size:14px; font-weight:900;}
+    .qr-class{font-size:18px; font-weight:800; color:#102a43; margin:6px 0 12px;}
     .qr-box{display:flex; justify-content:center; margin-bottom:10px;}
     .qr-hint{font-size:11px; color:#0f766e; font-weight:700;}
     .qr-actions{display:none;}
   </style></head><body>${html}</body></html>`);
   w.document.close();
-  const images=Array.from(w.document.images);
-  const ready=images.map(img=>{
-    if(img.complete && img.naturalWidth>0) return Promise.resolve();
-    return new Promise(resolve=>{
-      const done=()=>resolve();
-      img.addEventListener('load',done,{once:true});
-      img.addEventListener('error',done,{once:true});
-      setTimeout(done,3000);
-    });
-  });
-  Promise.all(ready).then(()=>{
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      if(w.closed) return;
-      w.focus();
-      w.print();
-    }));
-  });
+  setTimeout(()=>{ w.focus(); w.print(); }, 400);
 }
 
 /* ==========================================================================\n   أولياء الأمور + تقرير الغياب\n   ========================================================================== */
