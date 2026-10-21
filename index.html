@@ -1872,11 +1872,31 @@ function bindQR(){
     navigator.clipboard.writeText(classScanUrl(b.dataset.copy)).then(()=> toast('تم نسخ الرابط')).catch(()=> toast('تعذّر النسخ', true));
   });
   document.querySelectorAll('[data-print]').forEach(b=> b.onclick = ()=>{
-    printElement(document.getElementById('qrcard-'+b.dataset.print).outerHTML, 'كود ' + b.dataset.print);
+    const card = document.getElementById('qrcard-'+b.dataset.print);
+    const printable = qrPrintMarkup(card);
+    if(printable) printElement(printable, 'كود ' + b.dataset.print);
   });
   document.getElementById('printAll').onclick = ()=>{
-    printElement(document.getElementById('qrGrid').outerHTML, 'أكواد QR لكل الفصول');
+    const printable = qrPrintMarkup(document.getElementById('qrGrid'));
+    if(printable) printElement(printable, 'أكواد QR لكل الفصول');
   };
+}
+function qrPrintMarkup(source){
+  if(!source) return '';
+  const copy = source.cloneNode(true);
+  const sourceBoxes = source.matches('.qr-box') ? [source] : Array.from(source.querySelectorAll('.qr-box'));
+  const copyBoxes = copy.matches('.qr-box') ? [copy] : Array.from(copy.querySelectorAll('.qr-box'));
+  for(let i=0;i<copyBoxes.length;i++){
+    const sourceBox=sourceBoxes[i];
+    const canvas=sourceBox?.querySelector('canvas');
+    const image=sourceBox?.querySelector('img');
+    let dataUrl='';
+    try{if(canvas?.width && canvas?.height) dataUrl=canvas.toDataURL('image/png');}catch(e){}
+    if(!dataUrl && image?.src?.startsWith('data:image/')) dataUrl=image.src;
+    if(!dataUrl){toast('تعذّر تجهيز رمز QR للطباعة. حدّث الصفحة وحاول مرة أخرى.',true);return '';}
+    copyBoxes[i].innerHTML=`<img src="${dataUrl}" width="180" height="180" alt="رمز QR" style="display:block;width:180px;height:180px;max-width:100%;object-fit:contain;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact;">`;
+  }
+  return copy.outerHTML;
 }
 function statusRank(s){ s=String(s||''); if(s==='غائبة'||s==='غائب'||s==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s==='present') return 1; return 2; }
 // الغائبات أولاً ثم الحاضرات ثم غير المرصودات (مع الحفاظ على الترتيب الأصلي داخل كل مجموعة)
@@ -1901,6 +1921,7 @@ function reportSignatureFooter(){
 
 function printElement(html, title){
   const w = window.open('', '_blank');
+  if(!w){toast('اسمح بفتح النوافذ المنبثقة للطباعة ثم حاول مرة أخرى.',true);return;}
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
   <style>
@@ -1916,7 +1937,23 @@ function printElement(html, title){
     .qr-actions{display:none;}
   </style></head><body>${html}</body></html>`);
   w.document.close();
-  setTimeout(()=>{ w.focus(); w.print(); }, 400);
+  const images=Array.from(w.document.images);
+  const ready=images.map(img=>{
+    if(img.complete && img.naturalWidth>0) return Promise.resolve();
+    return new Promise(resolve=>{
+      const done=()=>resolve();
+      img.addEventListener('load',done,{once:true});
+      img.addEventListener('error',done,{once:true});
+      setTimeout(done,3000);
+    });
+  });
+  Promise.all(ready).then(()=>{
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(w.closed) return;
+      w.focus();
+      w.print();
+    }));
+  });
 }
 
 /* ==========================================================================\n   أولياء الأمور + تقرير الغياب\n   ========================================================================== */
