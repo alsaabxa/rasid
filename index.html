@@ -538,6 +538,11 @@ async function syncStudentRecordToCloud(studentId){
   if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
   // Initial migration must still upload the complete store once.
   if(!cloudMetaExists||!cloudBaseline)return syncStoreToCloud();
+  // If anything besides this student changed locally, flush the whole pending change set first.
+  const baseline=normalizeCloudStore(cloudBaseline),target=normalizeCloudStore(cloneStoreSnapshot());
+  baseline.students=baseline.students.filter(st=>String(st.id)!==String(studentId));
+  target.students=target.students.filter(st=>String(st.id)!==String(studentId));
+  if(stableCloudJson(baseline)!==stableCloudJson(target))return syncStoreToCloud();
   const requestedSchoolId=activeSchoolId;
   const run=async()=>{
     if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
@@ -556,10 +561,15 @@ async function syncStudentRecordToCloud(studentId){
       clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
       return {ok:true};
     }
-    cloudBaseline=normalizeCloudStore(cloneStoreSnapshot());
-    cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=false;
-    // Refresh from the complete cloud snapshot so edits never replace attendance records.
-    await pullFromServer(true,true);
+    const nextBaseline=normalizeCloudStore(cloudBaseline);
+    const oldIndex=nextBaseline.students.findIndex(st=>String(st.id)===String(studentId));
+    if(oldIndex>=0)nextBaseline.students[oldIndex]=student;
+    else nextBaseline.students.splice(index,0,student);
+    cloudBaseline=nextBaseline;
+    cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=localRevision!==revisionAtStart;
+    if(cloudDirty){
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+    }
     return {ok:true};
   };
   const queued=cloudWriteQueue.then(run,run);
@@ -694,15 +704,15 @@ async function pushToServer(action,payload){
     return {ok:false,error:e&&e.message?e.message:'تعذر حفظ البيانات في Firebase'};
   }
 }
-async function pullFromServer(silent,force=false){
+async function pullFromServer(silent){
   if(!db||!activeSchoolId)return false;
   // Never replace unsaved local edits with a polling response.
-  if(cloudDirty&&!force)return false;
+  if(cloudDirty)return false;
   const requestedSchoolId=activeSchoolId;
   const revisionAtStart=localRevision;
   try{
     const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').get();
-    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||(cloudDirty&&!force))return false;
+    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||cloudDirty)return false;
     const docs=snap.docs||[];
     const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
     const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
