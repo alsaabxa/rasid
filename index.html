@@ -830,6 +830,19 @@ async function pullFromServer(silent){
         next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
         next[kind]=next[kind].map(x=>x.__record);
       });
+      // Safety guard: a polling read must never make attendance disappear from the UI
+      // merely because the cloud snapshot returned fewer records. Keep local data intact
+      // and report the mismatch for diagnosis; do not silently replace it.
+      const localAttendance=Array.isArray(store&&store.attendance)?store.attendance:[];
+      if(localAttendance.length>next.attendance.length){
+        console.error('Cloud attendance count is lower than local count; preserving local store.',{
+          localAttendance:localAttendance.length,
+          cloudAttendance:next.attendance.length,
+          schoolId:requestedSchoolId,
+          cloudRevision:meta&&meta.revision
+        });
+        return false;
+      }
       store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       if(!silent)render();
