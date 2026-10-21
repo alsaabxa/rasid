@@ -534,6 +534,41 @@ async function syncStoreToCloud(){
     throw e;
   });
 }
+async function syncStudentRecordToCloud(studentId){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  // Initial migration must still upload the complete store once.
+  if(!cloudMetaExists||!cloudBaseline)return syncStoreToCloud();
+  const requestedSchoolId=activeSchoolId;
+  const run=async()=>{
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    if(!cloudMetaExists||!cloudBaseline)return {ok:false,error:'لم تكتمل مزامنة المدرسة الأولية'};
+    const index=(store.students||[]).findIndex(st=>String(st.id)===String(studentId));
+    if(index<0)return {ok:false,error:'تعذر العثور على الطالبة بعد التعديل'};
+    const revisionAtStart=localRevision,baseRevision=Number(cloudRevision)||0;
+    const student=store.students[index],privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
+    const batch=db.batch();
+    batch.set(privateRef.doc(cloudRecordId('students',student,index)),{kind:'record',recordType:'students',record:student,order:index,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    batch.set(privateRef.doc('appMeta'),Object.assign({},cloudMetaFor(store),{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true});
+    await batch.commit();
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    if(localRevision!==revisionAtStart){
+      cloudDirty=true;
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+      return {ok:true};
+    }
+    cloudBaseline=normalizeCloudStore(cloneStoreSnapshot());
+    cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=false;
+    // Refresh from the complete cloud snapshot so edits never replace attendance records.
+    await pullFromServer(true,true);
+    return {ok:true};
+  };
+  const queued=cloudWriteQueue.then(run,run);
+  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
+  return queued.catch(e=>{
+    cloudDirty=true;
+    throw e;
+  });
+}
 async function persistStoreMutation(action,payload,snapshot){
   clearTimeout(saveTimer);saveTimer=null;
   const result=await pushToServer(action,payload);
@@ -640,6 +675,9 @@ async function pushToServer(action,payload){
       const index=(store.students||[]).findIndex(x=>x.id===student.id);
       if(index>=0)store.students[index]=Object.assign({},store.students[index],student);else store.students.push(student);
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
+      const result=await syncStudentRecordToCloud(student.id);
+      if(!result.ok)return result;
+      return {ok:true,updated:1};
     }
     if(action==='saveGuardian'&&payload){
       const id=normalizeNameClient(payload.name),phone=normalizePhoneClient(payload.phone);
@@ -656,15 +694,15 @@ async function pushToServer(action,payload){
     return {ok:false,error:e&&e.message?e.message:'تعذر حفظ البيانات في Firebase'};
   }
 }
-async function pullFromServer(silent){
+async function pullFromServer(silent,force=false){
   if(!db||!activeSchoolId)return false;
   // Never replace unsaved local edits with a polling response.
-  if(cloudDirty)return false;
+  if(cloudDirty&&!force)return false;
   const requestedSchoolId=activeSchoolId;
   const revisionAtStart=localRevision;
   try{
     const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').get();
-    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||cloudDirty)return false;
+    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||(cloudDirty&&!force))return false;
     const docs=snap.docs||[];
     const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
     const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
