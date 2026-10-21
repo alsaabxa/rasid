@@ -570,8 +570,17 @@ async function syncStoreToCloud(){
         const latestMeta=await privateRef.doc('appMeta').get();
         if(activeSchoolId===requestedSchoolId&&!cloudDirty&&latestMeta.exists){
           const actualRevision=Number((latestMeta.data()||{}).revision)||0;
-          cloudRevision=actualRevision;
-          if(actualRevision!==baseRevision+1)await pullFromServer(true);
+          if(actualRevision!==baseRevision+1){
+            // Another device committed during our write. Do not pull blindly here:
+            // that would replace this device's local view with a potentially stale
+            // snapshot. Keep our expected revision so the next sync detects the race,
+            // rebases against the latest server state, and merges both devices' edits.
+            cloudDirty=true;
+            clearTimeout(saveTimer);
+            saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Concurrent cloud rebase failed',e)),50);
+          }else{
+            cloudRevision=actualRevision;
+          }
         }
       }catch(revisionError){console.error('Cloud revision confirmation failed',revisionError);}
     }
