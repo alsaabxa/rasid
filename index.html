@@ -504,6 +504,10 @@ async function syncStoreToCloud(){
         remote[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
         remote[kind]=remote[kind].map(x=>x.__record);
       });
+      // Preserve the actual latest server state as the diff baseline. The merged
+      // local+remote target must remain different from this baseline so local changes
+      // are actually written back to Firestore.
+      const remoteBase=normalizeCloudStore(remote);
       const baseRecords=cloudRecordsFor(localBase),localRecords=cloudRecordsFor(localTarget);
       const mergedRecords=cloudRecordsFor(remote);
       baseRecords.forEach((value,id)=>{if(!localRecords.has(id))mergedRecords.delete(id);});
@@ -525,8 +529,8 @@ async function syncStoreToCloud(){
       }
       store=normalizeCloudStore(remote);
       try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Cloud rebase local save failed',e);}
-      cloudBaseline=cloneStoreSnapshot();cloudMetaExists=true;cloudRevision=latestRevision;
-      base=normalizeCloudStore(cloudBaseline);baseRevision=latestRevision;
+      cloudBaseline=normalizeCloudStore(remoteBase);cloudMetaExists=true;cloudRevision=latestRevision;
+      base=normalizeCloudStore(remoteBase);baseRevision=latestRevision;
       store=normalizeCloudStore(remote);localRevision++;
       target=normalizeCloudStore(cloneStoreSnapshot());
     }
