@@ -684,8 +684,40 @@ async function pullFromServer(silent){
         next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
         next[kind]=next[kind].map(x=>x.__record);
       });
-      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
+      // Keep a locally visible, non-empty attendance session if the cloud snapshot
+      // is missing it or has an empty records array. This prevents a stale/incomplete
+      // cloud snapshot from making today's attendance counter drop to zero.
+      const cloudSnapshot=normalizeCloudStore(next);
+      const serverAttendance=cloudSnapshot.attendance.slice();
+      const incomingAttendance=serverAttendance.slice();
+      const protectedAttendance=[];
+      (store.attendance||[]).forEach(localSession=>{
+        if(!localSession||!Array.isArray(localSession.records)||localSession.records.length===0)return;
+        const matchingIndex=incomingAttendance.findIndex(remoteSession=>
+          (remoteSession.classId===localSession.classId&&remoteSession.date===localSession.date)||
+          (remoteSession.id!=null&&localSession.id!=null&&String(remoteSession.id)===String(localSession.id))
+        );
+        if(matchingIndex<0){
+          incomingAttendance.push(localSession);
+          protectedAttendance.push(localSession);
+        }else{
+          const remoteSession=incomingAttendance[matchingIndex];
+          if(!Array.isArray(remoteSession.records)||remoteSession.records.length===0){
+            incomingAttendance[matchingIndex]=localSession;
+            protectedAttendance.push(localSession);
+          }
+        }
+      });
+      store=normalizeCloudStore(Object.assign({},cloudSnapshot,{attendance:incomingAttendance}));
+      // Keep the baseline equal to the actual server snapshot so the follow-up
+      // sync detects and repairs any missing/empty attendance records.
+      cloudBaseline=normalizeCloudStore(Object.assign({},cloudSnapshot,{attendance:serverAttendance}));
+      cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=protectedAttendance.length>0;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      if(cloudDirty){
+        clearTimeout(saveTimer);
+        saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Attendance recovery sync failed',e)),100);
+      }
       if(!silent)render();
       return true;
     }
