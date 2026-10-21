@@ -7,6 +7,9 @@
       "hosting": {
         "rasid-main": [
           "rasid-sa-2026"
+        ],
+        "rasid-legacy": [
+          "fir-rc-91dbc"
         ]
       }
     }
