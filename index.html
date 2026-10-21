@@ -579,6 +579,39 @@ async function syncStudentRecordToCloud(studentId){
     throw e;
   });
 }
+async function syncAttendanceRecordToCloud(attendance){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  if(!cloudMetaExists||!cloudBaseline)return syncStoreToCloud();
+  const baseline=normalizeCloudStore(cloudBaseline),target=normalizeCloudStore(cloneStoreSnapshot());
+  const sameSession=a=>String(a.classId)===String(attendance.classId)&&String(a.date)===String(attendance.date);
+  baseline.attendance=baseline.attendance.filter(a=>!sameSession(a));
+  target.attendance=target.attendance.filter(a=>!sameSession(a));
+  if(stableCloudJson(baseline)!==stableCloudJson(target))return syncStoreToCloud();
+  const requestedSchoolId=activeSchoolId;
+  const run=async()=>{
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    if(!cloudMetaExists||!cloudBaseline)return {ok:false,error:'لم تكتمل مزامنة المدرسة الأولية'};
+    const index=(store.attendance||[]).findIndex(sameSession);
+    if(index<0)return {ok:false,error:'تعذر العثور على الرصد بعد تسجيله'};
+    const revisionAtStart=localRevision,baseRevision=Number(cloudRevision)||0;
+    const record=store.attendance[index],privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
+    const batch=db.batch();
+    batch.set(privateRef.doc(cloudRecordId('attendance',record,index)),{kind:'record',recordType:'attendance',record,order:index,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    batch.set(privateRef.doc('appMeta'),Object.assign({},cloudMetaFor(store),{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true});
+    await batch.commit();
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    const nextBaseline=normalizeCloudStore(cloudBaseline);
+    nextBaseline.attendance=normalizeCloudStore(cloneStoreSnapshot()).attendance;
+    cloudBaseline=nextBaseline;cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=localRevision!==revisionAtStart;
+    if(cloudDirty){
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+    }
+    return {ok:true};
+  };
+  const queued=cloudWriteQueue.then(run,run);
+  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
+  return queued.catch(e=>{cloudDirty=true;throw e;});
+}
 async function persistStoreMutation(action,payload,snapshot){
   clearTimeout(saveTimer);saveTimer=null;
   const result=await pushToServer(action,payload);
@@ -680,6 +713,10 @@ let guardianImportBusy = false;
 async function pushToServer(action,payload){
   if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
   try{
+    if(action==='saveAttendance'&&payload){
+      clearTimeout(saveTimer);saveTimer=null;
+      return await syncAttendanceRecordToCloud(payload);
+    }
     if(action==='saveStudent'&&payload){
       const student=Object.assign({},payload);delete student.oldName;
       const index=(store.students||[]).findIndex(x=>x.id===student.id);
