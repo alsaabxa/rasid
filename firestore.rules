@@ -2,10 +2,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner() {
-      return request.auth != null && request.auth.token.email == 'ahiixd6@gmail.com';
+      return request.auth != null
+        && request.auth.token.email == 'ahiixd6@gmail.com'
+        && request.auth.token.email_verified == true;
     }
     function profile(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+    function isApprovedSchool(schoolId) {
+      return request.auth != null
+        && profile(request.auth.uid).status == 'approved'
+        && profile(request.auth.uid).schoolId == schoolId;
+    }
+    function trialAllowsAccess(schoolId) {
+      let schoolPath = /databases/$(database)/documents/schools/$(schoolId);
+      let school = get(schoolPath).data;
+      let hasTrialStatus = school.keys().hasAny(['trialStatus']);
+      let hasTrialEnd = school.keys().hasAny(['trialEndsAt']);
+      return !exists(schoolPath)
+        || ((!hasTrialStatus || school.trialStatus != 'cancelled')
+          && (!hasTrialEnd || request.time < school.trialEndsAt));
     }
     match /users/{uid} {
       allow create: if request.auth != null && request.auth.uid == uid
@@ -16,11 +32,11 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
     match /schools/{schoolId} {
-      allow read, write: if isOwner();
+      allow get: if isOwner() || isApprovedSchool(schoolId);
+      allow list, create, update, delete: if isOwner();
       match /private/{docId} {
         allow read, write: if request.auth != null && (
-          isOwner() || (profile(request.auth.uid).status == 'approved'
-            && profile(request.auth.uid).schoolId == schoolId)
+          isOwner() || (isApprovedSchool(schoolId) && trialAllowsAccess(schoolId))
         );
       }
     }
