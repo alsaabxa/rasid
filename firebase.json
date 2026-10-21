@@ -1,8 +1,7 @@
 {
   "hosting": {
-    "target": "production",
     "public": ".",
-    "ignore": ["firebase.json", "firestore.rules", "README.md", "FIRESTORE_STORAGE_V2_TEST_PLAN.md", ".firebaserc", ".*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "firestore.rules", "README.md", ".firebaserc", ".*", "**/node_modules/**"],
     "cleanUrls": true,
     "headers": [{
       "source": "**",
