@@ -478,11 +478,65 @@ async function syncStoreToCloud(){
   const requestedSchoolId=activeSchoolId;
   const run=async()=>{
     if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
-    const target=normalizeCloudStore(cloneStoreSnapshot());
-    const revision=localRevision;
+    let target=normalizeCloudStore(cloneStoreSnapshot());
     const privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
-    const base=normalizeCloudStore(cloudBaseline||emptyCloudStore());
-    const baseRevision=Number(cloudRevision)||0;
+    let base=normalizeCloudStore(cloudBaseline||emptyCloudStore());
+    let baseRevision=Number(cloudRevision)||0;
+
+    // Rebase local changes if another device committed after our last cloud snapshot.
+    // Without this check, a stale whole-store snapshot can overwrite a newer attendance
+    // record or remove records changed on another device.
+    const latestMetaCheck=await privateRef.doc('appMeta').get();
+    let latestMetaDoc=latestMetaCheck.exists&&latestMetaCheck.data()&&latestMetaCheck.data().schemaVersion===2?latestMetaCheck:null;
+    let latestRevision=latestMetaDoc?Number((latestMetaDoc.data()||{}).revision)||0:0;
+    if(latestMetaDoc&&latestRevision!==baseRevision){
+      const localTarget=target,localBase=base;
+      const latestSnap=await privateRef.get();
+      latestMetaDoc=(latestSnap.docs||[]).find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2)||latestMetaDoc;
+      latestRevision=Number((latestMetaDoc.data()||{}).revision)||0;
+      const remote=emptyCloudStore(),meta=latestMetaDoc.data()||{};
+      remote.schoolType=meta.schoolType||'girls';
+      remote.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
+      remote.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
+      (latestSnap.docs||[]).filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record').forEach(d=>{
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')remote[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:remote[kind].length,__record:record});
+      });
+      CLOUD_ARRAY_FIELDS.forEach(kind=>{
+        remote[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        remote[kind]=remote[kind].map(x=>x.__record);
+      });
+      // Preserve the actual latest server state as the diff baseline. The merged
+      // local+remote target must remain different from this baseline so local changes
+      // are actually written back to Firestore.
+      const remoteBase=normalizeCloudStore(remote);
+      const baseRecords=cloudRecordsFor(localBase),localRecords=cloudRecordsFor(localTarget);
+      const mergedRecords=cloudRecordsFor(remote);
+      baseRecords.forEach((value,id)=>{if(!localRecords.has(id))mergedRecords.delete(id);});
+      localRecords.forEach((value,id)=>{
+        const oldRecord=baseRecords.get(id);
+        if(!oldRecord||stableCloudJson(oldRecord.record)!==stableCloudJson(value.record)||oldRecord.order!==value.order||oldRecord.kind!==value.kind)mergedRecords.set(id,value);
+      });
+      CLOUD_ARRAY_FIELDS.forEach(kind=>{
+        remote[kind]=Array.from(mergedRecords.entries())
+          .filter(([,value])=>value.kind===kind)
+          .sort((a,b)=>a[1].order-b[1].order)
+          .map(([,value])=>value.record);
+      });
+      const baseMeta=cloudMetaFor(localBase),localMeta=cloudMetaFor(localTarget);
+      if(stableCloudJson(baseMeta)!==stableCloudJson(localMeta)){
+        if(stableCloudJson(baseMeta.schoolType)!==stableCloudJson(localMeta.schoolType))remote.schoolType=localMeta.schoolType;
+        if(stableCloudJson(baseMeta.teacherNames)!==stableCloudJson(localMeta.teacherNames))remote.teacherNames=localMeta.teacherNames;
+        if(stableCloudJson(baseMeta.reportSignatures)!==stableCloudJson(localMeta.reportSignatures))remote.reportSignatures=localMeta.reportSignatures;
+      }
+      store=normalizeCloudStore(remote);
+      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Cloud rebase local save failed',e);}
+      cloudBaseline=normalizeCloudStore(remoteBase);cloudMetaExists=true;cloudRevision=latestRevision;
+      base=normalizeCloudStore(remoteBase);baseRevision=latestRevision;
+      store=normalizeCloudStore(remote);localRevision++;
+      target=normalizeCloudStore(cloneStoreSnapshot());
+    }
+    const revision=localRevision;
     const oldRecords=cloudRecordsFor(base),newRecords=cloudRecordsFor(target);
     const writes=[];
     newRecords.forEach((value,id)=>{
@@ -518,8 +572,15 @@ async function syncStoreToCloud(){
         const latestMeta=await privateRef.doc('appMeta').get();
         if(activeSchoolId===requestedSchoolId&&!cloudDirty&&latestMeta.exists){
           const actualRevision=Number((latestMeta.data()||{}).revision)||0;
-          cloudRevision=actualRevision;
-          if(actualRevision!==baseRevision+1)await pullFromServer(true);
+          if(actualRevision!==baseRevision+1){
+            // Do not replace local data with a potentially stale read after a concurrent commit.
+            // Queue a fresh sync so the revision mismatch triggers a merge against latest cloud state.
+            cloudDirty=true;
+            clearTimeout(saveTimer);
+            saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Concurrent cloud rebase failed',e)),50);
+          }else{
+            cloudRevision=actualRevision;
+          }
         }
       }catch(revisionError){console.error('Cloud revision confirmation failed',revisionError);}
     }
@@ -769,6 +830,19 @@ async function pullFromServer(silent){
         next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
         next[kind]=next[kind].map(x=>x.__record);
       });
+      // Safety guard: a polling read must never make attendance disappear from the UI
+      // merely because the cloud snapshot returned fewer records. Keep local data intact
+      // and report the mismatch for diagnosis; do not silently replace it.
+      const localAttendance=Array.isArray(store&&store.attendance)?store.attendance:[];
+      if(localAttendance.length>next.attendance.length){
+        console.error('Cloud attendance count is lower than local count; preserving local store.',{
+          localAttendance:localAttendance.length,
+          cloudAttendance:next.attendance.length,
+          schoolId:requestedSchoolId,
+          cloudRevision:meta&&meta.revision
+        });
+        return false;
+      }
       store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       if(!silent)render();
