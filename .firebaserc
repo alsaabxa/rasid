@@ -1,3 +1,14 @@
 {
-  "projects": { "default": "fir-rc-91dbc" }
+  "projects": {
+    "default": "fir-rc-91dbc"
+  },
+  "targets": {
+    "fir-rc-91dbc": {
+      "hosting": {
+        "rasid-main": [
+          "rasid-sa-2026"
+        ]
+      }
+    }
+  }
 }
