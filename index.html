@@ -583,7 +583,7 @@ function notificationTodayList(){
   (store.attendance||[]).filter(a=>String(a.date)===today).forEach(a=>{
     const key=String(a.classId||a.className||''); if(!key)return;
     const cls=store.classes.find(c=>String(c.id)===String(a.classId)), old=map.get(key);
-    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?classDisplayName(cls):(a.className||a.classId),time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>r.status==='غائب'||r.status==='absent').length});
+    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?classDisplayName(cls):(a.className||a.classId),time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>statusRank(r.status)===0).length});
   });
   return [...map.values()].sort((a,b)=>String(b.time).localeCompare(String(a.time)));
 }
@@ -825,7 +825,7 @@ function classStats(cls){
   const total = studentsOfClass(cls.id).length;
   const att = attendanceOf(cls.id);
   const marked = att ? att.records.length : 0;
-  const absent = att ? att.records.filter(r=>r.status==='غائب').length : 0;
+  const absent = att ? att.records.filter(r=>statusRank(r.status)===0).length : 0;
   const present = marked - absent;
   const pct = total ? Math.round((present/total)*100) : 0;
   return { total, marked, absent, present, pct };
@@ -1173,7 +1173,7 @@ function bindClassCardEvents(){
 function openAbsentModal(classId){
   const cls = store.classes.find(c=>c.id===classId);
   const att = attendanceOf(classId);
-  const absentees = att ? att.records.filter(r=>r.status==='غائب') : [];
+  const absentees = att ? att.records.filter(r=>statusRank(r.status)===0) : [];
   const host = document.getElementById('modalHost');
   host.innerHTML = `
   <div class="overlay" id="ov">
@@ -1709,7 +1709,7 @@ function viewScan(classId){
 }
 
 function viewScanConfirm(cls, att){
-  const absentees = att.records.filter(r=>r.status==='غائب');
+  const absentees = att.records.filter(r=>statusRank(r.status)===0);
   const present = att.records.length - absentees.length;
   return `
   <div class="scan-wrap">
@@ -1898,7 +1898,7 @@ function qrPrintMarkup(source){
   }
   return copy.outerHTML;
 }
-function statusRank(s){ s=String(s||''); if(s==='غائبة'||s==='غائب'||s==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s==='present') return 1; return 2; }
+function statusRank(s){ s=String(s||'').trim(); if(s==='غائبة'||s==='غائب'||s.toLowerCase()==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s.toLowerCase()==='present') return 1; return 2; }
 // الغائبات أولاً ثم الحاضرات ثم غير المرصودات (مع الحفاظ على الترتيب الأصلي داخل كل مجموعة)
 function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); return rows.map((r,i)=>[r,i]).sort((a,b)=>statusRank(getStatus(a[0]))-statusRank(getStatus(b[0]))||a[1]-b[1]).map(x=>x[0]); }
 function reportDateLabels(date=new Date()){
