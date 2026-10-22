@@ -1,0 +1,62 @@
+name: Validate Rasid rebuild package
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "rasid-rebuild/**"
+      - ".github/workflows/validate-rasid-rebuild.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "rasid-rebuild/**"
+      - ".github/workflows/validate-rasid-rebuild.yml"
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          cd rasid-rebuild
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.current = None
+                  self.external = False
+                  self.inline = []
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == "script":
+                      self.current = []
+                      self.external = any(k.lower() == "src" for k, _ in attrs)
+              def handle_data(self, data):
+                  if self.current is not None:
+                      self.current.append(data)
+              def handle_endtag(self, tag):
+                  if tag.lower() == "script" and self.current is not None:
+                      code = "".join(self.current)
+                      if not self.external and code.strip():
+                          self.inline.append(code)
+                      self.current = None
+                      self.external = False
+
+          out = Path("/tmp/rasid-inline")
+          out.mkdir(exist_ok=True)
+          for html_file in (Path("public/index.html"), Path("public/admin.html")):
+              parser = Scripts()
+              parser.feed(html_file.read_text(encoding="utf-8"))
+              if not parser.inline:
+                  raise SystemExit(f"No inline JavaScript in {html_file}.")
+              for i, code in enumerate(parser.inline):
+                  (out / f"{html_file.stem}-{i}.js").write_text(code, encoding="utf-8")
+          PY
+          for file in /tmp/rasid-inline/*.js; do node --check "$file"; done
