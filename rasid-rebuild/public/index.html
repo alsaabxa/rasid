@@ -1,0 +1,2496 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>منصة راصد للغياب</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{
+  --navy:#102a43;
+  --teal:#0f766e;
+  --gold:#eab308;
+  --bg1:#f6fafc;
+  --bg2:#edf7f5;
+  --text:#183247;
+  --white:#ffffff;
+  --danger:#dc2626;
+  --danger-bg:#fef2f2;
+  --success:#16a34a;
+  --success-bg:#f0fdf4;
+  --line:#dbe6ec;
+  --radius:16px;
+  --shadow:0 8px 24px -8px rgba(16,42,67,.18);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'Cairo',sans-serif;
+  background:linear-gradient(160deg,var(--bg1),var(--bg2));
+  color:var(--text);
+  min-height:100vh;
+  direction:rtl;
+}
+button, input, select{font-family:inherit; font-size:1rem;}
+button{cursor:pointer; border:none; background:none; touch-action:manipulation;}
+a{color:inherit; text-decoration:none;}
+::selection{background:var(--gold); color:var(--navy);}
+
+/* ---------- Header ---------- */
+.topbar{
+  background:var(--navy);
+  color:#fff;
+  padding:14px 22px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+  position:sticky; top:0; z-index:40;
+  box-shadow:0 4px 18px -6px rgba(0,0,0,.35);
+}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand-mark{
+  width:44px; height:44px; border-radius:12px;
+  background:linear-gradient(135deg,var(--teal),var(--navy));
+  display:flex; align-items:center; justify-content:center;
+  font-weight:800; font-size:1.3rem; color:var(--gold);
+  border:2px solid rgba(234,179,8,.5);
+}
+.brand-text h1{font-size:1.05rem; font-weight:800; letter-spacing:.2px;}
+.brand-text p{font-size:.75rem; color:#c7d7e0; font-weight:500;}
+.clock{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.10);
+  padding:5px 10px; border-radius:10px;
+  font-size:.76rem;
+}
+.clock .time{font-size:.98rem; font-weight:700; color:var(--gold); font-variant-numeric:tabular-nums; white-space:nowrap;}
+.clock .dates{display:flex; flex-direction:column; gap:1px; color:#dce9ee; line-height:1.2;}
+.topnav{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.nav-btn{
+  color:#e7eff3; padding:8px 14px; border-radius:10px; font-weight:600; font-size:.9rem;
+  transition:background .15s;
+}
+.nav-btn:hover{background:rgba(255,255,255,.1);}
+.nav-btn.active{background:var(--teal); color:#fff;}
+.user-chip{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(255,255,255,.08); padding:6px 12px; border-radius:999px;
+  font-size:.85rem;
+}
+.user-chip .dot{width:8px; height:8px; border-radius:50%; background:var(--gold);}
+.logout-btn{color:#f2b8b8; font-weight:700; font-size:.85rem;}
+
+/* ---------- Layout ---------- */
+.container{max-width:1240px; margin:0 auto; padding:26px 20px 60px;}
+.page-title{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:10px;}
+.page-title h2{font-size:1.4rem; font-weight:800; color:var(--navy);}
+.page-title p{color:#5b7382; font-size:.9rem;}
+
+/* ---------- Stat cards ---------- */
+.stats-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px;}
+@media(max-width:800px){.stats-grid{grid-template-columns:repeat(2,1fr);}}
+.stat-card{
+  background:#fff; border-radius:var(--radius); padding:18px 20px;
+  box-shadow:var(--shadow); border-top:4px solid var(--teal);
+  display:flex; flex-direction:column; gap:6px;
+}
+.stat-card.gold{border-top-color:var(--gold);}
+.stat-card.danger{border-top-color:var(--danger);}
+.stat-card.navy{border-top-color:var(--navy);}
+.stat-card .num{font-size:1.9rem; font-weight:800; color:var(--navy);}
+.stat-card .lbl{color:#5b7382; font-size:.85rem; font-weight:600;}
+
+/* ---------- Class cards ---------- */
+.classes-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px;}
+.class-card{
+  background:#fff; border-radius:var(--radius); box-shadow:var(--shadow);
+  overflow:hidden; display:flex; flex-direction:column;
+}
+.class-card .cc-top{height:6px; background:linear-gradient(90deg,var(--teal),var(--navy));}
+.class-card .cc-body{padding:18px; display:flex; flex-direction:column; gap:12px;}
+.cc-head{display:flex; align-items:center; justify-content:space-between;}
+.cc-head h3{font-size:1.05rem; font-weight:800; color:var(--navy);}
+.cc-menu{position:relative;}
+.cc-menu-btn{color:#8299a6; font-size:1.2rem; padding:2px 8px; border-radius:6px;}
+.cc-menu-btn:hover{background:#eef3f5;}
+.cc-menu-list{
+  position:absolute; left:0; top:28px; background:#fff; border-radius:10px;
+  box-shadow:var(--shadow); border:1px solid var(--line); min-width:140px; z-index:10; display:none; overflow:hidden;
+}
+.cc-menu-list.open{display:block;}
+.cc-menu-list button{display:block; width:100%; text-align:right; padding:10px 14px; font-size:.85rem; font-weight:600;}
+.cc-menu-list button:hover{background:#f4f8f9;}
+.progress-wrap{background:#eef3f5; border-radius:999px; height:9px; overflow:hidden;}
+.progress-bar{height:100%; background:linear-gradient(90deg,var(--teal),var(--success)); border-radius:999px; transition:width .4s;}
+.cc-nums{display:flex; justify-content:space-between; font-size:.78rem; color:#5b7382; font-weight:600;}
+.cc-nums b{color:var(--navy);}
+.cc-actions{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+.cc-actions button{
+  background:var(--bg1); border:1px solid var(--line); border-radius:9px; padding:8px 4px;
+  font-size:.72rem; font-weight:700; color:var(--navy); display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+.cc-actions button:hover{background:#e4f1ee; border-color:var(--teal);}
+.cc-actions button.primary{background:var(--teal); color:#fff; border-color:var(--teal);}
+.cc-actions button.primary:hover{background:#0c5f58;}
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:10px;
+  font-weight:700; font-size:.9rem; transition:transform .1s, box-shadow .15s;
+}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--teal); color:#fff; box-shadow:0 6px 16px -6px rgba(15,118,110,.5);}
+.btn-primary:hover{background:#0c5f58;}
+.btn-gold{background:var(--gold); color:var(--navy); box-shadow:0 6px 16px -6px rgba(234,179,8,.5);}
+.btn-gold:hover{background:#c99a06;}
+.btn-outline{background:#fff; color:var(--navy); border:1.5px solid var(--line);}
+.btn-outline:hover{border-color:var(--teal); color:var(--teal);}
+.btn-danger{background:var(--danger-bg); color:var(--danger); border:1.5px solid #fecaca;}
+.btn-danger:hover{background:#fee2e2;}
+.btn-sm{padding:7px 12px; font-size:.8rem;}
+.btn[disabled]{opacity:.5; cursor:not-allowed;}
+
+/* ---------- Login ---------- */
+.login-wrap{min-height:calc(100vh - 76px); display:flex; align-items:center; justify-content:center; padding:20px;}
+.login-card{
+  background:#fff; border-radius:22px; box-shadow:var(--shadow); width:100%; max-width:400px;
+  padding:36px 32px; text-align:center;
+}
+.login-card .brand-mark{margin:0 auto 14px; width:60px; height:60px; font-size:1.7rem;}
+.login-card h2{color:var(--navy); font-size:1.3rem; font-weight:800; margin-bottom:4px;}
+.login-card p.sub{color:#5b7382; font-size:.85rem; margin-bottom:26px;}
+.field{text-align:right; margin-bottom:14px;}
+.field label{display:block; font-size:.8rem; font-weight:700; color:var(--navy); margin-bottom:6px;}
+.field input, .field select{
+  width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--line); background:var(--bg1);
+  outline:none; transition:border .15s;
+}
+.field input:focus, .field select:focus{border-color:var(--teal); background:#fff;}
+.login-tabs{display:flex; gap:8px; margin-bottom:20px; background:var(--bg1); padding:4px; border-radius:12px;}
+.login-tabs button{flex:1; padding:9px; border-radius:9px; font-weight:700; font-size:.85rem; color:#5b7382;}
+.login-tabs button.active{background:#fff; color:var(--navy); box-shadow:0 2px 8px rgba(0,0,0,.08);}
+.login-error{color:var(--danger); font-size:.82rem; font-weight:600; margin-bottom:10px; min-height:1em;}
+
+/* ---------- Modal ---------- */
+.overlay{
+  position:fixed; inset:0; background:rgba(16,42,67,.55); display:flex; align-items:center; justify-content:center;
+  z-index:100; padding:16px; backdrop-filter:blur(2px);
+}
+.modal{
+  background:#fff; border-radius:20px; width:100%; max-width:560px; max-height:90vh; overflow:auto;
+  box-shadow:0 30px 60px -20px rgba(0,0,0,.4);
+}
+.modal.wide{max-width:820px;}
+.modal-head{
+  padding:20px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; background:#fff; z-index:2;
+}
+.modal-head h3{font-size:1.1rem; font-weight:800; color:var(--navy);}
+.modal-close{font-size:1.3rem; color:#8299a6; padding:4px 10px; border-radius:8px;}
+.modal-close:hover{background:#f2f5f6;}
+.modal-body{padding:22px 24px;}
+.modal-foot{padding:16px 24px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px;}
+.two-col{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+@media(max-width:520px){.two-col{grid-template-columns:1fr;}}
+
+/* ---------- Tables / lists ---------- */
+.list-row{
+  display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:10px;
+  border:1px solid var(--line); margin-bottom:8px;
+}
+.list-row .info b{display:block; color:var(--navy); font-size:.92rem;}
+.list-row .info span{color:#5b7382; font-size:.78rem;}
+.row-actions{display:flex; gap:6px;}
+.icon-btn{width:44px; min-width:44px; height:44px; min-height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#5b7382; background:var(--bg1); touch-action:manipulation;}
+.icon-btn:hover{background:#e4f1ee; color:var(--teal);}
+.icon-btn.del:hover{background:var(--danger-bg); color:var(--danger);}
+.searchbox{
+  width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--line); margin-bottom:14px; background:var(--bg1);
+}
+.chip-list{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.chip{
+  padding:5px 10px; border-radius:999px; border:1.5px solid var(--line); font-size:.75rem; font-weight:700; color:#5b7382; cursor:pointer;
+}
+.chip.selected{background:var(--teal); color:#fff; border-color:var(--teal);}
+
+/* ---------- Dropzone ---------- */
+.dropzone{
+  border:2px dashed var(--line); border-radius:14px; padding:26px; text-align:center; color:#5b7382; font-size:.85rem;
+  transition:border-color .15s, background .15s; margin-top:14px; cursor:pointer;
+}
+.dropzone.drag{border-color:var(--teal); background:#f0faf8;}
+.dropzone b{color:var(--teal); display:block; margin-bottom:4px; font-size:.95rem;}
+
+/* ---------- Scan page ---------- */
+.scan-wrap{max-width:640px; margin:0 auto; padding:26px 18px 60px;}
+.scan-head{
+  background:linear-gradient(135deg,var(--navy),#183f5f); color:#fff; border-radius:20px; padding:26px 24px; margin-bottom:20px;
+  text-align:center; box-shadow:0 14px 30px -14px rgba(16,42,67,.5); position:relative; overflow:hidden;
+}
+.scan-head::after{
+  content:''; position:absolute; inset:0; background:radial-gradient(circle at 30% -10%, rgba(234,179,8,.25), transparent 60%);
+  pointer-events:none;
+}
+.scan-head h2{font-size:1.3rem; font-weight:800; position:relative;}
+.scan-head p{font-size:.85rem; color:#cfe0e8; margin-top:4px; position:relative;}
+.teacher-field{margin-top:16px; position:relative;}
+.teacher-field input, .teacher-field select{
+  width:100%; padding:11px 14px; border-radius:10px; border:none; text-align:center; font-weight:700; color:var(--navy);
+}
+.student-item{
+  display:flex; align-items:center; justify-content:space-between; background:#fff; border-radius:14px; padding:14px 16px;
+  margin-bottom:10px; box-shadow:0 3px 10px -4px rgba(16,42,67,.12); border:2px solid transparent; transition:.15s;
+}
+.student-item.absent{border-color:var(--danger); background:var(--danger-bg);}
+.student-item .s-info{display:flex; align-items:center; gap:12px;}
+.student-item .s-num{
+  width:34px; height:34px; border-radius:9px; background:var(--bg1); display:flex; align-items:center; justify-content:center;
+  font-weight:800; color:var(--navy); font-size:.85rem;
+}
+.student-item.absent .s-num{background:var(--danger); color:#fff;}
+.student-item .s-name{font-weight:700; color:var(--navy);}
+.absent-toggle{
+  width:56px; height:30px; border-radius:999px; background:#e2ecef; position:relative; transition:.2s; flex-shrink:0;
+}
+.absent-toggle::after{
+  content:'حاضر/ة'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:.62rem; font-weight:800; color:#5b7382;
+}
+.absent-toggle.on{background:var(--danger);}
+.absent-toggle.on::after{content:'غائب/ة'; color:#fff;}
+.scan-submit-bar{position:sticky; bottom:14px; margin-top:18px;}
+.scan-submit-bar button{width:100%; padding:15px; font-size:1rem; border-radius:14px; box-shadow:0 14px 26px -10px rgba(15,118,110,.55);}
+.glow{box-shadow:0 0 0 6px rgba(234,179,8,.15), var(--shadow);}
+
+/* confirm screen */
+.confirm-wrap{text-align:center; background:#fff; border-radius:20px; padding:34px 26px; box-shadow:var(--shadow);}
+.confirm-icon{
+  width:74px; height:74px; border-radius:50%; margin:0 auto 16px; display:flex; align-items:center; justify-content:center;
+  font-size:2rem; background:var(--success-bg); color:var(--success);
+}
+.confirm-wrap h2{font-size:1.25rem; font-weight:800; color:var(--navy); margin-bottom:6px;}
+.confirm-nums{display:flex; justify-content:center; gap:14px; margin:18px 0;}
+.confirm-nums .cn{padding:14px 20px; border-radius:14px; background:var(--bg1); min-width:100px;}
+.confirm-nums .cn b{display:block; font-size:1.5rem; color:var(--navy);}
+.confirm-nums .cn.absent b{color:var(--danger);}
+.absent-names{text-align:right; background:var(--danger-bg); border-radius:12px; padding:14px 16px; margin-top:6px; max-height:200px; overflow:auto;}
+.absent-names li{font-size:.85rem; padding:4px 0; color:#7a1f1f; font-weight:600; list-style:none;}
+
+/* ---------- QR page ---------- */
+.qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;}
+.qr-card{background:#fff; border-radius:18px; box-shadow:var(--shadow); padding:20px; text-align:center;}
+.qr-card .qr-school{font-size:.72rem; color:#5b7382; font-weight:700;}
+.qr-card .qr-class{font-size:1.05rem; font-weight:800; color:var(--navy); margin:4px 0 8px;}
+.qr-card .qr-brand{display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; color:var(--navy); font-size:.82rem; font-weight:800;}
+.qr-card .qr-brand-mark{display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:var(--teal); color:#fff; font-size:1rem; font-weight:900;}
+.qr-card .qr-box{display:flex; justify-content:center; margin-bottom:12px;}
+.qr-card .qr-hint{font-size:.72rem; color:var(--teal); font-weight:700; margin-bottom:12px;}
+.qr-card .qr-actions{display:flex; gap:6px; justify-content:center;}
+
+/* ---------- Guardians / Reports ---------- */
+.guardian-phone{color:var(--teal)!important; font-weight:700; direction:ltr; unicode-bidi:plaintext;}
+.report-table{width:100%; border-collapse:collapse; background:#fff; border-radius:14px; overflow:hidden; box-shadow:var(--shadow);}
+.report-table th,.report-table td{padding:11px 12px; border-bottom:1px solid var(--line); text-align:right; font-size:.82rem;}
+.report-table th{background:var(--navy); color:#fff; font-weight:800;}
+.report-table tr:last-child td{border-bottom:none;}
+.status-present{color:var(--success);font-weight:800}.status-absent{color:var(--danger);font-weight:800}.status-missing{color:#8299a6;font-weight:700}
+.report-filters{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:18px}
+@media(max-width:700px){.report-filters{grid-template-columns:1fr}.report-table{font-size:.78rem}.report-table th,.report-table td{padding:8px 7px}}
+/* ---------- Toast ---------- */
+.toast{
+  position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--navy); color:#fff;
+  padding:12px 22px; border-radius:12px; font-weight:700; font-size:.85rem; box-shadow:var(--shadow); opacity:0; transition:.25s; z-index:200;
+  display:flex; align-items:center; gap:8px;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+.toast.err{background:var(--danger);}
+
+
+/* ---------- Responsive: mobile / iPad / desktop ---------- */
+html,body{max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;}
+button,input,select{font:inherit;}
+.topbar{flex-wrap:wrap;gap:10px;}
+.topnav{display:flex;flex-wrap:wrap;gap:6px;}
+.classes-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));}
+.stats-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));}
+.cc-actions{grid-template-columns:repeat(2,minmax(0,1fr));}
+.cc-actions button{min-height:44px;}
+.container,.scan-wrap{width:min(1180px,calc(100% - 24px));}
+input,select,.btn{min-height:44px; touch-action:manipulation;}
+.notification-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;font-size:1.2rem;}
+.notification-bell .bell-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:99px;background:#dc2626;color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:800;padding:0 4px;}
+.notification-bell.ring{animation:bellRing .55s ease-in-out 3;}
+@keyframes bellRing{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+@media(max-width:900px){.topbar{padding:8px 10px;gap:7px}.brand-text h1{font-size:.96rem}.brand-text p{font-size:.65rem}.clock{order:3;width:auto;max-width:100%;justify-content:flex-start;padding:4px 8px;font-size:.68rem;gap:7px;flex:0 1 auto}.clock .time{font-size:.88rem}.clock .dates{flex:0 1 auto;flex-direction:column;gap:1px}.topnav{order:4;width:100%;overflow-x:auto;flex-wrap:nowrap;padding:2px 0 5px;scrollbar-width:thin}.topnav .nav-btn{white-space:nowrap;flex-shrink:0}.notification-bell{flex-shrink:0}.page-title{align-items:flex-start;gap:10px}.cc-actions{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.topbar{padding:7px 9px;gap:5px;row-gap:5px}.brand{gap:6px;min-width:0;flex:1 1 auto}.brand-mark{width:32px;height:32px;border-radius:9px;font-size:1rem;flex-shrink:0}.brand-text{min-width:0}.brand-text h1{font-size:.84rem;white-space:nowrap}.brand-text p{font-size:.58rem;white-space:nowrap}.clock{order:2;flex:0 0 auto;gap:5px;padding:2px 5px;border-radius:7px;font-size:.57rem;max-width:48%;background:transparent;border-color:rgba(255,255,255,.08)}.clock .time{font-size:.72rem}.clock .dates{font-size:.55rem;line-height:1.1;gap:0}.topnav{order:3;width:100%;gap:5px;padding:1px 0 2px}.topnav .nav-btn{padding:6px 9px;font-size:.78rem}.container,.scan-wrap{width:calc(100% - 16px)}.page-title{flex-direction:column}.page-title>div:last-child{width:100%}.page-title .btn{width:100%}.stats-grid{grid-template-columns:repeat(2,1fr);gap:8px}.stat-card{padding:12px 8px}.stat-card .num{font-size:1.35rem}.class-card{border-radius:14px}.cc-body{padding:12px}.cc-actions{gap:6px}.cc-actions button{font-size:.75rem;padding:9px 5px}.scan-wrap{padding-bottom:12px}.student-item{padding:10px 8px}.student-item .s-name{font-size:.88rem}.report-table{min-width:620px}.report-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.report-filters{gap:8px}.confirm-wrap{padding:24px 14px}.toast{width:calc(100% - 24px);text-align:center;justify-content:center}.notification-bell{width:40px;height:40px}}
+@media(min-width:601px) and (max-width:1024px){.container,.scan-wrap{width:calc(100% - 32px)}.classes-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.cc-actions{grid-template-columns:repeat(3,1fr);}}
+
+.empty{text-align:center; padding:50px 20px; color:#8299a6;}
+.empty b{display:block; color:var(--navy); font-size:1rem; margin-bottom:6px;}
+
+@media print{
+  .topbar, .no-print{display:none !important;}
+  body{background:#fff;}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar no-print">
+  <div class="brand">
+    <div class="brand-mark">ر</div>
+    <div class="brand-text">
+      <h1>منصة راصد للغياب</h1>
+      <p id="brandSchoolName">إدارة المدارس بحساب معتمد</p>
+    </div>
+  </div>
+  <div class="clock" id="clock">
+    <div class="dates"><span id="clockHijri">—</span><span id="clockGregorian">—</span></div>
+    <div class="time" id="clockTime">—</div>
+  </div>
+  <div class="topnav" id="topnav"></div>
+</div>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="./firebase-config.js"></script>
+<script>
+/* ==========================================================================
+   منصة راصد للغياب — تطبيق صفحة واحدة (SPA)
+   مصدر البيانات السحابي: Firebase Authentication + Cloud Firestore.
+   يحتفظ التطبيق بنسخة محلية مؤقتة لدعم الاستمرارية عند ضعف الاتصال.
+   ========================================================================== */
+let SCHOOL_NAME = "منصة راصد للمدارس";
+const firebaseConfig = window.RASID_FIREBASE_CONFIG || {};
+let auth = null, db = null, activeSchoolId = null, firebaseReady = false, saveTimer = null, pendingRegistration = false;
+try {
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    firebase.initializeApp(firebaseConfig); auth = firebase.auth(); db = firebase.firestore(); firebaseReady = true;
+  }
+} catch (e) { console.error('Firebase initialization failed', e); }
+const SCHOOL_LOGO_DATA = 'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="24" fill="#102a43"/><text x="50" y="68" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="58" fill="#eab308">ر</text></svg>');
+let STORAGE_KEY = "rasid_store_v1";
+const SESSION_KEY = "rasid_session_v1";
+
+/* ---------- state ---------- */
+let store = loadStore();
+let session = loadSession();
+// Do not render a cached, unscoped store as an authenticated school's data.
+let schoolDataReady = !auth;
+let route = { name: session ? "dashboard" : "login" };
+let dashboardQuery = '';
+let pendingClassForScan = null; // used for ?class= deep link
+
+function loadStore(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(!Array.isArray(parsed.teacherNames)) parsed.teacherNames = [];
+      if(!Array.isArray(parsed.guardians)) parsed.guardians = [];
+      if(!parsed.reportSignatures || typeof parsed.reportSignatures !== 'object') parsed.reportSignatures = {manager:'', attendance:''};
+      if(typeof parsed.reportSignatures.manager !== 'string') parsed.reportSignatures.manager = '';
+      if(typeof parsed.reportSignatures.attendance !== 'string') parsed.reportSignatures.attendance = '';
+      if(!['boys','girls'].includes(parsed.schoolType)) parsed.schoolType = 'girls';
+      return parsed;
+    }
+  }catch(e){}
+  return { classes:[], students:[], staff:[], attendance:[], teacherNames:[], guardians:[], schoolType:'girls', reportSignatures:{manager:'',attendance:''} };
+}
+function emptyCloudStore(){
+  return {classes:[],students:[],staff:[],attendance:[],teacherNames:[],guardians:[],schoolType:'girls',reportSignatures:{manager:'',attendance:''}};
+}
+function normalizeCloudStore(value){
+  const out=Object.assign(emptyCloudStore(),value||{});
+  ['classes','students','staff','attendance','teacherNames','guardians'].forEach(k=>{if(!Array.isArray(out[k]))out[k]=[];});
+  if(!out.reportSignatures||typeof out.reportSignatures!=='object')out.reportSignatures={manager:'',attendance:''};
+  if(typeof out.reportSignatures.manager!=='string')out.reportSignatures.manager='';
+  if(typeof out.reportSignatures.attendance!=='string')out.reportSignatures.attendance='';
+  if(!['boys','girls'].includes(out.schoolType))out.schoolType='girls';
+  return out;
+}
+let cloudBaseline = null;
+let cloudMetaExists = false;
+let cloudRevision = 0;
+let cloudDirty = false;
+let cloudWriteQueue = Promise.resolve();
+let localRevision = 0;
+const CLOUD_ARRAY_FIELDS = ['classes','students','staff','attendance','guardians'];
+function cloudRecordId(kind,item,index){
+  // Attendance is keyed by class and date in this app, so keep its document ID stable even without a legacy record ID.
+  const raw=item&&item.id!=null?String(item.id):(kind==='attendance'&&item?String(item.classId||'')+'_'+String(item.date||''):'legacy_'+index);
+  return 'v2_'+kind+'_'+encodeURIComponent(raw);
+}
+function cloudRecordsFor(value){
+  const out=new Map();
+  CLOUD_ARRAY_FIELDS.forEach(kind=>{
+    (value[kind]||[]).forEach((item,index)=>{
+      const id=cloudRecordId(kind,item,index);
+      out.set(id,{kind,record:item,order:index});
+    });
+  });
+  return out;
+}
+function cloudMetaFor(value){
+  return {kind:'meta',schemaVersion:2,schoolType:value.schoolType,teacherNames:value.teacherNames||[],reportSignatures:value.reportSignatures||{manager:'',attendance:''}};
+}
+function stableCloudJson(value){
+  try{return JSON.stringify(value===undefined?null:value);}catch(e){return String(value);}
+}
+function saveStore(){
+  if(!['boys','girls'].includes(store.schoolType))store.schoolType='girls';
+  store=normalizeCloudStore(store);
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+  localRevision++; cloudDirty=true;
+  if(db&&activeSchoolId&&session&&session.approved){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud save failed',e)),450);
+  }
+}
+function cloneStoreSnapshot(){return JSON.parse(JSON.stringify(store));}
+function resetCloudSyncState(schoolId){clearTimeout(saveTimer);saveTimer=null;cloudBaseline=null;cloudMetaExists=false;cloudRevision=0;cloudDirty=false;localRevision++;}
+function restoreStoreSnapshot(snapshot){
+  clearTimeout(saveTimer);saveTimer=null;
+  store=normalizeCloudStore(snapshot);localRevision++;cloudDirty=true;
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Local rollback failed',e);}
+  if(db&&activeSchoolId&&session&&session.approved){
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud rollback sync failed',e)),3000);
+  }
+}
+async function syncStoreToCloud(){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  const requestedSchoolId=activeSchoolId;
+  const run=async()=>{
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    const target=normalizeCloudStore(cloneStoreSnapshot());
+    const revision=localRevision;
+    const privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
+    const base=normalizeCloudStore(cloudBaseline||emptyCloudStore());
+    const baseRevision=Number(cloudRevision)||0;
+    const oldRecords=cloudRecordsFor(base),newRecords=cloudRecordsFor(target);
+    const writes=[];
+    newRecords.forEach((value,id)=>{
+      const old=oldRecords.get(id);
+      if(!old||stableCloudJson(old.record)!==stableCloudJson(value.record)||old.kind!==value.kind||old.order!==value.order){
+        writes.push({type:'set',id,data:{kind:'record',recordType:value.kind,record:value.record,order:value.order,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}});
+      }
+    });
+    oldRecords.forEach((value,id)=>{if(!newRecords.has(id))writes.push({type:'delete',id});});
+    const oldMeta=cloudMetaFor(base),newMeta=cloudMetaFor(target);
+    if(writes.length||stableCloudJson(oldMeta)!==stableCloudJson(newMeta)||!cloudMetaExists){
+      writes.push({type:'set',id:'appMeta',merge:true,data:Object.assign({},newMeta,{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()})});
+    }
+    // Use multiple small batches; Firestore permits at most 500 writes per batch.
+    for(let offset=0;offset<writes.length;offset+=400){
+      const batch=db.batch();
+      writes.slice(offset,offset+400).forEach(w=>{
+        const ref=privateRef.doc(w.id);
+        if(w.type==='delete')batch.delete(ref);else if(w.merge)batch.set(ref,w.data,{merge:true});else batch.set(ref,w.data);
+      });
+      await batch.commit();
+    }
+    cloudBaseline=target;
+    const wroteMeta=writes.some(w=>w.id==='appMeta');
+    if(wroteMeta)cloudRevision=baseRevision+1;
+    cloudMetaExists=true;
+    cloudDirty=(localRevision!==revision);
+    if(cloudDirty){
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+    }else if(wroteMeta){
+      // Read the committed revision back: another device may have written concurrently.
+      try{
+        const latestMeta=await privateRef.doc('appMeta').get();
+        if(activeSchoolId===requestedSchoolId&&!cloudDirty&&latestMeta.exists){
+          const actualRevision=Number((latestMeta.data()||{}).revision)||0;
+          cloudRevision=actualRevision;
+          if(actualRevision!==baseRevision+1)await pullFromServer(true);
+        }
+      }catch(revisionError){console.error('Cloud revision confirmation failed',revisionError);}
+    }
+    return {ok:true};
+  };
+  const queued=cloudWriteQueue.then(run,run);
+  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
+  return queued.catch(e=>{
+    cloudDirty=true;
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>syncStoreToCloud().catch(err=>console.error('Cloud retry failed',err)),3000);
+    throw e;
+  });
+}
+async function syncStudentRecordToCloud(studentId){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  // Initial migration must still upload the complete store once.
+  if(!cloudMetaExists||!cloudBaseline)return syncStoreToCloud();
+  // If anything besides this student changed locally, flush the whole pending change set first.
+  const baseline=normalizeCloudStore(cloudBaseline),target=normalizeCloudStore(cloneStoreSnapshot());
+  baseline.students=baseline.students.filter(st=>String(st.id)!==String(studentId));
+  target.students=target.students.filter(st=>String(st.id)!==String(studentId));
+  if(stableCloudJson(baseline)!==stableCloudJson(target))return syncStoreToCloud();
+  const requestedSchoolId=activeSchoolId;
+  const run=async()=>{
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    if(!cloudMetaExists||!cloudBaseline)return {ok:false,error:'لم تكتمل مزامنة المدرسة الأولية'};
+    const index=(store.students||[]).findIndex(st=>String(st.id)===String(studentId));
+    if(index<0)return {ok:false,error:'تعذر العثور على الطالبة بعد التعديل'};
+    const revisionAtStart=localRevision,baseRevision=Number(cloudRevision)||0;
+    const student=store.students[index],privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
+    const batch=db.batch();
+    batch.set(privateRef.doc(cloudRecordId('students',student,index)),{kind:'record',recordType:'students',record:student,order:index,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    batch.set(privateRef.doc('appMeta'),Object.assign({},cloudMetaFor(store),{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true});
+    await batch.commit();
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    if(localRevision!==revisionAtStart){
+      cloudDirty=true;
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+      return {ok:true};
+    }
+    const nextBaseline=normalizeCloudStore(cloudBaseline);
+    const oldIndex=nextBaseline.students.findIndex(st=>String(st.id)===String(studentId));
+    if(oldIndex>=0)nextBaseline.students[oldIndex]=student;
+    else nextBaseline.students.splice(index,0,student);
+    cloudBaseline=nextBaseline;
+    cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=localRevision!==revisionAtStart;
+    if(cloudDirty){
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+    }
+    return {ok:true};
+  };
+  const queued=cloudWriteQueue.then(run,run);
+  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
+  return queued.catch(e=>{
+    cloudDirty=true;
+    throw e;
+  });
+}
+async function syncAttendanceRecordToCloud(attendance){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  if(!cloudMetaExists||!cloudBaseline)return syncStoreToCloud();
+  const baseline=normalizeCloudStore(cloudBaseline),target=normalizeCloudStore(cloneStoreSnapshot());
+  const sameSession=a=>String(a.classId)===String(attendance.classId)&&String(a.date)===String(attendance.date);
+  baseline.attendance=baseline.attendance.filter(a=>!sameSession(a));
+  target.attendance=target.attendance.filter(a=>!sameSession(a));
+  if(stableCloudJson(baseline)!==stableCloudJson(target))return syncStoreToCloud();
+  const requestedSchoolId=activeSchoolId;
+  const run=async()=>{
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    if(!cloudMetaExists||!cloudBaseline)return {ok:false,error:'لم تكتمل مزامنة المدرسة الأولية'};
+    const index=(store.attendance||[]).findIndex(sameSession);
+    if(index<0)return {ok:false,error:'تعذر العثور على الرصد بعد تسجيله'};
+    const revisionAtStart=localRevision,baseRevision=Number(cloudRevision)||0;
+    const record=store.attendance[index],privateRef=db.collection('schools').doc(requestedSchoolId).collection('private');
+    const batch=db.batch();
+    batch.set(privateRef.doc(cloudRecordId('attendance',record,index)),{kind:'record',recordType:'attendance',record,order:index,schemaVersion:2,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    batch.set(privateRef.doc('appMeta'),Object.assign({},cloudMetaFor(store),{revision:firebase.firestore.FieldValue.increment(1),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true});
+    await batch.commit();
+    if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
+    const nextBaseline=normalizeCloudStore(cloudBaseline);
+    nextBaseline.attendance=normalizeCloudStore(cloneStoreSnapshot()).attendance;
+    cloudBaseline=nextBaseline;cloudRevision=baseRevision+1;cloudMetaExists=true;cloudDirty=localRevision!==revisionAtStart;
+    if(cloudDirty){
+      clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
+    }
+    return {ok:true};
+  };
+  const queued=cloudWriteQueue.then(run,run);
+  cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
+  return queued.catch(e=>{cloudDirty=true;throw e;});
+}
+async function persistStoreMutation(action,payload,snapshot){
+  clearTimeout(saveTimer);saveTimer=null;
+  const result=await pushToServer(action,payload);
+  if(!result.ok)restoreStoreSnapshot(snapshot);
+  return result;
+}
+function loadSession(){
+  try{ const raw = sessionStorage.getItem(SESSION_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+  return null;
+}
+function saveSession(){ sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); }
+function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function nowTimeStr(){ const d=new Date(); return d.toLocaleTimeString('ar-SA-u-nu-latn',{hour:'2-digit',minute:'2-digit',hour12:true}); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function normalizeNameClient(name){
+  return String(name==null?'':name).replace(/[\u064B-\u0652\u0670\u0640]/g,'').replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g,'').replace(/[\u00A0]/g,' ').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/\s+/g,' ').trim();
+}
+function guardianForStudent(student){
+  const key=normalizeNameClient(student&&student.name);
+  return (store.guardians||[]).find(g=>g.id===key) || null;
+}
+function normalizePhoneClient(phone){
+  let s=String(phone==null?'':phone).replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\D/g,'');
+  if(s.indexOf('00966')===0) s=s.slice(2);
+  if(/^05\d{8}$/.test(s)) s='966'+s.slice(1);
+  else if(/^5\d{8}$/.test(s)) s='966'+s;
+  return /^9665\d{8}$/.test(s) ? s : '';
+}
+function guardianPhoneForStudent(student){ return (guardianForStudent(student)||{}).phone || student.guardianPhone || ''; }
+
+
+function playAttendanceBell(absentCount){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(AC){ const ctx=new AC(); const now=ctx.currentTime;
+      [0,0.16].forEach((d,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=i?880:660;g.gain.setValueAtTime(.0001,now+d);g.gain.exponentialRampToValueAtTime(.16,now+d+.02);g.gain.exponentialRampToValueAtTime(.0001,now+d+.13);o.connect(g);g.connect(ctx.destination);o.start(now+d);o.stop(now+d+.15);});
+    }
+  }catch(e){}
+  const bell=document.getElementById('notificationBell');
+  const count=document.getElementById('bellCount');
+  if(bell){bell.classList.remove('ring'); void bell.offsetWidth; bell.classList.add('ring');}
+  if(count) count.textContent=String(Math.max(0,absentCount||0));
+}
+function notificationTodayList(){
+  const today=todayStr(), map=new Map();
+  (store.attendance||[]).filter(a=>String(a.date)===today).forEach(a=>{
+    const key=String(a.classId||''); if(!key)return;
+    const cls=store.classes.find(c=>String(c.id)===key); if(!cls)return;
+    const old=map.get(key);
+    if(!old || String(a.time||'')>String(old.time||'')) map.set(key,{classId:a.classId,className:cls?classDisplayName(cls):(a.className||a.classId),time:a.time||'',teacher:a.teacher||'',absent:(a.records||[]).filter(r=>statusRank(r.status)===0).length});
+  });
+  return [...map.values()].sort((a,b)=>String(b.time).localeCompare(String(a.time)));
+}
+function refreshNotificationBell(){const c=document.getElementById('bellCount');if(c)c.textContent=String(notificationTodayList().length);}
+function bindNotificationBell(){
+  const b=document.getElementById('notificationBell'); if(!b)return; refreshNotificationBell();
+  b.onclick=()=>{
+    let panel=document.getElementById('notificationPanel');
+    if(!panel){panel=document.createElement('div');panel.id='notificationPanel';panel.style.cssText='position:fixed;top:72px;right:18px;width:min(360px,calc(100vw - 36px));max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(16,42,67,.18);z-index:1000;padding:12px;direction:rtl';document.body.appendChild(panel);}
+    const list=notificationTodayList();
+    panel.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 4px 10px;border-bottom:1px solid var(--line)"><b>تنبيهات اليوم</b><button id="closeNotificationPanel" class="icon-btn">✕</button></div>`+(list.length?list.map(x=>`<button data-notify-class="${esc(x.classId||'')}" style="display:block;width:100%;text-align:right;border:0;border-bottom:1px solid var(--line);background:#fff;padding:12px 6px;cursor:pointer"><b>${esc(x.className)}</b><div style="font-size:.78rem;color:#607d8b;margin-top:4px">${esc(x.time||'')} ${x.teacher?'— '+esc(x.teacher):''} — غائبات: ${x.absent}</div></button>`).join(''):'<div style="padding:22px 8px;text-align:center;color:#8299a6">لا يوجد رصد اليوم</div>');
+    panel.querySelector('#closeNotificationPanel').onclick=()=>panel.remove();
+    panel.querySelectorAll('[data-notify-class]').forEach(el=>el.onclick=()=>{panel.remove();navigate('scan',{classId:el.dataset.notifyClass});});
+  };
+}
+
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.className='toast', 2600);
+}
+
+/* ---------- clock ---------- */
+function tickClock(){
+  const now = new Date();
+  const time = now.toLocaleTimeString('ar-SA-u-nu-latn', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true});
+  let hijri = '—', greg = '—';
+  try{
+    hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
+  }catch(e){}
+  try{
+    greg = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
+  }catch(e){}
+  document.getElementById('clockTime').textContent = time;
+  document.getElementById('clockHijri').textContent = hijri;
+  document.getElementById('clockGregorian').textContent = greg;
+}
+setInterval(tickClock, 1000); tickClock();
+if(auth){auth.onAuthStateChanged(async user=>{
+  if(pendingRegistration)return;
+  if(!user){
+    if(session&&session.type==='admin'){
+      session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();
+    }
+    return;
+  }
+  schoolDataReady=false;
+  try{
+    const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();
+    if(!p||p.status!=='approved'||!p.schoolId){await auth.signOut();session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();return;}
+    activeSchoolId=p.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();store.schoolType=p.schoolType==='boys'?'boys':'girls';SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);
+    schoolDataReady=true;startAutoSync();render();
+  }catch(e){console.error(e);if(activeSchoolId){schoolDataReady=true;render();}else{session=null;schoolDataReady=true;route={name:'login'};render();}}
+});}
+
+
+/* ==========================================================================
+   المزامنة مع Firebase Cloud Firestore
+   ========================================================================== */
+let syncTimer = null;
+let guardianImportBusy = false;
+async function pushToServer(action,payload){
+  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  try{
+    if(action==='saveAttendance'&&payload){
+      clearTimeout(saveTimer);saveTimer=null;
+      return await syncAttendanceRecordToCloud(payload);
+    }
+    if(action==='saveStudent'&&payload){
+      const student=Object.assign({},payload);delete student.oldName;
+      const index=(store.students||[]).findIndex(x=>x.id===student.id);
+      if(index>=0)store.students[index]=Object.assign({},store.students[index],student);else store.students.push(student);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
+      const result=await syncStudentRecordToCloud(student.id);
+      if(!result.ok)return result;
+      return {ok:true,updated:1};
+    }
+    if(action==='saveGuardian'&&payload){
+      const id=normalizeNameClient(payload.name),phone=normalizePhoneClient(payload.phone);
+      if(!phone)return {ok:false,error:'رقم الجوال السعودي غير صالح'};
+      const guardian={id,name:String(payload.name||'').trim(),phone};
+      store.guardians=(store.guardians||[]).filter(g=>g.id!==id);store.guardians.push(guardian);
+      store.students=(store.students||[]).map(st=>normalizeNameClient(st.name)===id?Object.assign({},st,{guardianPhone:phone}):st);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
+    }
+    const result=await syncStoreToCloud();
+    if(!result.ok)return result;
+    return {ok:true,phone:action==='saveGuardian'?normalizePhoneClient(payload&&payload.phone):undefined,added:action==='importGuardians'&&payload&&Array.isArray(payload.guardians)?payload.guardians.length:undefined,updated:0};
+  }catch(e){
+    console.error('Firebase sync failed:',action,e);
+    return {ok:false,error:e&&e.message?e.message:'تعذر حفظ البيانات في Firebase'};
+  }
+}
+async function pullFromServer(silent){
+  if(!db||!activeSchoolId)return false;
+  // Never replace unsaved local edits with a polling response.
+  if(cloudDirty)return false;
+  const requestedSchoolId=activeSchoolId;
+  const revisionAtStart=localRevision;
+  try{
+    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').get();
+    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||cloudDirty)return false;
+    const docs=snap.docs||[];
+    const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
+    const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
+    const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
+    // Only appMeta marks a complete V2 snapshot. Without it, reconcile partial writes below.
+    if(metaDoc){
+      const meta=metaDoc?metaDoc.data():{};
+      const next=emptyCloudStore();
+      next.schoolType=meta.schoolType||'girls';
+      next.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
+      next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')next[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:next[kind].length,__record:record});
+      });
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        next[kind]=next[kind].map(x=>x.__record);
+      });
+      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      if(!silent)render();
+      return true;
+    }
+    // One-time, backward-compatible migration from the previous appData document.
+    if(legacy){
+      store=normalizeCloudStore(legacy.data().store);
+      // Treat any partial V2 records as the previous cloud snapshot so stale partial records are deleted.
+      const partial=emptyCloudStore();
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')partial[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:partial[kind].length,__record:record});
+      });
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        partial[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        partial[kind]=partial[kind].map(x=>x.__record);
+      });
+      cloudBaseline=normalizeCloudStore(partial);cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // Recover an interrupted first-time upload when records exist but appMeta does not.
+    if(recordDocs.length){
+      const merged=normalizeCloudStore(store);
+      ['classes','students','staff','attendance','guardians'].forEach(kind=>{
+        const docsForKind=recordDocs.filter(d=>(d.data().recordType||d.data().kind)===kind).sort((a,b)=>{
+          const ao=Number.isFinite(a.data().order)?a.data().order:0;
+          const bo=Number.isFinite(b.data().order)?b.data().order:0;
+          return ao-bo;
+        });
+        const known=new Set(merged[kind].map((item,index)=>cloudRecordId(kind,item,index)));
+        docsForKind.forEach(d=>{
+          const data=d.data(),record=data.record;
+          if(record&&typeof record==='object'&&!known.has(d.id)){
+            merged[kind].push(record);
+            known.add(d.id);
+          }
+        });
+      });
+      store=normalizeCloudStore(merged);
+      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // No cloud data yet: keep this school's local data and upload it in the new format.
+    cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;
+    const local=normalizeCloudStore(store);
+    const hasLocalData=CLOUD_ARRAY_FIELDS.some(k=>local[k].length)||local.teacherNames.length||
+      local.reportSignatures.manager||local.reportSignatures.attendance;
+    if(hasLocalData){cloudDirty=true;await syncStoreToCloud();}
+    else {cloudDirty=false;await syncStoreToCloud();}
+    if(!silent)render();
+    return false;
+  }catch(e){console.error('Cloud load failed',e);return false;}
+}
+let syncListenersBound = false;
+async function checkCloudMetaAndPull(){
+  if(!db||!activeSchoolId||cloudDirty)return false;
+  const requestedSchoolId=activeSchoolId;
+  try{
+    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').doc('appMeta').get();
+    if(activeSchoolId!==requestedSchoolId||cloudDirty||!snap.exists)return false;
+    const data=snap.data()||{},revision=Number(data.revision)||0;
+    if(revision!==cloudRevision){
+      const pulled=await pullFromServer(true);
+      // Pulling silently updates the in-memory store, but the current view also
+      // needs a repaint to show changes made in another device/session. Avoid
+      // interrupting a form or modal the user is currently editing.
+      const active=document.activeElement;
+      const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
+      if(pulled&&!editing&&!document.querySelector('.overlay'))render();
+      return pulled;
+    }
+  }catch(e){console.error('Cloud revision check failed',e);}
+  return false;
+}
+function startAutoSync(){
+  if(syncTimer) clearInterval(syncTimer);
+  if(!db || !activeSchoolId) return;
+  syncTimer = setInterval(()=>checkCloudMetaAndPull(), 4000);
+  if(!syncListenersBound){
+    syncListenersBound = true;
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkCloudMetaAndPull(); });
+    window.addEventListener('focus', ()=> checkCloudMetaAndPull());
+  }
+}
+
+/* ==========================================================================
+   المصادقة
+   ========================================================================== */
+async function sha256Hex(s){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(s)));
+  return Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+// التحقق يتم على الخادم. إن رفض الخادم صراحةً (error:'invalid') نرفض؛ وإن تعذر الوصول إليه أو كان إصداراً قديماً نستخدم الاحتياط المحلي.
+async function doLoginAdmin(){ return false; }
+async function verifyAdminPassword(){ return false; }
+async function doLoginStaff(){ return false; }
+function logout(){
+  session = null; sessionStorage.removeItem(SESSION_KEY);
+  if(auth) auth.signOut(); activeSchoolId=null;
+  navigate('login');
+}
+
+/* ==========================================================================
+   التنقل
+   ========================================================================== */
+function navigate(name, params){
+  const nextRoute=Object.assign({name}, params||{});
+  const wasScanning=route&&(route.name==='scan'||route.name==='scanDeep');
+  const willScan=nextRoute.name==='scan'||nextRoute.name==='scanDeep';
+  if(!wasScanning||!willScan||String(route.classId)!==String(nextRoute.classId)){
+    scanAbsentSet=new Set();
+    scanAbsentContext=null;
+  }
+  route = nextRoute;
+  render();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ==========================================================================
+   الحسابات المساعدة
+   ========================================================================== */
+function studentUniqueKey(st){
+  const cls=String(st.classId||'');
+  const name=normalizeNameClient(st.name||'');
+  return cls+'|'+(name || String(st.id||''));
+}
+function dedupeStudents(list){
+  const seen=new Set(); const out=[];
+  (list||[]).forEach(st=>{
+    const key=studentUniqueKey(st);
+    if(seen.has(key)) return;
+    seen.add(key); out.push(st);
+  });
+  return out;
+}
+function studentsOfClass(classId){ return dedupeStudents(store.students.filter(s=>s.classId===classId)); }
+function attendanceOf(classId, date){ return store.attendance.find(a=>a.classId===classId && a.date===(date||todayStr())); }
+function classStats(cls){
+  const total = studentsOfClass(cls.id).length;
+  const att = attendanceOf(cls.id);
+  const marked = att ? att.records.length : 0;
+  const absent = att ? att.records.filter(r=>statusRank(r.status)===0).length : 0;
+  const present = marked - absent;
+  const pct = total ? Math.round((present/total)*100) : 0;
+  return { total, marked, absent, present, pct };
+}
+function visibleClasses(){
+  if(!session) return [];
+  if(session.type==='admin') return store.classes;
+  return store.classes.filter(c=> (session.classes||[]).includes(c.id));
+}
+
+/* ==========================================================================
+   العرض الرئيسي
+   ========================================================================== */
+function render(){
+  if(auth&&session&&session.type==='admin'&&!schoolDataReady){
+    document.title='منصة راصد للغياب';
+    const brandSchoolName=document.getElementById('brandSchoolName');
+    if(brandSchoolName)brandSchoolName.textContent='إدارة المدارس بحساب معتمد';
+    document.getElementById('topnav').innerHTML='';
+    document.getElementById('app').innerHTML='<div class="container"><div class="empty"><b>جارٍ تحميل بيانات المدرسة…</b></div></div>';
+    return;
+  }
+  document.title = session ? `منصة راصد للغياب — ${SCHOOL_NAME}` : 'منصة راصد للغياب';
+  const brandSchoolName = document.getElementById('brandSchoolName');
+  if(brandSchoolName) brandSchoolName.textContent = session ? SCHOOL_NAME : 'إدارة المدارس بحساب معتمد';
+  const active = document.activeElement;
+  let focusInfo = null;
+  if(active && active.id && (active.tagName==='INPUT' || active.tagName==='TEXTAREA')){
+    focusInfo = { id: active.id, selStart: active.selectionStart, selEnd: active.selectionEnd };
+  }
+  renderTopnav();
+  const app = document.getElementById('app');
+  if(route.name==='scanDeep'){ app.innerHTML = viewScan(route.classId); bindScan(); }
+  else if(!session){ app.innerHTML = viewLogin(); bindLogin(); }
+  else{
+    switch(route.name){
+      case 'dashboard': app.innerHTML = viewDashboard(); bindDashboard(); break;
+      case 'scan': app.innerHTML = viewScan(route.classId); bindScan(); break;
+      case 'qr': app.innerHTML = viewQR(); bindQR(); break;
+      case 'staff': app.innerHTML = viewStaff(); bindStaff(); break;
+      case 'guardians': app.innerHTML = viewGuardians(); bindGuardians(); break;
+      case 'absenceReport': app.innerHTML = viewAbsenceReport(); bindAbsenceReport(); break;
+      case 'settings': app.innerHTML = viewSchoolSettings(); bindSchoolSettings(); break;
+      default: app.innerHTML = viewDashboard(); bindDashboard();
+    }
+  }
+  applyGenderLanguage(document.getElementById('topnav'));
+  applyGenderLanguage(app);
+  if(focusInfo){
+    const el = document.getElementById(focusInfo.id);
+    if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
+      el.focus();
+      try{ el.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); }catch(e){}
+    }
+  }
+}
+function renderTopnav(){
+  const nav = document.getElementById('topnav');
+  if(!session){ nav.innerHTML=''; return; }
+  let links = `<a class="nav-btn ${route.name==='dashboard'?'active':''}" data-nav="dashboard">لوحة التحكم</a>`;
+  links += `<a class="nav-btn ${route.name==='qr'?'active':''}" data-nav="qr">أكواد QR</a>`;
+  if(session.type==='admin'){
+    links += `<a class="nav-btn ${route.name==='staff'?'active':''}" data-nav="staff">الإداريات</a>`;
+    links += `<a class="nav-btn ${route.name==='guardians'?'active':''}" data-nav="guardians">أولياء الأمور</a>`;
+    links += `<a class="nav-btn ${route.name==='absenceReport'?'active':''}" data-nav="absenceReport">تقرير الغياب</a>`;
+    links += `<a class="nav-btn ${route.name==='settings'?'active':''}" data-nav="settings">الإعدادات</a>`;
+  }
+  nav.innerHTML = `
+    ${links}
+    <div class="user-chip"><span class="dot"></span> ${esc(session.name)}</div>
+    <button class="notification-bell no-print" id="notificationBell" title="تنبيهات الرصد" aria-label="تنبيهات الرصد">🔔<span class="bell-count" id="bellCount">0</span></button>
+    <button class="nav-btn logout-btn" id="logoutBtn">خروج</button>
+  `;
+  nav.querySelectorAll('[data-nav]').forEach(el=> el.onclick = ()=> navigate(el.dataset.nav));
+  document.getElementById('logoutBtn').onclick = logout;
+  bindNotificationBell();
+}
+
+/* ==========================================================================
+   إعدادات المدرسة واللغة
+   ========================================================================== */
+function viewSchoolSettings(){
+  const type = store.schoolType === 'boys' ? 'boys' : 'girls';
+  return `<div class="container">
+    <div class="page-title"><div><h2>الإعدادات</h2><p>تخصيص نوع المدرسة وأسماء التوقيع أسفل التقارير المصدّرة</p></div></div>
+    <div class="modal wide" style="position:relative;margin:0 auto;max-width:720px">
+      <div class="modal-head"><h3>إعدادات المدرسة والتقارير</h3></div>
+      <div class="modal-body">
+        <p style="color:#5b7382;margin-bottom:18px">يتغير أسلوب العبارات الظاهرة في المنصة تلقائيًا حسب اختيارك. لا يتم تعديل أسماء الطلاب أو سجلات الحضور والغياب.</p>
+        <div class="field">
+          <label for="schoolTypeSelect">اختر نوع المدرسة</label>
+          <select id="schoolTypeSelect">
+            <option value="boys" ${type==='boys'?'selected':''}>مدرسة بنين</option>
+            <option value="girls" ${type==='girls'?'selected':''}>مدرسة بنات</option>
+          </select>
+        </div>
+
+        <div style="border-top:1px solid var(--line);margin:22px 0 16px;padding-top:18px">
+          <h3 style="font-size:1rem;color:var(--navy);margin-bottom:12px">الأسماء أسفل التقارير المصدّرة</h3>
+          <div class="two-col">
+            <div class="field"><label for="reportManagerName">مدير / ة المدرسة</label><input id="reportManagerName" maxlength="120" value="${esc(store.reportSignatures?.manager||'')}" placeholder="اسم مدير/ة المدرسة"></div>
+            <div class="field"><label for="reportAttendanceName">مسؤول / ة الرصد</label><input id="reportAttendanceName" maxlength="120" value="${esc(store.reportSignatures?.attendance||'')}" placeholder="اسم مسؤول/ة الرصد"></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="saveSchoolType">حفظ الإعدادات</button>
+        <span id="schoolTypeSaved" style="margin-right:10px;color:var(--success);font-weight:700"></span>
+      </div>
+    </div>
+  </div>`;
+}
+function bindSchoolSettings(){
+  const select = document.getElementById('schoolTypeSelect');
+  const saved = document.getElementById('schoolTypeSaved');
+  if(!select) return;
+  select.onchange = ()=>{ saved.textContent = ''; };
+  document.getElementById('saveSchoolType').onclick = ()=>{
+    store.schoolType = select.value === 'boys' ? 'boys' : 'girls';
+    store.reportSignatures = {
+      manager: (document.getElementById('reportManagerName')?.value||'').trim(),
+      attendance: (document.getElementById('reportAttendanceName')?.value||'').trim()
+    };
+    saveStore();
+    saved.textContent = 'تم حفظ الإعدادات';
+    render();
+  };
+}
+function applyGenderLanguage(root){
+  if(!root || store.schoolType !== 'boys') return;
+  const pairs = [
+    ['الطلاب والطالبات','الطلاب'],
+    ['الطالبات','الطلاب'],
+    ['الطالبة','الطالب'],
+    ['الطالب/ة','الطالب'],
+    ['ابنتكم','ابنكم'],
+    ['المعلمات','المعلمين'],
+    ['المعلمة','المعلم'],
+    ['الإداريات','الإداريين'],
+    ['الإدارية','الإداري'],
+    ['اسحبي','اسحب'],
+    ['امسحي','امسح'],
+    ['اكتبي','اكتب'],
+    ['حاضرات','حاضرون'],
+    ['غائبات','غائبون'],
+    ['حاضرة','حاضر'],
+    ['غائبة','غائب'],
+    ['غائبات:','غائبون:'],
+    ['امسحي الكود','امسح الكود'],
+    ['أضيفي','أضف'],
+    ['اختاري','اختر'],
+    ['أدخلي','أدخل'],
+    ['اكتبي','اكتب']
+  ];
+  const translate = value => {
+    let out = value;
+    for(const [from,to] of pairs) out = out.split(from).join(to);
+    return out;
+  };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while(walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node=>{ node.nodeValue = translate(node.nodeValue); });
+  root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el=>{
+    ['placeholder','title','aria-label'].forEach(attr=>{
+      const val=el.getAttribute(attr);
+      if(val) el.setAttribute(attr,translate(val));
+    });
+  });
+}
+
+/* ==========================================================================
+   شاشة الدخول
+   ========================================================================== */
+function viewLogin(){
+  return `<div class="login-wrap"><div class="login-card"><div class="brand-mark">ر</div><h2>منصة راصد للغياب</h2><p class="sub">إدارة المدارس بحساب معتمد</p>
+  <div class="login-tabs"><button id="loginTab" class="active">تسجيل الدخول</button><button id="registerTab">تسجيل مدرسة جديدة</button></div>
+  <div class="login-error" id="loginErr"></div><form id="loginForm">
+   <div class="field" id="schoolField" style="display:none"><label>اسم المدرسة</label><input id="schoolName" autocomplete="organization"><label for="registrationSchoolType" style="display:block;margin-top:10px">نوع المدرسة</label><select id="registrationSchoolType"><option value="girls">بنات</option><option value="boys">بنين</option></select></div>
+   <div class="field"><label>البريد الإلكتروني</label><input id="lUser" type="email" required autocomplete="email"></div>
+   <div class="field"><label>كلمة المرور</label><input id="lPass" type="password" required minlength="6" autocomplete="current-password"></div>
+   <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">تسجيل الدخول</button>
+  </form><div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:#8299a6;font-size:.8rem"><span style="height:1px;background:#dbe6ec;flex:1"></span>أو<span style="height:1px;background:#dbe6ec;flex:1"></span></div>
+  <button class="btn btn-outline" id="googleLogin" type="button" style="width:100%;justify-content:center">المتابعة باستخدام Google</button>
+  <p style="margin-top:16px;color:#607d8b;font-size:.78rem">يُفعّل حساب المدرسة بعد مراجعة واعتماد الإدارة.</p></div></div>`;
+}
+function bindLogin(){
+ let registering=false; const loginTab=document.getElementById('loginTab'), registerTab=document.getElementById('registerTab');
+ const setMode=value=>{registering=value;loginTab.classList.toggle('active',!value);registerTab.classList.toggle('active',value);document.getElementById('schoolField').style.display=value?'block':'none';document.getElementById('schoolName').required=value;document.querySelector('#loginForm button[type=submit]').textContent=value?'إرسال طلب التسجيل':'تسجيل الدخول';document.getElementById('googleLogin').textContent=value?'التسجيل باستخدام Google':'المتابعة باستخدام Google';document.getElementById('loginErr').textContent='';};
+ loginTab.onclick=()=>setMode(false); registerTab.onclick=()=>setMode(true);
+ document.getElementById('googleLogin').onclick=async()=>{
+  const btn=document.getElementById('googleLogin');btn.disabled=true;btn.textContent='جارٍ الاتصال بـ Google…';
+  try{
+   if(!firebaseReady)throw new Error('أكمل إعداد Firebase أولاً بملف firebase-config.js.');
+   const schoolName=document.getElementById('schoolName').value.trim();if(registering&&!schoolName)throw new Error('اكتب اسم المدرسة أولاً.');
+   pendingRegistration=true;const provider=new firebase.auth.GoogleAuthProvider();const cred=await auth.signInWithPopup(provider);const uid=cred.user.uid;
+   const snap=await db.collection('users').doc(uid).get();const profile=snap.exists?snap.data():null;
+   if(registering){
+    if(profile){await auth.signOut();pendingRegistration=false;throw new Error(profile.status==='approved'?'هذا الحساب مرتبط بمدرسة معتمدة. اختر تسجيل الدخول.':'لديك طلب تسجيل سابق. انتظر اعتماده أو تواصل مع إدارة المنصة.');}
+    await db.collection('users').doc(uid).set({email:cred.user.email,schoolName,schoolType:document.getElementById('registrationSchoolType').value,schoolId:uid,status:'pending',provider:'google',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await auth.signOut();pendingRegistration=false;document.getElementById('loginErr').textContent='تم إرسال طلب التسجيل. سيعمل الحساب بعد اعتماد المدرسة.';
+   }else{
+    if(!profile||profile.status!=='approved'||!profile.schoolId){await auth.signOut();pendingRegistration=false;throw new Error(profile?'طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.':'اختر «تسجيل مدرسة جديدة» أولاً لإرسال طلب الاعتماد.');}
+    activeSchoolId=profile.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='zahra_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=profile.schoolName||'مدرستي';session={type:'admin',id:uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);schoolDataReady=true;
+    pendingRegistration=false;startAutoSync();navigate('dashboard');
+   }
+  }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/popup-closed-by-user'?'أُغلق تسجيل الدخول قبل اكتماله.':(err.message||'تعذر تسجيل الدخول باستخدام Google.');}
+  finally{btn.disabled=false;btn.textContent=registering?'التسجيل باستخدام Google':'المتابعة باستخدام Google';}
+ };
+ document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault(); const email=document.getElementById('lUser').value.trim().toLowerCase(), password=document.getElementById('lPass').value, btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='جارٍ التحقق…';
+  try{
+   if(!firebaseReady) throw new Error('أكمل إعداد Firebase أولاً بملف firebase-config.js.');
+   if(registering){
+    const schoolName=document.getElementById('schoolName').value.trim(); if(!schoolName) throw new Error('اكتب اسم المدرسة.');
+    pendingRegistration=true; const cred=await auth.createUserWithEmailAndPassword(email,password); const uid=cred.user.uid;
+    await db.collection('users').doc(uid).set({email,schoolName,schoolType:document.getElementById('registrationSchoolType').value,schoolId:uid,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await auth.signOut(); pendingRegistration=false; document.getElementById('loginErr').textContent='تم إرسال الطلب. سيعمل الحساب بعد اعتماد المدرسة.';
+   } else {
+    const cred=await auth.signInWithEmailAndPassword(email,password); const snap=await db.collection('users').doc(cred.user.uid).get(); const profile=snap.data();
+    if(!profile || profile.status!=='approved' || !profile.schoolId){await auth.signOut();throw new Error('طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.');}
+    activeSchoolId=profile.schoolId; resetCloudSyncState(activeSchoolId); STORAGE_KEY='zahra_store_v1_'+activeSchoolId; store=loadStore(); store.schoolType=profile.schoolType==='boys'?'boys':'girls'; SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);schoolDataReady=true;
+    startAutoSync(); navigate('dashboard');
+   }
+  }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/email-already-in-use'?'هذا البريد مسجل مسبقًا.':err.code==='auth/invalid-credential'?'البريد أو كلمة المرور غير صحيحة.':err.code==='auth/weak-password'?'كلمة المرور يجب أن تكون 6 أحرف على الأقل.':(err.message||'تعذر إتمام الطلب.');}
+  finally{btn.disabled=false;btn.textContent=registering?'إرسال طلب التسجيل':'تسجيل الدخول';}
+ };
+}
+
+/* ==========================================================================
+   لوحة التحكم
+   ========================================================================== */
+function classCardHtml(c){
+  const s = classStats(c);
+  return `
+  <div class="class-card">
+    <div class="cc-top"></div>
+    <div class="cc-body">
+      <div class="cc-head">
+        <h3>${esc(classDisplayName(c))}</h3>
+        ${session.type==='admin' ? `
+        <div class="cc-menu">
+          <button class="cc-menu-btn" data-menu="${c.id}">⋮</button>
+          <div class="cc-menu-list" id="menu-${c.id}">
+            <button data-edit-class="${c.id}">تعديل الفصل</button>
+            <button data-manage-students="${c.id}">إدارة الطلاب والطالبات</button>
+            <button data-del-class="${c.id}">حذف الفصل</button>
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${s.pct}%"></div></div>
+      <div class="cc-nums"><span>نسبة الحضور <b>${s.pct}%</b></span><span>مرصود <b>${s.marked}/${s.total}</b></span></div>
+      <div class="cc-nums"><span>غياب اليوم <b style="color:var(--danger)">${s.absent}</b></span></div>
+      <div class="cc-actions">
+        <button class="primary" data-goto-scan="${c.id}">📋<span>رصد</span></button>
+        <button data-view-absent="${c.id}">🚫<span>الغائبات</span></button>
+        <button data-goto-qr="${c.id}">🔗<span>QR</span></button>
+        <button data-export-xlsx="${c.id}">📊<span>Excel</span></button>
+        <button data-export-pdf="${c.id}">📄<span>PDF</span></button>
+        ${session.type==='admin' ? `<button data-report-class="${c.id}">📱<span>تقرير الفصل</span></button>` : ''}
+        ${session.type==='admin' ? `<button data-del-today="${c.id}">↺<span>حذف اليوم</span></button>` : `<span></span>`}
+      </div>
+    </div>
+  </div>`;
+}
+function filteredDashboardClasses(){
+  const q = (dashboardQuery||'').trim();
+  const classes = visibleClasses();
+  if(!q) return classes;
+  return classes.filter(c=>{
+    if(classDisplayName(c).toLocaleLowerCase().includes(q.toLocaleLowerCase())) return true;
+    return studentsOfClass(c.id).some(s=> s.name.includes(q) || String(s.number||'').includes(q));
+  });
+}
+function viewDashboard(){
+  const allClasses = visibleClasses();
+  const classes = filteredDashboardClasses();
+  const totalClasses = allClasses.length;
+  const totalStudents = allClasses.reduce((a,c)=>a+studentsOfClass(c.id).length,0);
+  let markedToday=0, absentToday=0;
+  allClasses.forEach(c=>{ const s=classStats(c); markedToday+=s.marked; absentToday+=s.absent; });
+
+  const cards = classes.map(classCardHtml).join('');
+
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>لوحة التحكم</h2><p>${esc(SCHOOL_NAME)}</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm" id="refreshNowBtn">↻ تحديث الآن</button>
+        ${session.type==='admin' ? `<button class="btn btn-gold" id="addClassBtn">+ إضافة فصل</button>` : ''}
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card navy"><div class="num">${totalClasses}</div><div class="lbl">عدد الفصول</div></div>
+      <div class="stat-card"><div class="num">${totalStudents}</div><div class="lbl">عدد الطلاب والطالبات الكلي</div></div>
+      <div class="stat-card gold"><div class="num">${markedToday}</div><div class="lbl">رصد اليوم</div></div>
+      <div class="stat-card danger"><div class="num">${absentToday}</div><div class="lbl">الغياب اليوم</div></div>
+    </div>
+    <input class="searchbox" id="dashSearch" style="margin-bottom:16px; width:100%;" placeholder="🔍 ابحث باسم الطالب/ة أو باسم/رقم الفصل..." value="${esc(dashboardQuery)}">
+    <div class="classes-grid" id="classesGrid">
+      ${cards || `<div class="empty" style="grid-column:1/-1"><b>${dashboardQuery? 'لا توجد نتائج مطابقة':'لا توجد فصول بعد'}</b>${dashboardQuery? 'جربي كلمة بحث أخرى' : (session.type==='admin' ? 'اضغطي "إضافة فصل" للبدء' : 'لم يتم إسناد فصول لك بعد')}</div>`}
+    </div>
+  </div>
+  <div id="modalHost"></div>`;
+}
+
+function bindDashboard(){
+  bindClassCardEvents();
+  document.getElementById('addClassBtn') && (document.getElementById('addClassBtn').onclick = ()=> openClassModal());
+  const refreshBtn = document.getElementById('refreshNowBtn');
+  if(refreshBtn){
+    refreshBtn.onclick = async ()=>{
+      refreshBtn.disabled = true; refreshBtn.textContent = '... جارٍ التحديث';
+      const ok = await pullFromServer(false);
+      if(ok===false) toast('تعذّر الاتصال بالخادم للمزامنة', true);
+      else toast('تم تحديث البيانات');
+    };
+  }
+  const dashSearch = document.getElementById('dashSearch');
+  if(dashSearch){
+    dashSearch.oninput = (e)=>{
+      dashboardQuery = e.target.value;
+      const classes = filteredDashboardClasses();
+      const cards = classes.map(classCardHtml).join('');
+      document.getElementById('classesGrid').innerHTML = cards || `<div class="empty" style="grid-column:1/-1"><b>${dashboardQuery? 'لا توجد نتائج مطابقة':'لا توجد فصول بعد'}</b>${dashboardQuery? 'جربي كلمة بحث أخرى' : ''}</div>`;
+      bindClassCardEvents();
+    };
+  }
+}
+
+function bindClassCardEvents(){
+  document.querySelectorAll('[data-menu]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      document.querySelectorAll('.cc-menu-list').forEach(m=>{ if(m.id!=='menu-'+btn.dataset.menu) m.classList.remove('open'); });
+      document.getElementById('menu-'+btn.dataset.menu).classList.toggle('open');
+    };
+  });
+  document.addEventListener('click', ()=> document.querySelectorAll('.cc-menu-list').forEach(m=>m.classList.remove('open')), {once:true});
+
+  document.querySelectorAll('[data-edit-class]').forEach(b=> b.onclick = ()=> openClassModal(store.classes.find(c=>c.id===b.dataset.editClass)));
+  document.querySelectorAll('[data-del-class]').forEach(b=> b.onclick = ()=> deleteClass(b.dataset.delClass));
+  document.querySelectorAll('[data-manage-students]').forEach(b=> b.onclick = ()=> openStudentsModal(b.dataset.manageStudents));
+  document.querySelectorAll('[data-goto-scan]').forEach(b=> b.onclick = ()=> navigate('scan', {classId:b.dataset.gotoScan}));
+  document.querySelectorAll('[data-goto-qr]').forEach(b=> b.onclick = ()=> navigate('qr', {focusClass:b.dataset.gotoQr}));
+  document.querySelectorAll('[data-view-absent]').forEach(b=> b.onclick = ()=> openAbsentModal(b.dataset.viewAbsent));
+  document.querySelectorAll('[data-export-xlsx]').forEach(b=> b.onclick = ()=> exportClassExcel(b.dataset.exportXlsx));
+  document.querySelectorAll('[data-export-pdf]').forEach(b=> b.onclick = ()=> exportClassPDF(b.dataset.exportPdf));
+  document.querySelectorAll('[data-report-class]').forEach(b=> b.onclick = ()=> navigate('absenceReport',{classId:b.dataset.reportClass}));
+  document.querySelectorAll('[data-del-today]').forEach(b=> b.onclick = ()=> deleteTodayAttendance(b.dataset.delToday));
+}
+
+function openAbsentModal(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const att = attendanceOf(classId);
+  const absentees = att ? att.records.filter(r=>statusRank(r.status)===0) : [];
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal">
+      <div class="modal-head"><h3>الغائبون/الغائبات في فصل ${esc(classDisplayName(cls))} — ${todayStr()}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        ${absentees.length ? absentees.map(a=>`<div class="list-row"><div class="info"><b>${esc(a.studentName)}</b></div><span style="color:var(--danger); font-weight:700; font-size:.8rem;">غائبة</span></div>`).join('') : `<div class="empty"><b>لا يوجد غياب مسجّل اليوم</b></div>`}
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('cl').onclick = ()=> host.innerHTML='';
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') host.innerHTML=''; };
+}
+
+async function deleteClass(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const count = studentsOfClass(classId).length;
+  const msg = count>0
+    ? `سيتم حذف فصل "${cls?cls.name:''}" مع جميع طالباته (${count}) وسجلات غيابه نهائياً. متابعة؟`
+    : 'تأكيد حذف الفصل؟';
+  if(!confirm(msg)) return;
+  if(!auth || !auth.currentUser || !activeSchoolId || !session || !session.approved){
+    toast('انتهت جلسة الدخول أو لا توجد صلاحية للحذف؛ سجلي الدخول مجددًا',true); return;
+  }
+  if(!confirm('تأكيد نهائي: سيتم حذف الفصل وبياناته من قاعدة البيانات. هل تريد المتابعة؟')) return;
+  const snapshot=cloneStoreSnapshot();
+  store.classes = store.classes.filter(c=>c.id!==classId);
+  store.students = store.students.filter(s=>s.classId!==classId);
+  store.attendance = store.attendance.filter(a=>a.classId!==classId);
+  saveStore();
+  const result=await persistStoreMutation('deleteClass', {id:classId},snapshot);
+  if(!result.ok){render();toast('تعذر حذف الفصل من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+  render(); toast('تم حذف الفصل وجميع طالباته');
+}
+async function deleteTodayAttendance(classId){
+  if(!confirm('حذف رصد اليوم لهذا الفصل؟')) return;
+  const snapshot=cloneStoreSnapshot();
+  store.attendance = store.attendance.filter(a=>!(a.classId===classId && a.date===todayStr()));
+  saveStore();
+  const result=await persistStoreMutation('deleteToday', {classId, date:todayStr()},snapshot);
+  if(!result.ok){render();toast('تعذر حذف الرصد من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+  render(); toast('تم حذف رصد اليوم');
+}
+
+/* ---------- إضافة / تعديل فصل ---------- */
+function cleanClassName(name, number){
+  let value=String(name || '').trim();
+  const num=String(number == null ? '' : number).trim();
+  if(num && /^\d+$/.test(num)){
+    value=value.replace(new RegExp('\\\\s*(?:[-/–—]\\\\s*|\\\\s+)'+num+'$'), '').trim();
+  }
+  return value;
+}
+function classDisplayName(c){
+  const name=cleanClassName(c && c.name, c && c.number);
+  const number=String(c && c.number != null ? c.number : '').trim();
+  return number ? (name ? name+' '+number : number) : String(c && c.name || '');
+}
+function nextClassNumber(className, excludeId){
+  const target=String(className || '').trim().toLocaleLowerCase();
+  const numbers=(store.classes || []).filter(c=>{
+    if(excludeId && c.id===excludeId) return false;
+    return cleanClassName(c && c.name, c && c.number).toLocaleLowerCase()===target;
+  }).map(c=>{
+    const value=String(c && c.number != null ? c.number : '').trim();
+    if(!/^\d+$/.test(value)) return null;
+    const n=Number(value);
+    return Number.isSafeInteger(n) && n>=0 ? n : null;
+  }).filter(n=>n!==null);
+  return String((numbers.length ? Math.max(...numbers) : 0)+1);
+}
+function openClassModal(existing){
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal wide">
+      <div class="modal-head"><h3>${existing? 'تعديل فصل':'إضافة فصل جديد وإدارة الطلاب والطالبات'}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div class="two-col">
+          <div class="field"><label>اسم الصف</label><input id="cName" value="${existing? esc(cleanClassName(existing.name, existing.number)):''}" placeholder="مثال: أول متوسط"></div>
+          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):''}" inputmode="numeric" placeholder="يُحدَّد تلقائيًا"></div>
+        </div>
+        ${existing ? `
+        <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
+        <p style="font-weight:800; color:var(--navy); margin-bottom:10px;">طلاب/طالبات الفصل (<span id="editStudentCount">0</span>)</p>
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <input class="searchbox" style="margin:0;" id="editSearchS" placeholder="بحث بالاسم أو الرقم...">
+          <button class="btn btn-outline" id="editAddS" style="flex-shrink:0;">+ إضافة طالبة</button>
+        </div>
+        <div id="editStudentsList" style="max-height:280px; overflow:auto;"></div>
+        ` : ''}
+        ${!existing ? `
+        <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
+        <p style="font-weight:800; color:var(--navy); margin-bottom:12px;">إضافة الطلاب والطالبات إلى الفصل (اختاري إحدى الطرق أو استخدميها معاً):</p>
+
+        <div class="field">
+          <label style="color:#5b7382;">1) إضافة اسم اسم</label>
+          <div style="display:flex; gap:8px;">
+            <input id="singleStudentName" placeholder="اكتبي اسم الطالب/ة واضغطي إضافة">
+            <button class="btn btn-outline" id="btnAddSingle" style="flex-shrink:0;">إضافة</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="color:#5b7382;">2) السحب والإسقاط (أي صيغة ملف)</label>
+          <div class="dropzone" id="dz">
+            <b>📥 اسحبي ملف الأسماء وأسقطيه هنا</b>
+            أو اضغطي لاختيار ملف من جهازك
+            <input type="file" id="fileInput" style="display:none">
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="color:#5b7382;">3) لصق قائمة أسماء كاملة (اسم واحد في كل سطر)</label>
+          <textarea id="bulkStudentsText" rows="3" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--line); background:var(--bg1); resize:vertical;" placeholder="ألصقي قائمة الأسماء هنا..."></textarea>
+          <button class="btn btn-sm btn-outline" id="btnParseText" style="margin-top:8px;">حفظ الأسماء</button>
+        </div>
+
+        <div style="margin-top:16px;">
+          <p style="font-weight:800; color:var(--navy); margin-bottom:8px;">قائمة الطلاب والطالبات المضافين (<span id="studentCount">0</span>)</p>
+          <div id="tempStudentList" style="max-height:220px; overflow:auto;"></div>
+        </div>
+        ` : ''}
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="cancel">إلغاء</button>
+        <button class="btn btn-primary" id="save">${existing? 'حفظ' : 'حفظ الفصل والطالبات'}</button>
+      </div>
+    </div>
+  </div>`;
+  let tempStudents = [];
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('cancel').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+
+  if(existing){
+    const drawEditStudents = (filter)=>{
+      let list = studentsOfClass(existing.id).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+      if(filter) list = list.filter(s=> s.name.includes(filter) || String(s.number).includes(filter));
+      document.getElementById('editStudentCount').textContent = studentsOfClass(existing.id).length;
+      document.getElementById('editStudentsList').innerHTML = list.map(s=>`
+        <div class="list-row">
+          <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
+          <div class="row-actions">
+            <button class="icon-btn" data-edit-student-inline="${s.id}">✎</button>
+            <button class="icon-btn del" data-del-student-inline="${s.id}">🗑</button>
+          </div>
+        </div>`).join('') || `<div class="empty"><b>لا توجد طالبات مطابقة</b></div>`;
+      document.querySelectorAll('[data-edit-student-inline]').forEach(b=> b.onclick = ()=> openStudentFormModal(existing.id, store.students.find(s=>s.id===b.dataset.editStudentInline), ()=> drawEditStudents(document.getElementById('editSearchS').value.trim())));
+      document.querySelectorAll('[data-del-student-inline]').forEach(b=> b.onclick = async ()=>{
+        if(!confirm('حذف هذا الطالب/ة؟')) return;
+        const snapshot=cloneStoreSnapshot();
+        store.students = store.students.filter(s=>s.id!==b.dataset.delStudentInline); saveStore();
+        const result=await persistStoreMutation('deleteStudent', {id:b.dataset.delStudentInline},snapshot);
+        drawEditStudents(document.getElementById('editSearchS').value.trim());
+        if(!result.ok){toast('تعذر حذف الطالب/ة من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+        toast('تم حذف الطالب/ة');
+      });
+    };
+    drawEditStudents();
+    document.getElementById('editSearchS').oninput = (e)=> drawEditStudents(e.target.value.trim());
+    document.getElementById('editAddS').onclick = ()=> openStudentFormModal(existing.id, null, ()=> drawEditStudents(document.getElementById('editSearchS').value.trim()));
+  }
+
+  if(!existing){
+    const renderTemp = ()=>{
+      document.getElementById('studentCount').textContent = tempStudents.length;
+      document.getElementById('tempStudentList').innerHTML = tempStudents.map((name,i)=>`
+        <div class="list-row" style="margin-bottom:6px; padding:9px 12px;">
+          <div class="info"><b style="font-size:.88rem;">${esc(name)}</b></div>
+          <button class="icon-btn del" data-rm="${i}">🗑</button>
+        </div>`).join('') || `<p style="color:#8299a6; font-size:.85rem;">لم تتم إضافة أي طالبة بعد</p>`;
+      document.querySelectorAll('[data-rm]').forEach(b=> b.onclick = ()=>{ tempStudents.splice(Number(b.dataset.rm),1); renderTemp(); });
+    };
+    const addNames = (names)=>{
+      names.forEach(n=>{ if(n && !tempStudents.includes(n)) tempStudents.push(n); });
+      renderTemp();
+    };
+    renderTemp();
+
+    document.getElementById('btnAddSingle').onclick = ()=>{
+      const inp = document.getElementById('singleStudentName');
+      const val = inp.value.trim();
+      if(val){ addNames([val]); inp.value=''; inp.focus(); }
+    };
+    document.getElementById('singleStudentName').addEventListener('keypress', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnAddSingle').click(); }
+    });
+    document.getElementById('btnParseText').onclick = ()=>{
+      const text = document.getElementById('bulkStudentsText').value;
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      addNames(lines);
+      document.getElementById('bulkStudentsText').value='';
+    };
+
+    const dz = document.getElementById('dz');
+    dz.onclick = ()=> document.getElementById('fileInput').click();
+    dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+    dz.addEventListener('drop', e=>{
+      e.preventDefault(); dz.classList.remove('drag');
+      if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    document.getElementById('fileInput').onchange = (e)=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
+
+    async function handleFile(file){
+      try{
+        const imported = await readNamesImportFile(file);
+        let names = [];
+        if(imported.kind === 'excel'){
+          names = extractNamesFromExcel(imported.sheets || [imported.rows || []]);
+        }else{
+          names = imported.text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+        }
+        if(!names.length){ toast('لم يتم العثور على أسماء. تأكدي من أن ملف Excel يحتوي على عمود أسماء واضح.', true); return; }
+        addNames(names);
+        toast(`تم استيراد ${names.length} اسمًا من "${file.name}"`);
+      }catch(err){ toast(err && err.message ? err.message : 'تعذّرت قراءة الملف', true); }
+    }
+  }
+
+  const classNameInput=document.getElementById('cName');
+  const classNumberInput=document.getElementById('cNum');
+  let numberManuallyEdited=false;
+  classNumberInput.addEventListener('input', ()=>{ numberManuallyEdited=true; });
+  classNameInput.addEventListener('input', ()=>{
+    if(!numberManuallyEdited && classNameInput.value.trim()){
+      classNumberInput.value=nextClassNumber(classNameInput.value.trim(), existing && existing.id);
+    } else if(!classNameInput.value.trim() && !numberManuallyEdited){
+      classNumberInput.value='';
+    }
+  });
+  if(existing) classNameInput.value=cleanClassName(existing.name, existing.number);
+  if(existing) classNumberInput.value=existing.number;
+  document.getElementById('save').onclick = async ()=>{
+    const name = classNameInput.value.trim();
+    let number = classNumberInput.value.trim();
+    if(!name){ toast('يرجى إدخال اسم الصف', true); return; }
+    if(!number) number=nextClassNumber(name, existing && existing.id);
+    if(!/^\d+$/.test(number)){ toast('رقم الفصل يجب أن يكون رقمًا صحيحًا', true); return; }
+    const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && String(c.number).trim()===number);
+    if(duplicate){ toast('هذا الصف ورقم الفصل موجودان مسبقًا', true); return; }
+    const snapshot=cloneStoreSnapshot();
+    if(existing){
+      existing.number = number; existing.name = name;
+      saveStore();
+      const result=await persistStoreMutation('saveClass', existing,snapshot);
+      if(!result.ok){close();render();toast('تعذر حفظ تعديل الفصل في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      toast('تم تحديث الفصل وحفظه في قاعدة البيانات');
+    }else{
+      const classId = uid();
+      const classObj = { id: classId, number, name };
+      const newStudents = tempStudents.map((n,i)=>({ id: uid(), classId, number: String(i+1), name: n }));
+      store.classes.push(classObj);
+      store.students.push(...newStudents);
+      saveStore();
+      const result=await persistStoreMutation('saveClassWithStudents', { classObj, students: newStudents },snapshot);
+      if(!result.ok){close();render();toast('تعذر حفظ الفصل والطلاب في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      toast('تم حفظ الفصل والطالبات في قاعدة البيانات');
+    }
+    close(); render();
+  };
+}
+
+
+/* قراءة ملفات الاستيراد حسب نوعها، لتجنب عرض محتوى PDF وWord الثنائي كرموز */
+function extractNamesFromExcel(sheets){
+  const found = [];
+  const seen = new Set();
+  const isName = value => {
+    const v = String(value ?? '').replace(/\s+/g,' ').trim();
+    return v.length >= 2 && /[\u0600-\u06FFa-zA-Z]/.test(v) && !/^\d+$/.test(v);
+  };
+  for(const rows of sheets){
+    if(!Array.isArray(rows) || !rows.length) continue;
+    let headerRow = -1, nameCol = -1;
+    for(let ri=0;ri<Math.min(rows.length,30);ri++){
+      const row = rows[ri] || [];
+      const ci = row.findIndex(v => /اسم\s*(الطالبة|الطالب|الاسم)|student\s*name|^name$/i.test(String(v ?? '').trim()));
+      if(ci>=0){headerRow=ri;nameCol=ci;break;}
+    }
+    if(nameCol>=0){
+      for(let ri=headerRow+1;ri<rows.length;ri++){
+        const value=String((rows[ri]||[])[nameCol] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(value) && !seen.has(value)){seen.add(value);found.push(value);}
+      }
+      continue;
+    }
+    const maxCols=Math.max(0,...rows.map(row=>(row||[]).length));
+    let bestCol=-1,bestScore=0;
+    for(let ci=0;ci<maxCols;ci++){
+      let score=0;
+      for(const row of rows){
+        const v=String((row||[])[ci] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(v) && !/^(الفصل|اسم الطالب\/ة|اسم الطالبة|اسم الطالب|رقم الطالب\/ة|رقم الطالبة|رقم الطالب|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(v)) score++;
+      }
+      if(score>bestScore){bestScore=score;bestCol=ci;}
+    }
+    if(bestCol>=0){
+      for(const row of rows){
+        const value=String((row||[])[bestCol] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(value) && !/^(الفصل|اسم الطالب\/ة|اسم الطالبة|اسم الطالب|رقم الطالب\/ة|رقم الطالبة|رقم الطالب|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(value) && !seen.has(value)){
+          seen.add(value);found.push(value);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+async function readNamesImportFile(file){
+  const name = String(file && file.name || '');
+  const ext = (name.match(/\.([^.]+)$/) || [,''])[1].toLowerCase();
+  if (['xlsx','xls'].includes(ext)) {
+    if (!window.XLSX) throw new Error('مكتبة Excel غير متاحة');
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, {type:'array'});
+    const sheets = wb.SheetNames.map(sheetName => XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''}));
+    return {kind:'excel', sheets};
+  }
+  if (ext === 'docx') {
+    if (!window.mammoth) throw new Error('تعذر تحميل قارئ Word');
+    const result = await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return {kind:'text', text:result.value || ''};
+  }
+  if (ext === 'pdf') {
+    if (!window.pdfjsLib) throw new Error('تعذر تحميل قارئ PDF');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    const lines = [];
+    for (let pageNo=1; pageNo<=pdf.numPages; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      const groups = new Map();
+      for (const item of content.items) {
+        if (!item.str || !item.str.trim()) continue;
+        const y = Math.round(item.transform[5]);
+        if (!groups.has(y)) groups.set(y, []);
+        groups.get(y).push({x:item.transform[4], text:item.str.trim()});
+      }
+      [...groups.keys()].sort((a,b)=>b-a).forEach(y=>{
+        const line = groups.get(y).sort((a,b)=>b.x-a.x).map(x=>x.text).join(' ').trim();
+        if (line) lines.push(line);
+      });
+    }
+    let text = lines.join('\n');
+    if (!text.trim()) {
+      if(!window.Tesseract) throw new Error('هذا PDF عبارة عن صور. تعذّر تحميل قارئ OCR؛ جرّبي نسخة PDF نصية أو ملف Word.');
+      const worker = await Tesseract.createWorker('ara');
+      try{
+        const ocrLines=[];
+        for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+          const page=await pdf.getPage(pageNo);
+          const viewport=page.getViewport({scale:2});
+          const canvas=document.createElement('canvas');
+          canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
+          const ctx=canvas.getContext('2d');
+          await page.render({canvasContext:ctx,viewport}).promise;
+          const result=await worker.recognize(canvas);
+          if(result && result.data && result.data.text) ocrLines.push(result.data.text);
+          canvas.width=canvas.height=1;
+        }
+        text=ocrLines.join('\n');
+      }finally{ await worker.terminate(); }
+      if(!text.trim()) throw new Error('لم يتمكن OCR من قراءة أسماء من هذا الملف. جرّبي نسخة أوضح أو ملف Excel/Word.');
+    }
+    return {kind:'text', text};
+  }
+  if (['txt','csv'].includes(ext)) return {kind:'text', text:await file.text()};
+  throw new Error('نوع الملف غير مدعوم. استخدمي PDF أو Excel أو Word بصيغة DOCX أو TXT أو CSV.');
+}
+
+/* ---------- إدارة الطلاب والطالبات ---------- */
+function openStudentsModal(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const host = document.getElementById('modalHost');
+  const draw = (filter)=>{
+    let list = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+    if(filter) list = list.filter(s=> s.name.includes(filter) || String(s.number).includes(filter));
+    return list.map(s=>`
+      <div class="list-row">
+        <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
+        <div class="row-actions">
+          <button class="icon-btn" data-edit-student="${s.id}">✎</button>
+          <button class="icon-btn del" data-del-student="${s.id}">🗑</button>
+        </div>
+      </div>`).join('') || `<div class="empty"><b>لا توجد طالبات</b></div>`;
+  };
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal wide">
+      <div class="modal-head"><h3>الطلاب والطالبات في فصل ${esc(classDisplayName(cls))}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div style="display:flex; gap:10px; margin-bottom:14px;">
+          <input class="searchbox" style="margin:0;" id="searchS" placeholder="بحث بالاسم أو الرقم...">
+          <button class="btn btn-primary" id="addS" style="flex-shrink:0;">+ إضافة طالبة</button>
+        </div>
+        <div id="studentsList">${draw()}</div>
+      </div>
+    </div>
+  </div>`;
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+  document.getElementById('searchS').oninput = (e)=>{ document.getElementById('studentsList').innerHTML = draw(e.target.value.trim()); bindStudentRowEvents(); };
+  document.getElementById('addS').onclick = ()=> openStudentFormModal(classId, null, ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); });
+  function bindStudentRowEvents(){
+    document.querySelectorAll('[data-edit-student]').forEach(b=> b.onclick = ()=> openStudentFormModal(classId, store.students.find(s=>s.id===b.dataset.editStudent), ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); }));
+    document.querySelectorAll('[data-del-student]').forEach(b=> b.onclick = async ()=>{
+      if(!confirm('حذف هذا الطالب/ة؟')) return;
+      const snapshot=cloneStoreSnapshot();
+      store.students = store.students.filter(s=>s.id!==b.dataset.delStudent); saveStore();
+      const result=await persistStoreMutation('deleteStudent', {id:b.dataset.delStudent},snapshot);
+      document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents();
+      if(!result.ok){toast('تعذر حذف الطالب/ة من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      renderTopnav(); toast('تم حذف الطالب/ة');
+    });
+  }
+  bindStudentRowEvents();
+}
+
+function nextStudentNumber(classId, excludeId){
+  const numbers = studentsOfClass(classId)
+    .filter(s=>s.id!==excludeId)
+    .map(s=>Number(String(s.number||'').trim()))
+    .filter(n=>Number.isSafeInteger(n) && n>0);
+  return String(Math.max(0, ...numbers)+1);
+}
+
+function openStudentFormModal(classId, existing, onDone){
+  const host = document.getElementById('modalHost');
+  const prevHTML = host.innerHTML;
+  const classOptions = store.classes.map(c=>`<option value="${c.id}" ${existing&&existing.classId===c.id?'selected':(c.id===classId?'selected':'')}>${esc(classDisplayName(c))}</option>`).join('');
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+  <div class="overlay" id="ov2" style="z-index:110;">
+    <div class="modal">
+      <div class="modal-head"><h3>${existing?'تعديل طالبة':'إضافة طالبة'}</h3><button class="modal-close" id="cl2">✕</button></div>
+      <div class="modal-body">
+        <div class="field"><label>الفصل</label><select id="sClass">${classOptions}</select></div>
+        <div class="two-col">
+          <div class="field"><label>رقم الطالب/ة</label><input id="sNum" value="${existing?esc(existing.number):esc(nextStudentNumber(classId))}" readonly><small style="display:block;color:#8299a6;font-size:.72rem;margin-top:4px;">يُحدد تلقائياً حسب ترتيب الفصل</small></div>
+          <div class="field"><label>الاسم الكامل</label><input id="sName" value="${existing?esc(existing.name):''}"></div>
+        </div>
+        <div class="field"><label>رقم جوال ولي الأمر <span style="color:#8299a6;font-weight:500;">(اختياري)</span></label><input id="sGuardian" inputmode="tel" placeholder="05xxxxxxxx" value="${existing?esc(guardianPhoneForStudent(existing)):''}"></div>
+      </div>
+      <div class="modal-foot"><button class="btn btn-outline" id="cancel2">إلغاء</button><button class="btn btn-primary" id="save2">حفظ</button></div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const close = ()=> document.body.removeChild(wrap);
+  wrap.querySelector('#cl2').onclick = close;
+  wrap.querySelector('#cancel2').onclick = close;
+  wrap.querySelector('#ov2').onclick = (e)=>{ if(e.target.id==='ov2') close(); };
+  wrap.querySelector('#sClass').onchange = ()=>{
+    const selectedClassId = wrap.querySelector('#sClass').value;
+    if(!existing || selectedClassId!==existing.classId){
+      wrap.querySelector('#sNum').value = nextStudentNumber(selectedClassId, existing&&existing.id);
+    }else{
+      wrap.querySelector('#sNum').value = existing.number;
+    }
+  };
+  wrap.querySelector('#save2').onclick = async ()=>{
+    const name = wrap.querySelector('#sName').value.trim();
+    const clsId = wrap.querySelector('#sClass').value;
+    const number = existing && clsId===existing.classId ? existing.number : nextStudentNumber(clsId, existing&&existing.id);
+    const rawGuardianPhone = wrap.querySelector('#sGuardian').value.trim();
+    const guardianPhone = rawGuardianPhone ? normalizePhoneClient(rawGuardianPhone) : '';
+    if(!name){ toast('أدخلي اسم الطالب/ة', true); return; }
+    if(rawGuardianPhone && !guardianPhone){ toast('رقم جوال ولي الأمر غير صالح؛ أدخلي رقمًا سعوديًا يبدأ بـ 05', true); return; }
+    const snapshot=cloneStoreSnapshot();
+    if(existing){
+      const oldName = existing.name;
+      const updated = Object.assign({}, existing, {name, number, classId:clsId, guardianPhone, oldName});
+      const result = await persistStoreMutation('saveStudent', updated,snapshot);
+      if(!result.ok) { toast('تعذر حفظ التعديل في قاعدة البيانات؛ أُعيدت البيانات كما كانت', true); return; }
+      toast('تم تحديث بيانات الطالب/ة ورقم ولي الأمر وحفظها في قاعدة البيانات');
+    }else{
+      const st = { id: uid(), classId: clsId, number, name, guardianPhone };
+      const result = await persistStoreMutation('saveStudent', st,snapshot);
+      if(!result.ok) { toast('تعذر حفظ الطالب/ة في قاعدة البيانات؛ أُعيدت البيانات كما كانت', true); return; }
+      toast('تمت إضافة الطالب/ة ورقم ولي الأمر وحفظهما في قاعدة البيانات');
+    }
+    close(); onDone && onDone(); renderTopnav();
+  };
+}
+
+/* ==========================================================================
+   صفحة الرصد
+   ========================================================================== */
+function viewScan(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  if(!cls){
+    return `<div class="scan-wrap"><div class="empty"><b>لم يتم العثور على هذا الفصل</b>تأكدي من رابط كود QR${session? `<div style="margin-top:14px;"><button class="btn btn-primary" onclick="navigate('dashboard')">العودة للوحة التحكم</button></div>`:''}</div></div>`;
+  }
+  const existing = attendanceOf(cls.id);
+  if(existing && !route.editing){
+    return viewScanConfirm(cls, existing);
+  }
+  const students = studentsOfClass(cls.id).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+  const allTeacherNames = [...new Set([...store.staff.map(s=>s.name), ...(store.teacherNames||[])])].filter(Boolean);
+  const staffOptions = allTeacherNames.map(n=>`<option value="${esc(n)}"></option>`).join('');
+  const defaultTeacher = session && session.type==='staff' ? session.name : (existing? existing.teacher : '');
+  return `
+  <div class="scan-wrap">
+    ${session ? `<button class="btn btn-outline" style="margin-bottom:14px;" onclick="navigate('dashboard')">→ العودة للوحة التحكم</button>` : ''}
+    <div class="scan-head glow">
+      <h2>رصد الغياب والحضور — فصل ${esc(cls.name)}</h2>
+      <p>${esc(SCHOOL_NAME)} — ${todayStr()}</p>
+      <div class="teacher-field" style="display:flex; gap:8px; align-items:stretch;">
+        <input id="teacherSelect" list="teacherNamesList" placeholder="اسم المعلم/ة (اختياري)" value="${esc(defaultTeacher)}" autocomplete="off" style="flex:1;">
+        <datalist id="teacherNamesList">${staffOptions}</datalist>
+        <button type="button" id="addTeacherNameBtn" title="إضافة اسم معلم/ة جديد للقائمة" style="flex-shrink:0; width:42px; border-radius:10px; background:rgba(255,255,255,.16); color:#fff; font-weight:800; font-size:1.1rem;">+</button>
+      </div>
+      <p style="font-size:.72rem; color:#cfe0e8; margin-top:6px; position:relative;">اختياري — يمكنك اختيار اسمك من القائمة أو كتابته أو تركه فارغاً</p>
+    </div>
+    ${students.length ? `
+    <div class="field" style="margin:16px 0 0;">
+      <label style="font-weight:800; color:var(--navy);">مسح الباركود / رقم الطالب/ة</label>
+      <input id="barcodeInput" placeholder="امسحي الباركود هنا أو اكتبي رقم الطالب/ة واضغطي Enter..." autocomplete="off" style="text-align:center; font-weight:700;">
+    </div>` : ''}
+    <div id="studentsList">
+      ${students.length ? students.map(s=>`
+        <div class="student-item" data-id="${s.id}">
+          <div class="s-info"><div class="s-num">${esc(s.number)}</div><div class="s-name">${esc(s.name)}</div></div>
+          <button class="absent-toggle" data-toggle="${s.id}"></button>
+        </div>`).join('') : `<div class="empty"><b>لا يوجد طلاب أو طالبات في هذا الفصل بعد</b></div>`}
+    </div>
+    ${students.length ? `
+    <div class="scan-submit-bar">
+      <button class="btn btn-primary" id="finishScan">✅ إنهاء الرصد</button>
+    </div>` : ''}
+  </div>`;
+}
+
+function viewScanConfirm(cls, att){
+  const absentees = att.records.filter(r=>statusRank(r.status)===0);
+  const present = att.records.length - absentees.length;
+  return `
+  <div class="scan-wrap">
+    ${session ? `<button class="btn btn-outline" style="margin-bottom:14px;" onclick="navigate('dashboard')">→ العودة للوحة التحكم</button>` : ''}
+    <div class="confirm-wrap">
+      <div class="confirm-icon">✔</div>
+      <h2>تم رصد الغياب بنجاح</h2>
+      <p style="color:#5b7382; font-size:.85rem;">فصل ${esc(cls.name)} — رصدتها: ${esc(att.teacher||'—')} — الساعة ${esc(att.time||'')}</p>
+      <div class="confirm-nums">
+        <div class="cn"><b>${present}</b>حاضر/ة</div>
+        <div class="cn absent"><b>${absentees.length}</b>غائب/ة</div>
+      </div>
+      ${absentees.length ? `<ul class="absent-names">${absentees.map(a=>`<li>${esc(a.studentName)}</li>`).join('')}</ul>` : `<p style="color:var(--success); font-weight:700;">جميع الطلاب والطالبات حاضرون/حاضرات 🎉</p>`}
+      <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+        <button class="btn btn-outline" id="editScanBtn">تعديل الرصد</button>
+        ${session ? `<button class="btn btn-primary" onclick="navigate('dashboard')">لوحة التحكم</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+let scanAbsentSet = new Set();
+let scanAbsentContext = null;
+function scanContextKey(){
+  return `${String(route.classId)}|${todayStr()}|${route.editing?'edit':'new'}`;
+}
+function absentStudentIds(attendance){
+  return new Set((attendance?.records||[]).filter(r=>statusRank(r.status)===0).map(r=>String(r.studentId)));
+}
+function toggleStudentAbsent(id){
+  id=String(id);
+  const btn = document.querySelector(`[data-toggle="${id}"]`);
+  if(!btn) return false;
+  const item = btn.closest('.student-item');
+  if(scanAbsentSet.has(id)){ scanAbsentSet.delete(id); btn.classList.remove('on'); item.classList.remove('absent'); }
+  else{ scanAbsentSet.add(id); btn.classList.add('on'); item.classList.add('absent'); }
+  return true;
+}
+function bindScan(){
+  const existing=attendanceOf(route.classId);
+  // Cloud polling can re-render this screen while another device is syncing.
+  // Keep unsaved taps for the current scan instead of resetting them on every render.
+  const context=scanContextKey();
+  if(scanAbsentContext!==context){
+    scanAbsentContext=context;
+    scanAbsentSet=route.editing&&existing ? absentStudentIds(existing) : new Set();
+  }
+  const list = document.getElementById('studentsList');
+  if(!list) { bindEditBtn(); return; }
+  list.querySelectorAll('[data-toggle]').forEach(btn=>{
+    if(!scanAbsentSet.has(String(btn.dataset.toggle)))return;
+    btn.classList.add('on');
+    btn.closest('.student-item')?.classList.add('absent');
+  });
+  list.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-toggle]');
+    if(!btn) return;
+    toggleStudentAbsent(btn.dataset.toggle);
+  });
+  const barcodeInput = document.getElementById('barcodeInput');
+  if(barcodeInput){
+    barcodeInput.addEventListener('keypress', (e)=>{
+      if(e.key !== 'Enter') return;
+      e.preventDefault();
+      const code = barcodeInput.value.trim();
+      barcodeInput.value = '';
+      if(!code) return;
+      const students = studentsOfClass(route.classId);
+      const match = students.find(s => String(s.number) === code || String(s.id) === code);
+      if(match){
+        toggleStudentAbsent(match.id);
+        toast(scanAbsentSet.has(String(match.id)) ? `تم تحديد "${match.name}" غائب/ة` : `تم تحديد "${match.name}" حاضر/ة`);
+      }else{
+        toast('لم يتم العثور على طالب/ة بهذا الرقم', true);
+      }
+    });
+  }
+  const finishBtn = document.getElementById('finishScan');
+  if(finishBtn) finishBtn.onclick = submitScan;
+  const addNameBtn = document.getElementById('addTeacherNameBtn');
+  if(addNameBtn) addNameBtn.onclick = addTeacherNameQuick;
+  bindEditBtn();
+}
+async function addTeacherNameQuick(){
+  const name = (prompt('اكتبي اسم المعلم/ة لإضافته إلى القائمة:')||'').trim();
+  if(!name) return;
+  if(!store.teacherNames) store.teacherNames = [];
+  if(!store.teacherNames.includes(name)){
+    store.teacherNames.push(name);
+    saveStore();
+    // تُحفظ أسماء الاقتراحات ضمن بيانات المدرسة في Firestore.
+  }
+  // نحدّث القائمة المنسدلة وحقل الإدخال مباشرة دون إعادة رسم الصفحة
+  // حتى لا تُفقد حالة الطالبات المحددات كغائبات أثناء الرصد.
+  const list = document.getElementById('teacherNamesList');
+  if(list && !Array.from(list.options).some(o=>o.value===name)){
+    const opt = document.createElement('option'); opt.value = name; list.appendChild(opt);
+  }
+  const input = document.getElementById('teacherSelect');
+  if(input) input.value = name;
+  toast(`تمت إضافة "${name}" إلى قائمة المعلمين/المعلمات`);
+}
+function bindEditBtn(){
+  const editBtn = document.getElementById('editScanBtn');
+  if(editBtn) editBtn.onclick = ()=>{ route.editing = true; render(); };
+}
+async function submitScan(){
+  const classId = route.classId;
+  const teacherSel = document.getElementById('teacherSelect');
+  const teacher = (teacherSel ? teacherSel.value.trim() : '') || 'غير محدد';
+  const students = studentsOfClass(classId);
+  const records = students.map(s=>({ studentId:s.id, studentName:s.name, status: scanAbsentSet.has(String(s.id))?'غائب':'حاضر' }));
+  const session_ = { id: classId+'|'+todayStr(), classId, date: todayStr(), teacher, time: nowTimeStr(), records };
+  store.attendance = store.attendance.filter(a=>!(a.classId===classId && a.date===todayStr()));
+  store.attendance.push(session_);
+  saveStore();
+  const saveResult = await pushToServer('saveAttendance', session_);
+  const absentCount = records.filter(r=>r.status==='غائب').length;
+  playAttendanceBell(absentCount);
+  if(saveResult.ok) toast('تم حفظ الرصد في قاعدة البيانات');
+  else { console.warn('saveAttendance failed:', saveResult); toast('تعذر حفظ الرصد في قاعدة البيانات — تحقق من الاتصال', true); }
+  speakThanks(teacher, absentCount);
+  route.editing = false;
+  render();
+}
+function speakThanks(teacher, absentCount){
+  try{
+    const greeting = (teacher && teacher!=='غير محدد') ? `شكراً لك ${teacher}، ` : 'شكراً لك، ';
+    const girl=store.schoolType!=='boys';
+    const absentLabel=girl?'الغائبات':'الطلاب الغائبين';
+    const presentLabel=girl?'الطالبات':'الطلاب';
+    const msg = absentCount>0
+      ? `${greeting}تم رصد الغياب بنجاح. عدد ${absentLabel} ${absentCount}.`
+      : `${greeting}تم رصد الحضور. جميع ${presentLabel} حاضرون.`;
+    const utter = new SpeechSynthesisUtterance(msg);
+    utter.lang = 'ar-SA';
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  }catch(e){}
+}
+
+/* ==========================================================================
+   صفحة أكواد QR
+   ========================================================================== */
+function viewQR(){
+  const classes = visibleClasses();
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>أكواد QR للفصول</h2><p>كل فصل له رابط رصد مستقل — يُطبع ويُلصق في الفصل</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline" id="printAll">🖨 طباعة الكل</button>
+      </div>
+    </div>
+    <div class="qr-grid" id="qrGrid">
+      ${classes.map(c=>`
+      <div class="qr-card" id="qrcard-${c.id}">
+        <div class="qr-school">${esc(SCHOOL_NAME)}</div>
+        <div class="qr-class">${esc(classDisplayName(c))}</div>
+        <div class="qr-brand" aria-label="شعار منصة راصد"><span class="qr-brand-mark" aria-hidden="true">ر</span><span>منصة راصد للغياب</span></div>
+        <div class="qr-box" id="qrbox-${c.id}"></div>
+        <div class="qr-hint">امسحي الكود لبدء رصد الغياب</div>
+        <div class="qr-actions">
+          <button class="btn btn-sm btn-outline" data-copy="${c.id}">نسخ الرابط</button>
+          <button class="btn btn-sm btn-outline" data-print="${c.id}">طباعة</button>
+        </div>
+      </div>`).join('') || `<div class="empty" style="grid-column:1/-1"><b>لا توجد فصول</b></div>`}
+    </div>
+  </div>`;
+}
+function classScanUrl(classId){
+  const url = new URL(window.location.href);
+  url.search = '?class=' + encodeURIComponent(classId);
+  url.hash = '';
+  return url.toString();
+}
+function bindQR(){
+  visibleClasses().forEach(c=>{
+    const box = document.getElementById('qrbox-'+c.id);
+    if(box && window.QRCode) new QRCode(box, { text: classScanUrl(c.id), width:150, height:150, colorDark:'#102a43', colorLight:'#ffffff' });
+  });
+  document.querySelectorAll('[data-copy]').forEach(b=> b.onclick = ()=>{
+    navigator.clipboard.writeText(classScanUrl(b.dataset.copy)).then(()=> toast('تم نسخ الرابط')).catch(()=> toast('تعذّر النسخ', true));
+  });
+  document.querySelectorAll('[data-print]').forEach(b=> b.onclick = ()=>{
+    const card = document.getElementById('qrcard-'+b.dataset.print);
+    const printable = qrPrintMarkup(card);
+    if(printable) printElement(printable, 'كود ' + b.dataset.print);
+  });
+  document.getElementById('printAll').onclick = ()=>{
+    const printable = qrPrintMarkup(document.getElementById('qrGrid'));
+    if(printable) printElement(printable, 'أكواد QR لكل الفصول');
+  };
+}
+function qrPrintMarkup(source){
+  if(!source) return '';
+  const copy = source.cloneNode(true);
+  const sourceBoxes = source.matches('.qr-box') ? [source] : Array.from(source.querySelectorAll('.qr-box'));
+  const copyBoxes = copy.matches('.qr-box') ? [copy] : Array.from(copy.querySelectorAll('.qr-box'));
+  for(let i=0;i<copyBoxes.length;i++){
+    const sourceBox=sourceBoxes[i];
+    const canvas=sourceBox?.querySelector('canvas');
+    const image=sourceBox?.querySelector('img');
+    let dataUrl='';
+    try{if(canvas?.width && canvas?.height) dataUrl=canvas.toDataURL('image/png');}catch(e){}
+    if(!dataUrl && image?.src?.startsWith('data:image/')) dataUrl=image.src;
+    if(!dataUrl){toast('تعذّر تجهيز رمز QR للطباعة. حدّث الصفحة وحاول مرة أخرى.',true);return '';}
+    copyBoxes[i].innerHTML=`<img src="${dataUrl}" width="180" height="180" alt="رمز QR" style="display:block;width:180px;height:180px;max-width:100%;object-fit:contain;margin:0 auto;print-color-adjust:exact;-webkit-print-color-adjust:exact;">`;
+  }
+  return copy.outerHTML;
+}
+function statusRank(s){ s=String(s||'').trim(); if(s==='غائبة'||s==='غائب'||s.toLowerCase()==='absent') return 0; if(s==='حاضرة'||s==='حاضر'||s.toLowerCase()==='present') return 1; return 2; }
+// الغائبات أولاً ثم الحاضرات ثم غير المرصودات (مع الحفاظ على الترتيب الأصلي داخل كل مجموعة)
+function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); return rows.map((r,i)=>[r,i]).sort((a,b)=>statusRank(getStatus(a[0]))-statusRank(getStatus(b[0]))||a[1]-b[1]).map(x=>x[0]); }
+function reportDateLabels(date=new Date()){
+  let hijri='—', greg='—';
+  try{hijri=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
+  try{greg=new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
+  return {hijri,greg};
+}
+function reportHijriForDate(dateStr){
+  try{
+    const parts=String(dateStr||'').split('-').map(Number);
+    if(parts.length!==3||parts.some(n=>!Number.isFinite(n))) return '—';
+    return reportDateLabels(new Date(parts[0],parts[1]-1,parts[2],12,0,0)).hijri;
+  }catch(e){return '—';}
+}
+function reportSignatureFooter(){
+  const names=store.reportSignatures||{};
+  return `<footer style="display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-top:36px;padding-top:14px;border-top:1px solid #b8c8d0;color:#102a43;font-size:13px;page-break-inside:avoid"><div style="min-width:220px;text-align:center">مدير / ة المدرسة<br><strong>${esc(names.manager||'')}</strong><br>التوقيع: ........................</div><div style="min-width:220px;text-align:center">مسؤول / ة الرصد<br><strong>${esc(names.attendance||'')}</strong><br>التوقيع: ........................</div></footer>`;
+}
+
+function printElement(html, title){
+  const w = window.open('', '_blank');
+  if(!w){toast('اسمح بفتح النوافذ المنبثقة للطباعة ثم حاول مرة أخرى.',true);return;}
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Cairo',sans-serif; padding:20px; direction:rtl;}
+    .qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:20px;}
+    .qr-card{border:2px solid #102a43; border-radius:14px; padding:18px; text-align:center; page-break-inside:avoid;}
+    .qr-school{font-size:11px; color:#555;}
+    .qr-class{font-size:18px; font-weight:800; color:#102a43; margin:6px 0 8px;}
+    .qr-brand{display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; color:#102a43; font-size:12px; font-weight:800;}
+    .qr-brand-mark{display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:#0f766e; color:#fff; font-size:14px; font-weight:900;}
+    .qr-box{display:flex; justify-content:center; margin-bottom:10px;}
+    .qr-hint{font-size:11px; color:#0f766e; font-weight:700;}
+    .qr-actions{display:none;}
+  </style></head><body>${html}</body></html>`);
+  w.document.close();
+  const images=Array.from(w.document.images);
+  const ready=images.map(img=>{
+    if(img.complete && img.naturalWidth>0) return Promise.resolve();
+    return new Promise(resolve=>{
+      const done=()=>resolve();
+      img.addEventListener('load',done,{once:true});
+      img.addEventListener('error',done,{once:true});
+      setTimeout(done,3000);
+    });
+  });
+  Promise.all(ready).then(()=>{
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(w.closed) return;
+      w.focus();
+      w.print();
+    }));
+  });
+}
+
+/* ==========================================================================\n   أولياء الأمور + تقرير الغياب\n   ========================================================================== */
+function viewGuardians(){
+  const list=(store.guardians||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
+  return `<div class="container">
+    <div class="page-title"><div><h2>أرقام أولياء الأمور</h2><p>الربط يتم باسم الطالب/ة المطبّع، ولا يتغير QR الفصل.</p></div>
+      <div style="display:flex;gap:8px;"><button class="btn btn-outline" id="importGuardiansBtn">📥 استيراد Excel</button><button class="btn btn-gold" id="addGuardianBtn">+ إضافة رقم</button></div>
+    </div>
+    <div class="field"><input class="searchbox" id="guardianSearch" placeholder="🔍 البحث باسم الطالب/ة أو رقم ولي الأمر..."></div>
+    <div id="guardiansList">${guardiansRowsHtml(list)}</div>
+  </div><div id="modalHost"></div>`;
+}
+function guardiansRowsHtml(list){
+  return list.length ? list.map(g=>`<div class="list-row" style="padding:14px 16px;"><div class="info"><b>${esc(g.name)}</b><span class="guardian-phone">${esc(g.phone)}</span></div><div class="row-actions"><button class="icon-btn" data-edit-guardian="${esc(g.id)}">✎</button><button class="icon-btn del" data-del-guardian="${esc(g.id)}">🗑</button></div></div>`).join('') : `<div class="empty"><b>لا توجد أرقام أولياء أمور</b><span>يمكنك إضافتها من إدارة الطلاب والطالبات أو من زر إضافة رقم.</span></div>`;
+}
+function bindGuardians(){
+  document.getElementById('addGuardianBtn').onclick=()=>openGuardianModal();
+  document.getElementById('importGuardiansBtn').onclick=()=>openGuardianImportModal();
+  const refresh=()=>{
+    const q=(document.getElementById('guardianSearch').value||'').trim();
+    const list=(store.guardians||[]).filter(g=>!q || g.name.includes(q) || g.phone.includes(q));
+    document.getElementById('guardiansList').innerHTML=guardiansRowsHtml(list); bindGuardianRows();
+  };
+  document.getElementById('guardianSearch').oninput=refresh;
+  bindGuardianRows();
+}
+function bindGuardianRows(){
+  document.querySelectorAll('[data-edit-guardian]').forEach(b=>b.onclick=()=>openGuardianModal(store.guardians.find(g=>g.id===b.dataset.editGuardian)));
+  document.querySelectorAll('[data-del-guardian]').forEach(b=>b.onclick=async()=>{
+    const g=store.guardians.find(x=>x.id===b.dataset.delGuardian); if(!g) return;
+    if(!confirm(`حذف رقم ولي الأمر للطالب/ة "${g.name}"؟`)) return;
+    const snapshot=cloneStoreSnapshot();
+    store.guardians=store.guardians.filter(x=>x.id!==g.id);
+    store.students=store.students.map(s=>normalizeNameClient(s.name)===normalizeNameClient(g.name)?Object.assign({},s,{guardianPhone:''}):s);
+    const result=await persistStoreMutation('deleteGuardian',{name:g.name},snapshot);
+    if(!result.ok){render();toast('تعذر حذف الرقم من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+    render(); toast('تم حذف رقم ولي الأمر');
+  });
+}
+function openGuardianModal(existing){
+  const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="overlay" id="gov"><div class="modal"><div class="modal-head"><h3>${existing?'تعديل رقم ولي الأمر':'إضافة رقم ولي أمر'}</h3><button class="modal-close" id="gcl">✕</button></div><div class="modal-body">
+    <div class="field"><label>الطالب/ة</label><input id="gName" list="gStudents" value="${existing?esc(existing.name):''}" placeholder="اكتبي اسم الطالب/ة"><datalist id="gStudents">${store.students.map(s=>`<option value="${esc(s.name)}">`).join('')}</datalist></div>
+    <div class="field"><label>رقم الجوال</label><input id="gPhone" inputmode="tel" value="${existing?esc(existing.phone):''}" placeholder="05xxxxxxxx"></div>
+    <p style="font-size:.75rem;color:#8299a6;">يتم تطبيع الرقم تلقائياً في الخادم إلى الصيغة السعودية المناسبة.</p>
+  </div><div class="modal-foot"><button class="btn btn-outline" id="gcancel">إلغاء</button><button class="btn btn-primary" id="gsave">حفظ</button></div></div></div>`;
+  const close=()=>host.innerHTML=''; document.getElementById('gcl').onclick=close; document.getElementById('gcancel').onclick=close;
+  document.getElementById('gov').onclick=e=>{if(e.target.id==='gov')close()};
+  document.getElementById('gsave').onclick=async()=>{
+    const name=document.getElementById('gName').value.trim(), phone=document.getElementById('gPhone').value.trim();
+    if(!name||!phone){toast('أدخلي اسم الطالب/ة ورقم ولي الأمر',true);return;}
+    if(!normalizePhoneClient(phone)){toast('أدخلي رقم جوال سعودي صحيحاً بصيغة 05xxxxxxxx',true);return;}
+    const result=await pushToServer('saveGuardian',{name,phone});
+    if(!result.ok){toast('تعذر حفظ الرقم على الخادم',true);return;}
+    const id=normalizeNameClient(name), normalized=result.phone||phone;
+    const g={id,name,phone:normalized};
+    store.guardians=(store.guardians||[]).filter(x=>x.id!==id); store.guardians.push(g);
+    store.students=store.students.map(s=>normalizeNameClient(s.name)===id?Object.assign({},s,{guardianPhone:normalized}):s); saveStore();
+    close(); render(); toast('تم حفظ رقم ولي الأمر');
+  };
+}
+function openGuardianImportModal(){
+  const host=document.getElementById('modalHost');
+  host.innerHTML=`<div class="overlay" id="iov"><div class="modal wide"><div class="modal-head"><h3>استيراد أرقام أولياء الأمور</h3><button class="modal-close" id="icl">✕</button></div><div class="modal-body">
+  <p style="font-size:.82rem;color:#5b7382;margin-bottom:12px;">يفضل أن يحتوي الملف على عمودين: <b>اسم الطالب/ة</b> و<b>رقم الجوال</b>.</p>
+  <div class="dropzone" id="gdz"><b>📥 اسحبي ملف Excel هنا</b>أو اضغطي لاختيار الملف<input type="file" id="gfile" accept=".xlsx,.xls,.csv" style="display:none"></div>
+  <div id="gimportPreview" style="margin-top:14px;"></div>
+  </div><div class="modal-foot"><button class="btn btn-outline" id="icancel">إلغاء</button><button class="btn btn-primary" id="gimportSave" disabled>استيراد</button></div></div></div>`;
+  let rows=[]; const close=()=>host.innerHTML=''; document.getElementById('icl').onclick=close; document.getElementById('icancel').onclick=close; document.getElementById('iov').onclick=e=>{if(e.target.id==='iov')close()};
+  const dz=document.getElementById('gdz'), file=document.getElementById('gfile'); dz.onclick=()=>file.click();
+  const read=async f=>{try{
+    const imported=await readNamesImportFile(f);
+    if(imported.kind==='excel'){
+      const data=imported.rows;
+      const headers=(data[0]||[]).map(x=>String(x).trim());
+      let ni=headers.findIndex(h=>h.includes('اسم الطالب/ة')||h.includes('اسم الطالبة')||h.includes('اسم الطالب')||h==='الطالب/ة'||h==='الطالبة'||h==='الطالب'||h.includes('اسم'));
+      let pi=headers.findIndex(h=>h.includes('رقم')||h.includes('جوال')||h.includes('هاتف')||h.includes('ولي'));
+      if(ni<0) ni=0; if(pi<0) pi=1;
+      rows=data.slice(1).map(r=>({name:String(r[ni]??'').trim(),phone:normalizePhoneClient(r[pi])})).filter(x=>x.name&&x.phone);
+    }else{
+      rows=String(imported.text).split(/\r?\n/).slice(1).map(l=>l.split(/[,;\t]/)).map(r=>({name:String(r[0]||'').trim(),phone:normalizePhoneClient(r[1])})).filter(x=>x.name&&x.phone);
+    }
+    document.getElementById('gimportPreview').innerHTML=`<div class="list-row"><div class="info"><b>جاهز للاستيراد</b><span>${rows.length} سجل</span></div></div>`;
+    document.getElementById('gimportSave').disabled=!rows.length;
+  }catch(err){toast(err&&err.message?err.message:'تعذر قراءة الملف',true)}};
+  file.onchange=e=>{if(e.target.files[0])read(e.target.files[0])}; dz.ondragover=e=>{e.preventDefault();dz.classList.add('drag')}; dz.ondragleave=()=>dz.classList.remove('drag'); dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])read(e.dataTransfer.files[0])};
+  document.getElementById('gimportSave').onclick=async()=>{
+    const btn=document.getElementById('gimportSave'); btn.disabled=true;
+    guardianImportBusy = true;
+    // نعرض الأرقام فوراً محلياً، ثم نحاول حفظها على الخادم.
+    const incoming=rows.map(g=>({id:normalizeNameClient(g.name),name:g.name,phone:normalizePhoneClient(g.phone)}));
+    const map={}; (store.guardians||[]).forEach(g=>map[g.id]=g);
+    incoming.forEach(g=>map[g.id]=g);
+    store.guardians=Object.values(map);
+    store.students=store.students.map(st=>{const g=map[normalizeNameClient(st.name)]; return g?Object.assign({},st,{guardianPhone:g.phone}):st;});
+    saveStore(); render();
+    const result=await pushToServer('importGuardians',{guardians:rows});
+    if(!result.ok){ guardianImportBusy=false; toast('تم تحميل الأرقام في الصفحة، لكن تعذر حفظها في قاعدة البيانات. تحققي من الاتصال وصلاحيات Firebase.',true); btn.disabled=false; return; }
+    guardianImportBusy = false;
+    close(); toast(`تم الاستيراد: ${result.added||0} إضافة، ${result.updated||0} تحديث`);
+  };
+}
+function viewAbsenceReport(){
+  const classes=visibleClasses(); const selected=route.classId||classes[0]?.id||''; const date=route.date||todayStr();
+  return `<div class="container"><div class="page-title"><div><h2>تقارير الحضور والغياب</h2><p>تقارير يومية وأسبوعية وشهرية</p></div><button class="btn btn-outline" id="reportRefresh">↻ تحديث البيانات</button></div>
+  <div class="report-filters"><div class="field"><label>الفصل</label><select id="reportClass">${classes.map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(classDisplayName(c))}</option>`).join('')}</select></div><div class="field"><label>نوع التقرير</label><select id="reportPeriod"><option value="daily">يومي</option><option value="weekly">أسبوعي</option><option value="monthly">شهري</option></select></div><div class="field"><label>التاريخ المرجعي</label><input id="reportDate" type="date" value="${esc(date)}"></div><button class="btn btn-primary" id="loadReport">عرض التقرير</button><button class="btn btn-outline" id="allClassesReport">🖨 تقرير اليوم لجميع الفصول</button></div>
+  <div id="reportHost"></div></div>`;
+}
+async function fetchReportBootstrap(){
+  // التقارير تقرأ من نفس مخزن Firebase المستخدم في بقية المنصة، دون أي endpoint خارجي.
+  await pullFromServer(true);
+  return {
+    classes:Array.isArray(store.classes)?store.classes:[],
+    students:Array.isArray(store.students)?store.students:[],
+    attendance:Array.isArray(store.attendance)?store.attendance:[],
+    guardians:Array.isArray(store.guardians)?store.guardians:[]
+  };
+}
+// يزيل عمود واتساب من نسخة الطباعة
+function stripWaColumn(html){ return String(html).replace(/<(th|td) class="wa-col">[\s\S]*?<\/\1>/g,''); }
+function whatsappLink(phone, name, date){
+  const num = normalizePhoneClient(phone);
+  if(!num) return '';
+  const girl=store.schoolType!=='boys';
+  const msg = 'السلام عليكم ورحمة الله وبركاته\nولي أمر '+(girl?'الطالبة':'الطالب')+' / '+name+'\nنفيدكم بأن '+(girl?'ابنتكم غائبة':'ابنكم غائب')+' اليوم '+date+' — '+SCHOOL_NAME+'.\nنأمل إفادتنا بسبب الغياب. شاكرين لكم تعاونكم.';
+  return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg);
+}
+function reportPeriodBounds(period, date){
+  const [y,m,d]=date.split('-').map(Number); const selected=new Date(y,m-1,d);
+  if(period==='monthly') return {start:`${y}-${String(m).padStart(2,'0')}-01`,end:`${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`};
+  if(period==='weekly'){
+    const day=selected.getDay(); const from=new Date(y,m-1,d-day); const to=new Date(from); to.setDate(from.getDate()+6);
+    const fmt=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+    return {start:fmt(from),end:fmt(to)};
+  }
+  return {start:date,end:date};
+}
+function reportStatus(att, student){
+  const rec=att?.records?.find(r=>String(r.studentId)===String(student.id)||normalizeNameClient(r.studentName||'')===normalizeNameClient(student.name));
+  if(!rec)return 'لم يُرصد';
+  return (rec.status==='غائب'||rec.status==='absent')?'غائبة':(rec.status==='حاضر'||rec.status==='present')?'حاضرة':String(rec.status||'لم يُرصد');
+}
+async function loadAbsenceReport(){
+  const classId=document.getElementById('reportClass').value, date=document.getElementById('reportDate').value||todayStr(), period=document.getElementById('reportPeriod').value;
+  route.classId=classId;route.date=date;
+  const host=document.getElementById('reportHost'); host.innerHTML='<div class="empty"><b>جارٍ تحميل التقرير...</b></div>';
+  const fresh=await fetchReportBootstrap();
+  if(fresh){
+    store.students=dedupeStudents(fresh.students.map(s=>({id:s.id,classId:s.classId,number:s.number,name:s.name,guardianPhone:s.guardianPhone||''})));
+    store.guardians=fresh.guardians.map(g=>({id:String(g.id||''),name:String(g.name||''),phone:String(g.phone||'')}));
+    const amap={}; fresh.attendance.forEach(r=>{const k=String(r.classId)+'|'+String(r.date); if(!amap[k]) amap[k]={id:k,classId:r.classId,date:r.date,teacher:r.teacher,time:r.time,records:[]}; amap[k].records.push({studentId:r.studentId,studentName:r.studentName,status:r.status});});
+    store.attendance=Object.values(amap); saveStore();
+  }
+  const bounds=reportPeriodBounds(period,date), guardianMap={};
+  (store.guardians||[]).forEach(g=>guardianMap[normalizeNameClient(g.name)]=g.phone);
+  const students=studentsOfClass(classId).slice().sort((a,b)=>(a.number||'').localeCompare(b.number||'','ar',{numeric:true}));
+  const sessions=store.attendance.filter(a=>String(a.classId)===String(classId)&&String(a.date)>=bounds.start&&String(a.date)<=bounds.end).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const dates=period==='daily'?[date]:[...new Set(sessions.map(a=>String(a.date)))];
+  const rows=[];
+  dates.forEach(day=>{
+    const att=sessions.find(a=>String(a.date)===day)||attendanceOf(classId,day);
+    const dayRows=students.map(st=>({date:day,number:st.number||'',name:st.name,phone:guardianMap[normalizeNameClient(st.name)]||guardianPhoneForStudent(st)||'',status:reportStatus(att,st)}));
+    rows.push(...sortAbsentFirst(dayRows));
+  });
+  const absent=rows.filter(r=>statusRank(r.status)===0).length, present=rows.filter(r=>statusRank(r.status)===1).length;
+  const periodLabel=period==='daily'?'يومي':period==='weekly'?'أسبوعي':'شهري';
+  const referenceHijri=reportHijriForDate(date);
+  const dateLabel=period==='daily'?`${date} — ${referenceHijri}`:`${bounds.start} إلى ${bounds.end} — التاريخ المرجعي هجريًا: ${referenceHijri}`;
+  host.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 14px"><p style="font-size:.85rem;color:#5b7382">${periodLabel} | ${esc(dateLabel)} | الغياب: <b style="color:#dc2626">${absent}</b> | الحضور: <b style="color:#16a34a">${present}</b> | السجلات: <b>${rows.length}</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" id="reportExcel">📊 Excel</button><button class="btn btn-primary btn-sm" id="reportPdf">📄 PDF</button></div></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>#</th>${period==='daily'?'':'<th>التاريخ</th>'}<th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th><th class="wa-col">إرسال واتساب</th></tr></thead><tbody>${rows.map((r,i)=>{const wa=statusRank(r.status)===0&&r.phone?whatsappLink(r.phone,r.name,r.date):'';return `<tr><td>${i+1}</td>${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td class="guardian-phone">${r.phone?esc(r.phone):'—'}</td><td class="${statusRank(r.status)===0?'status-absent':statusRank(r.status)===1?'status-present':'status-missing'}">${esc(r.status)}</td><td class="wa-col">${wa?`<a href="${wa}" target="_blank" rel="noopener" aria-label="إرسال واتساب لولي أمر ${esc(r.name)}" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:#25d366;color:#fff;font-size:18px;font-weight:800;text-decoration:none" title="إرسال إشعار الغياب عبر واتساب"><svg viewBox="0 0 32 32" width="21" height="21" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16 .5C7.44.5.5 7.43.5 15.98c0 2.73.72 5.4 2.08 7.77L.5 31.5l7.94-2.08a15.47 15.47 0 0 0 7.55 1.95h.01c8.55 0 15.5-6.94 15.5-15.49A15.38 15.38 0 0 0 16 .5Zm0 28.25h-.01a12.84 12.84 0 0 1-6.54-1.79l-.47-.28-4.71 1.23 1.26-4.59-.31-.48a12.8 12.8 0 0 1-1.97-6.86C3.25 8.82 8.85 3.25 16 3.25s12.75 5.57 12.75 12.63c0 7.1-5.68 12.87-12.75 12.87Zm7-9.64c-.38-.19-2.23-1.1-2.58-1.22-.35-.13-.6-.19-.85.19-.25.37-.98 1.22-1.2 1.47-.22.25-.44.28-.82.09-.38-.19-1.6-.59-3.04-1.88-1.12-1-1.88-2.23-2.1-2.61-.22-.38-.02-.58.16-.77.17-.16.38-.44.57-.66.19-.22.25-.38.38-.63.12-.25.06-.47-.03-.66-.1-.19-.85-2.04-1.16-2.79-.3-.73-.61-.63-.85-.64h-.72c-.25 0-.66.1-1 .47-.35.38-1.32 1.29-1.32 3.14s1.35 3.64 1.54 3.89c.19.25 2.66 4.06 6.44 5.7.9.39 1.6.62 2.14.8.9.29 1.71.25 2.35.15.72-.11 2.23-.91 2.54-1.79.31-.88.31-1.63.22-1.79-.1-.16-.35-.25-.73-.44Z"/></svg></a>`:'—'}</td></tr>`}).join('')||`<tr><td colspan="7" style="text-align:center;padding:28px;color:#8299a6">لا توجد طالبات أو سجلات في الفترة المحددة</td></tr>`}</tbody></table></div>`;
+  document.getElementById('reportExcel').onclick=()=>exportPeriodReportExcel(rows,classId,periodLabel,dateLabel);
+  document.getElementById('reportPdf').onclick=()=>exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period);
+}
+function exportPeriodReportExcel(rows,classId,periodLabel,dateLabel){
+  if(typeof XLSX==='undefined'){toast('تعذر تحميل مكتبة Excel',true);return;}
+  const cls=store.classes.find(c=>String(c.id)===String(classId)); const wb=XLSX.utils.book_new();
+  const sign=store.reportSignatures||{};
+  const data=[[SCHOOL_NAME],['تقرير الحضور والغياب '+periodLabel],['الفصل: '+(cls?.name||'')],['الفترة: '+dateLabel],['التاريخ الهجري: '+reportDateLabels().hijri],['التاريخ الميلادي: '+reportDateLabels().greg],['الساعة: '+nowTimeStr()],[],['التاريخ','رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة'],...rows.map(r=>[r.date,r.number,r.name,r.phone,r.status]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']];
+  const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:14},{wch:16},{wch:30},{wch:20},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,ws,'تقرير الحضور');
+  XLSX.writeFile(wb,`تقرير_${periodLabel}_${(cls?.name||'الفصل').replace(/[\\/:*?"<>|]/g,'_')}_${dateLabel.replace(/[^0-9-]/g,'_')}.xlsx`);
+}
+function exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period){
+  const cls=store.classes.find(c=>String(c.id)===String(classId));
+  const body=rows.map((r,i)=>`<tr><td>${i+1}</td>${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td>${esc(r.status)}</td></tr>`).join('');
+  const dateHead=period==='daily'?'':'<th>التاريخ</th>';
+  const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p><p style="margin:4px 0 0">التاريخ الهجري: ${reportDateLabels().hijri} — الميلادي: ${reportDateLabels().greg} — الساعة: ${nowTimeStr()}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${dateHead}<th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</b></p>${reportSignatureFooter()}`;
+  printElement(html,`تقرير ${periodLabel} ${cls?.name||''} ${dateLabel}`);
+}
+async function printAllClassesAbsenceReport(){
+  const date=document.getElementById('reportDate')?.value||todayStr(), classes=visibleClasses();
+  if(!classes.length){toast('لا توجد فصول للطباعة',true);return;}
+  toast('جاري تجهيز التقرير الشامل…');
+  const guardianMap={}; (store.guardians||[]).forEach(g=>{guardianMap[String(g.studentId||g.id||'').trim()]=g.phone;guardianMap[normalizeNameClient(g.name)]=g.phone;});
+  // طلب واحد لكل الفصول بدل طلب لكل فصل (وبدون إعادة تحميل كل البيانات قبله)
+  let all=null;
+  try{ const res=await pushToServer('absenceReportAll',{date}); if(res&&res.ok&&res.classes) all=res.classes; }catch(e){ console.warn('absenceReportAll failed',e); }
+  let sections='', totalAbsent=0;
+  classes.forEach(cls=>{
+    let rows=all&&Array.isArray(all[String(cls.id)])?all[String(cls.id)].map(r=>Object.assign({},r,{phone:r.phone||guardianMap[String(r.studentId||'').trim()]||guardianMap[normalizeNameClient(r.name)]||''})):[];
+    if(!rows.length){const students=studentsOfClass(cls.id),att=attendanceOf(cls.id,date);rows=students.map(st=>{const rec=att?.records?.find(r=>String(r.studentId)===String(st.id)||normalizeNameClient(r.studentName||'')===normalizeNameClient(st.name));const raw=rec?rec.status:'لم يُرصد';return{name:st.name,phone:guardianMap[String(st.id||'').trim()]||guardianMap[normalizeNameClient(st.name)]||guardianPhoneForStudent(st)||'',status:(raw==='غائب'||raw==='absent')?'غائبة':(raw==='حاضر'||raw==='present')?'حاضرة':raw};});}
+    rows=sortAbsentFirst(rows);
+    const absentCount=rows.filter(r=>statusRank(r.status)===0).length; totalAbsent+=absentCount;
+    const color=st=>statusRank(st)===0?'#dc2626':statusRank(st)===1?'#16a34a':'#8299a6';
+    sections+=`<section style="page-break-after:always;margin-bottom:25px;"><h2>${esc(cls.name)}</h2><p>${esc(SCHOOL_NAME)} — التاريخ: ${esc(date)} — الغائبات: <b>${absentCount}</b> من ${rows.length}</p><table style="width:100%;border-collapse:collapse;" border="1" cellpadding="7"><thead><tr><th>#</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${rows.map((r,j)=>`<tr><td>${j+1}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td style="color:${color(r.status)};font-weight:700;">${esc(r.status)}</td></tr>`).join('')}</tbody></table></section>`;
+  });
+  printElement(`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain;"><div><h1 style="color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2>تقرير الغياب — جميع الفصول</h2><p>التاريخ الميلادي: ${reportDateLabels().greg} — التاريخ الهجري: ${reportDateLabels().hijri} — الساعة: ${nowTimeStr()}</p><p>التاريخ: ${esc(date)} — إجمالي الغائبات: <b>${totalAbsent}</b></p></div></header>${sections}${reportSignatureFooter()}`,`تقرير غياب جميع الفصول — ${date}`);
+}
+
+function bindAbsenceReport(){document.getElementById('loadReport').onclick=loadAbsenceReport;document.getElementById('reportRefresh').onclick=loadAbsenceReport;document.getElementById('allClassesReport').onclick=printAllClassesAbsenceReport;loadAbsenceReport();}
+
+/* ==========================================================================
+   إدارة الإداريات (Staff)
+   ========================================================================== */
+function viewStaff(){
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>إدارة الطاقم التعليمي</h2><p>إدارة أسماء الطاقم التعليمي وإسناد الفصول</p></div>
+      <button class="btn btn-gold" id="addStaffBtn">+ إضافة عضو للطاقم</button>
+    </div>
+    <div id="staffList">
+      ${store.staff.map(s=>`
+        <div class="list-row" style="padding:16px;">
+          <div class="info">
+            <b>${esc(s.name)} <span style="color:var(--teal); font-weight:600; font-size:.78rem;">(${esc(s.role||'إدارية')})</span></b>
+            <span>الفصول: ${(s.classes||[]).map(id=>{ const c=store.classes.find(x=>x.id===id); return c?classDisplayName(c):''; }).filter(Boolean).join('، ') || 'لا يوجد'}</span>
+          </div>
+          <div class="row-actions">
+            <button class="icon-btn" data-edit-staff="${s.id}">✎</button>
+            <button class="icon-btn del" data-del-staff="${s.id}">🗑</button>
+          </div>
+        </div>`).join('') || `<div class="empty"><b>لا توجد إداريات مضافة</b></div>`}
+    </div>
+
+    <div class="page-title" style="margin-top:34px;">
+      <div><h2>أسماء المعلمات لصفحة الرصد</h2><p>أسماء بسيطة (بدون حساب دخول) تظهر كاقتراحات عند رصد الغياب</p></div>
+    </div>
+    <div class="field" style="max-width:420px; display:flex; gap:8px; align-items:flex-end;">
+      <div style="flex:1;"><label>اسم المعلمة</label><input id="quickTeacherName" placeholder="اكتبي الاسم ثم اضغطي إضافة"></div>
+      <button class="btn btn-primary" id="addQuickTeacherBtn">+ إضافة</button>
+    </div>
+    <div class="chip-list" id="teacherNamesChips" style="margin-top:12px;">
+      ${(store.teacherNames||[]).length ? store.teacherNames.map(n=>`<span class="chip" data-teacher-name="${esc(n)}">${esc(n)} ✕</span>`).join('') : '<span style="color:#8299a6; font-size:.85rem;">لا توجد أسماء مضافة بعد</span>'}
+    </div>
+  </div>`;
+}
+function bindStaff(){
+  document.getElementById('addStaffBtn').onclick = ()=> openStaffModal();
+  document.querySelectorAll('[data-edit-staff]').forEach(b=> b.onclick = ()=> openStaffModal(store.staff.find(s=>s.id===b.dataset.editStaff)));
+  document.querySelectorAll('[data-del-staff]').forEach(b=> b.onclick = async ()=>{
+    if(!confirm('حذف عضو الطاقم هذا؟')) return;
+    const snapshot=cloneStoreSnapshot();
+    store.staff = store.staff.filter(s=>s.id!==b.dataset.delStaff);
+    const result=await persistStoreMutation('deleteStaff', {id:b.dataset.delStaff},snapshot);
+    if(!result.ok){render();toast('تعذر حذف عضو الطاقم من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+    render();toast('تم حذف عضو الطاقم');
+  });
+  const addQuickBtn = document.getElementById('addQuickTeacherBtn');
+  const quickInput = document.getElementById('quickTeacherName');
+  const addQuickName = async ()=>{
+    const name = (quickInput.value||'').trim();
+    if(!name) return;
+    if(!store.teacherNames) store.teacherNames = [];
+    if(store.teacherNames.includes(name)){ toast('هذا الاسم موجود بالفعل', true); return; }
+    store.teacherNames.push(name); saveStore();
+    // تُحفظ أسماء الاقتراحات ضمن بيانات المدرسة في Firestore.
+    render();
+  };
+  if(addQuickBtn) addQuickBtn.onclick = addQuickName;
+  if(quickInput) quickInput.addEventListener('keypress', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); addQuickName(); } });
+  document.querySelectorAll('[data-teacher-name]').forEach(chip=> chip.onclick = async ()=>{
+    const name = chip.dataset.teacherName;
+    if(!confirm(`حذف "${name}" من قائمة أسماء المعلمات؟`)) return;
+    store.teacherNames = (store.teacherNames||[]).filter(n=>n!==name); saveStore();
+    // مزامنة التغيير إلى Firestore عبر حفظ مخزن المدرسة.
+    render();
+  });
+}
+function openStaffModal(existing){
+  const host = document.getElementById('modalHost') || (()=>{ const d=document.createElement('div'); d.id='modalHost'; document.body.appendChild(d); return d; })();
+  let selected = new Set(existing ? (existing.classes||[]) : []);
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal">
+      <div class="modal-head"><h3>${existing?'تعديل بيانات الإداري/ة':'إضافة إداري/ة'}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div class="two-col">
+          <div class="field"><label>الاسم</label><input id="stName" value="${existing?esc(existing.name):''}"></div>
+          <div class="field"><label>الصفة</label><input id="stRole" value="${existing?esc(existing.role||''):''}" placeholder="معلم/ة / وكيل/ة..."></div>
+        </div>
+        <div class="field">
+          <label>الفصول المسندة</label>
+          <div class="chip-list" id="classChips">
+            ${store.classes.map(c=>`<span class="chip ${selected.has(c.id)?'selected':''}" data-chip="${c.id}" >${esc(classDisplayName(c))}</span>`).join('') || 'لا توجد فصول بعد'}
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn btn-outline" id="cancel">إلغاء</button><button class="btn btn-primary" id="save">حفظ</button></div>
+    </div>
+  </div>`;
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('cancel').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+  document.querySelectorAll('[data-chip]').forEach(chip=> chip.onclick = ()=>{
+    const id = chip.dataset.chip;
+    if(selected.has(id)){ selected.delete(id); chip.classList.remove('selected'); }
+    else{ selected.add(id); chip.classList.add('selected'); }
+  });
+  document.getElementById('save').onclick = async ()=>{
+    const name = document.getElementById('stName').value.trim();
+    const role = document.getElementById('stRole').value.trim();
+    if(!name){ toast('يرجى إدخال الاسم', true); return; }
+    if(existing){
+      const upd = {name, role, classes:[...selected]};
+      Object.assign(existing, upd); delete existing.username; delete existing.password;
+      saveStore(); await pushToServer('saveStaff', existing);
+      toast('تم تحديث بيانات عضو الطاقم');
+    }else{
+      const st = { id: uid(), name, role, classes:[...selected] };
+      store.staff.push(st); saveStore();
+      await pushToServer('saveStaff', st);
+      toast('تمت إضافة عضو الطاقم');
+    }
+    close(); render();
+  };
+}
+
+/* ==========================================================================
+   التصدير: Excel و PDF
+   ========================================================================== */
+function exportClassExcel(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const students = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+  const att = attendanceOf(classId);
+  const rows = sortAbsentFirst(students, s=>{ const rec = att ? att.records.find(r=>r.studentId===s.id) : null; return rec ? rec.status : 'لم يُرصد'; }).map(s=>{
+    const rec = att ? att.records.find(r=>r.studentId===s.id) : null;
+    return {
+      'رقم الطالب/ة': s.number,
+      'اسم الطالب/ة': s.name,
+      'رقم ولي الأمر': guardianPhoneForStudent(s),
+      'الحالة': rec ? rec.status : 'لم يُرصد',
+      'المعلمة': att ? att.teacher : '',
+      'وقت الرصد': att ? att.time : '',
+      'التاريخ': todayStr()
+    };
+  });
+  const sign=store.reportSignatures||{};
+  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+cls.name],['التاريخ الميلادي: '+reportDateLabels().greg],['التاريخ الهجري: '+reportDateLabels().hijri],['الساعة: '+nowTimeStr()],[],['رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r['رقم الطالب/ة'],r['اسم الطالب/ة'],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'الغياب');
+  XLSX.writeFile(wb, `تقرير_غياب_${cls.name}_${todayStr()}.xlsx`);
+}
+function exportClassPDF(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const students = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+  const att = attendanceOf(classId);
+  const statusOf = s=>{ const rec = att ? att.records.find(r=>r.studentId===s.id) : null; return rec ? rec.status : 'لم يُرصد'; };
+  const sortedStudents = sortAbsentFirst(students, statusOf);
+  const rowsHtml = sortedStudents.map(s=>{
+    const status = statusOf(s);
+    const color = statusRank(status)===0 ? '#dc2626' : (statusRank(status)===1 ? '#16a34a' : '#8299a6');
+    const guardianPhone = guardianPhoneForStudent(s);
+    return `<tr><td>${esc(s.number)}</td><td>${esc(s.name)}</td><td>${guardianPhone?`<span class="guardian-phone">${esc(guardianPhone)}</span>`:'—'}</td><td style="color:${color}; font-weight:700;">${esc(status)}</td></tr>`;
+  }).join('');
+  const html = `
+  <div style="font-family:'Cairo',sans-serif; direction:rtl; padding:10px;">
+    <header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${SCHOOL_LOGO_DATA}" alt="شعار المدرسة" style="width:90px;height:72px;object-fit:contain;"><div><h1 style="font-size:22px;color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2 style="color:#102a43;margin:5px 0;">تقرير غياب — ${esc(cls.name)}</h2></div></header>
+    <p style="color:#555; font-size:13px;">${esc(SCHOOL_NAME)} — التاريخ الميلادي: ${reportDateLabels().greg} — التاريخ الهجري: ${reportDateLabels().hijri} — الساعة: ${nowTimeStr()} ${att? '— المعلمة: '+esc(att.teacher)+' — وقت الرصد: '+esc(att.time):''}</p>
+    <table style="width:100%; border-collapse:collapse; margin-top:14px;" border="1" cellpadding="8">
+      <thead style="background:#102a43; color:#fff;"><tr><th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    ${reportSignatureFooter()}
+  </div>`;
+  printElement(html, `تقرير غياب ${cls.name}`);
+}
+
+/* ==========================================================================
+   بدء التشغيل + التعامل مع رابط ?class=
+   ========================================================================== */
+function init(){
+  const params = new URLSearchParams(window.location.search);
+  const cid = params.get('class');
+  if(cid){
+    route = { name:'scanDeep', classId:cid };
+    pullFromServer(false).finally(render);
+  }else{
+    if(session) startAutoSync();
+    render();
+  }
+}
+window.navigate = navigate;
+init();
+</script>
+</body>
+</html>
