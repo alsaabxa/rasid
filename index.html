@@ -1286,7 +1286,7 @@ function openClassModal(existing){
       <div class="modal-body">
         <div class="two-col">
           <div class="field"><label>اسم الصف</label><input id="cName" value="${existing? esc(cleanClassName(existing.name, existing.number)):''}" placeholder="مثال: أول متوسط"></div>
-          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):''}" inputmode="numeric" placeholder="يُحدَّد تلقائيًا"></div>
+          <div class="field"><label>رقم الصف</label><input id="cNum" value="${existing? esc(existing.number):''}" inputmode="numeric" placeholder="أدخل رقم الصف يدويًا" required></div>
         </div>
         ${existing ? `
         <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
@@ -1430,25 +1430,16 @@ function openClassModal(existing){
 
   const classNameInput=document.getElementById('cName');
   const classNumberInput=document.getElementById('cNum');
-  let numberManuallyEdited=false;
-  classNumberInput.addEventListener('input', ()=>{ numberManuallyEdited=true; });
-  classNameInput.addEventListener('input', ()=>{
-    if(!numberManuallyEdited && classNameInput.value.trim()){
-      classNumberInput.value=nextClassNumber(classNameInput.value.trim(), existing && existing.id);
-    } else if(!classNameInput.value.trim() && !numberManuallyEdited){
-      classNumberInput.value='';
-    }
-  });
   if(existing) classNameInput.value=cleanClassName(existing.name, existing.number);
   if(existing) classNumberInput.value=existing.number;
   document.getElementById('save').onclick = async ()=>{
     const name = classNameInput.value.trim();
-    let number = classNumberInput.value.trim();
+    const number = classNumberInput.value.trim();
     if(!name){ toast('يرجى إدخال اسم الصف', true); return; }
-    if(!number) number=nextClassNumber(name, existing && existing.id);
-    if(!/^\d+$/.test(number)){ toast('رقم الفصل يجب أن يكون رقمًا صحيحًا', true); return; }
+    if(!number){ toast('يرجى إدخال رقم الصف يدويًا', true); classNumberInput.focus(); return; }
+    if(!/^\d+$/.test(number)){ toast('رقم الصف يجب أن يكون رقمًا صحيحًا', true); return; }
     const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && String(c.number).trim()===number);
-    if(duplicate){ toast('هذا الصف ورقم الفصل موجودان مسبقًا', true); return; }
+    if(duplicate){ toast('هذا الصف ورقم الصف موجودان مسبقًا', true); return; }
     const snapshot=cloneStoreSnapshot();
     if(existing){
       existing.number = number; existing.name = name;
