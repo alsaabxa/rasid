@@ -348,10 +348,10 @@ input,select,.btn{min-height:44px; touch-action:manipulation;}
 .message-nav{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:42px;height:42px;padding:0!important;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;transition:background .15s}
 .message-nav:hover,.message-nav.active{background:var(--teal);color:#fff}
 .message-nav svg{width:21px;height:21px}.message-nav .message-count{position:absolute;top:-4px;right:-4px;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:#dc2626;color:#fff;font-size:.62rem;font-weight:800}.message-nav-label{display:none}
-.refresh-icon-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;width:1.15em;height:1.15em;font-size:1.2em;line-height:1;vertical-align:middle}
-.sync-indicator{position:absolute;top:0;right:0;width:8px;height:8px;border:1.5px solid #fff;border-radius:50%;background:#dc2626;box-shadow:0 0 0 1px rgba(16,42,67,.16)}
-.sync-indicator[data-state="synced"]{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.2)}
-.sync-indicator[data-state="syncing"]{background:#eab308;box-shadow:0 0 0 3px rgba(234,179,8,.22);animation:syncPulse 1.1s ease-in-out infinite}
+.refresh-icon-wrap{display:inline-flex;align-items:center;justify-content:center;width:1.15em;height:1.15em;font-size:1.2em;line-height:1;vertical-align:middle}
+.sync-indicator{display:inline-block;width:11px;height:11px;flex:0 0 11px;border:1.5px solid #fff;border-radius:50%;background:#dc2626;box-shadow:0 0 0 1px rgba(16,42,67,.18);vertical-align:middle}
+.sync-indicator[data-state="synced"]{background:#16a34a;box-shadow:0 0 0 1px rgba(22,163,74,.28)}
+.sync-indicator[data-state="syncing"]{background:#eab308;box-shadow:0 0 0 1px rgba(234,179,8,.35);animation:syncPulse 1.1s ease-in-out infinite}
 @keyframes syncPulse{50%{opacity:.45}}
 .message-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:16px;margin:12px 0}.message-card.unread{border-right:4px solid var(--teal);background:#f7fcfb}.message-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:#607d8b;font-size:.78rem;margin:7px 0}.message-tag{border-radius:99px;background:#e7f0f1;color:var(--navy);padding:2px 9px;font-weight:700}.message-body{line-height:1.9;white-space:normal;overflow-wrap:anywhere}
 .message-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.message-delete{color:#b91c1c;border-color:#fecaca}.message-attachment{margin-top:12px}
@@ -1368,7 +1368,7 @@ function viewDashboard(){
     <div class="page-title">
       <div><h2>لوحة التحكم</h2><p>${esc(SCHOOL_NAME)}</p></div>
       <div style="display:flex; gap:8px;">
-        <button class="btn btn-outline btn-sm" id="refreshNowBtn"><span class="refresh-icon-wrap" aria-hidden="true">↻<span id="syncIndicator" class="sync-indicator" data-state="disconnected"></span></span> تحديث الآن</button>
+        <button class="btn btn-outline btn-sm" id="refreshNowBtn"><span class="refresh-icon-wrap" aria-hidden="true">↻</span><span id="syncIndicator" class="sync-indicator" data-state="disconnected" aria-label="منقطع" role="status"></span> تحديث الآن</button>
         ${session.type==='admin' ? `<button class="btn btn-gold" id="addClassBtn">+ إضافة فصل</button>` : ''}
       </div>
     </div>
