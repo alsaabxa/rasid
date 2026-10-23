@@ -339,6 +339,8 @@ input,select,.btn{min-height:44px; touch-action:manipulation;}
   .topbar, .no-print{display:none !important;}
   body{background:#fff;}
 }
+
+@media(max-width:900px){.topbar{display:flex;flex-wrap:wrap;align-items:center}.brand{flex:1 1 auto;min-width:0}.clock{order:3;flex:1 1 100%;width:100%;max-width:100%;justify-content:center}.clock .dates{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:3px 8px}.topnav{order:4;display:flex;width:100%;flex-wrap:wrap;justify-content:center;gap:6px}.topnav .nav-btn{flex:1 1 auto;white-space:nowrap;text-align:center}}@media(max-width:480px){.topbar{gap:7px;padding:8px}.clock{font-size:.68rem}.topnav .nav-btn{flex-basis:40%;font-size:.75rem;padding:6px 8px}}
 </style>
 </head>
 <body>
@@ -546,8 +548,8 @@ function loadSession(){
 }
 function saveSession(){ sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); }
 function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
-function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-function nowTimeStr(){ const d=new Date(); return d.toLocaleTimeString('ar-SA-u-nu-latn',{hour:'2-digit',minute:'2-digit',hour12:true}); }
+function todayStr(){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());const p=Object.fromEntries(parts.map(x=>[x.type,x.value]));return p.year+'-'+p.month+'-'+p.day;}
+function nowTimeStr(){return new Date().toLocaleTimeString('ar-SA-u-nu-latn',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit',hour12:true});}
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function normalizeNameClient(name){
   return String(name==null?'':name).replace(/[\u064B-\u0652\u0670\u0640]/g,'').replace(/[\u200B-\u200F\u202A-\u202E\uFEFF]/g,'').replace(/[\u00A0]/g,' ').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/\s+/g,' ').trim();
@@ -611,13 +613,13 @@ function toast(msg, isErr){
 /* ---------- clock ---------- */
 function tickClock(){
   const now = new Date();
-  const time = now.toLocaleTimeString('ar-SA-u-nu-latn', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true});
+  const time = now.toLocaleTimeString('ar-SA-u-nu-latn', {timeZone:'Asia/Riyadh',hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true});
   let hijri = '—', greg = '—';
   try{
-    hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
+    hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn', {timeZone:'Asia/Riyadh',day:'numeric', month:'long', year:'numeric'}).format(now);
   }catch(e){}
   try{
-    greg = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
+    greg = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', {timeZone:'Asia/Riyadh',day:'numeric', month:'long', year:'numeric'}).format(now);
   }catch(e){}
   document.getElementById('clockTime').textContent = time;
   document.getElementById('clockHijri').textContent = hijri;
@@ -1638,7 +1640,7 @@ function openStudentFormModal(classId, existing, onDone){
       <div class="modal-body">
         <div class="field"><label>الفصل</label><select id="sClass">${classOptions}</select></div>
         <div class="two-col">
-          <div class="field"><label>رقم الطالب/ة</label><input id="sNum" value="${existing?esc(existing.number):esc(nextStudentNumber(classId))}" readonly><small style="display:block;color:#8299a6;font-size:.72rem;margin-top:4px;">يُحدد تلقائياً حسب ترتيب الفصل</small></div>
+          <input id="sNum" type="hidden" value="${existing?esc(existing.number):esc(nextStudentNumber(classId))}">
           <div class="field"><label>الاسم الكامل</label><input id="sName" value="${existing?esc(existing.name):''}"></div>
         </div>
         <div class="field"><label>رقم جوال ولي الأمر <span style="color:#8299a6;font-weight:500;">(اختياري)</span></label><input id="sGuardian" inputmode="tel" placeholder="05xxxxxxxx" value="${existing?esc(guardianPhoneForStudent(existing)):''}"></div>
@@ -1904,8 +1906,8 @@ function statusRank(s){ s=String(s||''); if(s==='غائبة'||s==='غائب'||s=
 function sortAbsentFirst(rows, getStatus){ getStatus=getStatus||(r=>r.status); return rows.map((r,i)=>[r,i]).sort((a,b)=>statusRank(getStatus(a[0]))-statusRank(getStatus(b[0]))||a[1]-b[1]).map(x=>x[0]); }
 function reportDateLabels(date=new Date()){
   let hijri='—', greg='—';
-  try{hijri=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
-  try{greg=new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
+  try{hijri=new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn',{timeZone:'Asia/Riyadh',day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
+  try{greg=new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn',{timeZone:'Asia/Riyadh',day:'numeric',month:'long',year:'numeric'}).format(date);}catch(e){}
   return {hijri,greg};
 }
 function reportHijriForDate(dateStr){
