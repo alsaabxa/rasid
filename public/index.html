@@ -347,14 +347,19 @@ input,select,.btn{min-height:44px; touch-action:manipulation;}
 .notification-bell .bell-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:99px;background:#dc2626;color:#fff;font-size:.65rem;display:flex;align-items:center;justify-content:center;font-weight:800;padding:0 4px;}
 .message-nav{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:42px;height:42px;padding:0!important;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;transition:background .15s}
 .message-nav:hover,.message-nav.active{background:var(--teal);color:#fff}
-.message-nav svg{width:21px;height:21px}.message-nav .message-count{position:absolute;top:-4px;right:-4px;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:#dc2626;color:#fff;font-size:.62rem;font-weight:800}
+.message-nav svg{width:21px;height:21px}.message-nav .message-count{position:absolute;top:-4px;right:-4px;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:99px;background:#dc2626;color:#fff;font-size:.62rem;font-weight:800}.message-nav-label{display:none}
+.refresh-icon-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;width:1.15em;height:1.15em;font-size:1.2em;line-height:1;vertical-align:middle}
+.sync-indicator{position:absolute;top:0;right:0;width:8px;height:8px;border:1.5px solid #fff;border-radius:50%;background:#dc2626;box-shadow:0 0 0 1px rgba(16,42,67,.16)}
+.sync-indicator[data-state="synced"]{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.2)}
+.sync-indicator[data-state="syncing"]{background:#eab308;box-shadow:0 0 0 3px rgba(234,179,8,.22);animation:syncPulse 1.1s ease-in-out infinite}
+@keyframes syncPulse{50%{opacity:.45}}
 .message-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:16px;margin:12px 0}.message-card.unread{border-right:4px solid var(--teal);background:#f7fcfb}.message-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:#607d8b;font-size:.78rem;margin:7px 0}.message-tag{border-radius:99px;background:#e7f0f1;color:var(--navy);padding:2px 9px;font-weight:700}.message-body{line-height:1.9;white-space:normal;overflow-wrap:anywhere}
 .message-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.message-delete{color:#b91c1c;border-color:#fecaca}.message-attachment{margin-top:12px}
 .notification-bell.ring{animation:bellRing .55s ease-in-out 3;}
 @keyframes bellRing{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
 @media(max-width:900px){.topbar{padding:8px 10px;gap:7px;position:sticky}.brand-text h1{font-size:.96rem}.brand-text p{font-size:.65rem}.clock{order:3;width:auto;max-width:100%;justify-content:flex-start;padding:4px 8px;font-size:.68rem;gap:7px;flex:0 1 auto}.clock .time{font-size:.88rem}.clock .dates{flex:0 1 auto;flex-direction:column;gap:1px}.menu-toggle{display:inline-flex;order:2;flex-shrink:0}.topnav{display:none;position:absolute;top:calc(100% + 4px);left:10px;right:10px;width:auto;max-height:calc(100dvh - 100px);overflow-y:auto;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:5px;padding:10px;background:var(--navy);border:1px solid rgba(255,255,255,.14);border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.25)}.topnav.mobile-open{display:flex}.topnav .nav-btn{white-space:nowrap;flex-shrink:0;text-align:right;width:100%}.topnav .user-chip{order:10}.topnav .notification-bell{order:11}.topnav .logout-btn{order:12}.page-title{align-items:flex-start;gap:10px}.cc-actions{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.topbar{padding:7px 9px;gap:5px;row-gap:5px}.brand{gap:6px;min-width:0;flex:1 1 auto}.brand-mark{width:32px;height:32px;border-radius:9px;font-size:1rem;flex-shrink:0}.brand-text{min-width:0}.brand-text h1{font-size:.84rem;white-space:nowrap}.brand-text p{font-size:.68rem;font-weight:800;white-space:nowrap}.clock{order:2;flex:0 0 auto;gap:5px;padding:2px 5px;border-radius:7px;font-size:.57rem;max-width:48%;background:transparent;border-color:rgba(255,255,255,.08)}.clock .time{font-size:.72rem}.clock .dates{font-size:.55rem;line-height:1.1;gap:0}.topnav{order:3;width:100%;gap:5px;padding:1px 0 2px}.topnav .nav-btn{padding:6px 9px;font-size:.78rem}.container,.scan-wrap{width:calc(100% - 16px)}.page-title{flex-direction:column}.page-title>div:last-child{width:100%}.page-title .btn{width:100%}.stats-grid{grid-template-columns:repeat(2,1fr);gap:8px}.stat-card{padding:12px 8px}.stat-card .num{font-size:1.35rem}.class-card{border-radius:14px}.cc-body{padding:12px}.cc-actions{gap:6px}.cc-actions button{font-size:.75rem;padding:9px 5px}.scan-wrap{padding-bottom:12px}.student-item{padding:10px 8px}.student-item .s-name{font-size:.88rem}.report-table{min-width:620px}.report-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}.report-filters{gap:8px}.confirm-wrap{padding:24px 14px}.toast{width:calc(100% - 24px);text-align:center;justify-content:center}.notification-bell{width:40px;height:40px}}
-@media(max-width:900px){.topnav{width:min(300px,calc(100vw - 24px));left:auto;right:12px;max-height:min(72dvh,520px);padding:8px;background:#fff;color:var(--navy);border:1px solid var(--line);border-radius:15px;box-shadow:0 14px 35px rgba(16,42,67,.22)}.topnav .nav-btn{display:flex;align-items:center;min-height:42px;padding:8px 12px;color:var(--navy);border-radius:9px}.topnav .nav-btn:hover{background:#eef5f6}.topnav .nav-btn.active{background:var(--teal);color:#fff}.topnav .message-nav{width:100%;height:42px;justify-content:flex-start;padding:8px 12px!important}.topnav .message-nav .message-count{position:static;margin-inline-start:auto}.topnav .notification-bell{width:100%;height:42px;justify-content:flex-start;padding:0 12px;background:#eef5f6;color:var(--navy);font-size:.95rem}.topnav .user-chip{display:none}.topnav .logout-btn{color:#b91c1c}}
+@media(max-width:900px){.topnav{width:min(300px,calc(100vw - 24px));left:auto;right:12px;max-height:min(72dvh,520px);padding:8px;background:#fff;color:var(--navy);border:1px solid var(--line);border-radius:15px;box-shadow:0 14px 35px rgba(16,42,67,.22)}.topnav .nav-btn{display:flex;align-items:center;min-height:42px;padding:8px 12px;color:var(--navy);border-radius:9px}.topnav .nav-btn:hover{background:#eef5f6}.topnav .nav-btn.active{background:var(--teal);color:#fff}.topnav .message-nav{position:relative;width:100%;height:42px;justify-content:flex-start;gap:10px;padding:8px 12px!important}.topnav .message-nav-label{display:inline}.topnav .message-nav .message-count{position:absolute;top:3px;right:26px;margin:0}.topnav .notification-bell{width:100%;height:42px;justify-content:flex-start;padding:0 12px;background:#eef5f6;color:var(--navy);font-size:.95rem}.topnav .user-chip{display:none}.topnav .logout-btn{color:#b91c1c}}
 @media(max-width:600px){.topnav{width:min(300px,calc(100vw - 24px));left:auto;right:12px;gap:4px;padding:8px}.topnav .nav-btn{width:100%;padding:8px 12px;font-size:.86rem}}
 @media(min-width:601px) and (max-width:1024px){.container,.scan-wrap{width:calc(100% - 32px)}.classes-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.cc-actions{grid-template-columns:repeat(3,1fr);}}
 
@@ -488,6 +493,7 @@ function saveStore(){
   localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
   localRevision++; cloudDirty=true;
   if(db&&activeSchoolId&&session&&session.approved){
+    setSyncIndicator('syncing');
     clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud save failed',e)),450);
   }
@@ -503,7 +509,9 @@ function restoreStoreSnapshot(snapshot){
   }
 }
 async function syncStoreToCloud(){
-  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  if(!db||!activeSchoolId||!session||!session.approved){setSyncIndicator('disconnected');return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};}
+  if(!navigator.onLine){setSyncIndicator('disconnected');return {ok:false,offline:true,error:'لا يوجد اتصال بالإنترنت'};}
+  setSyncIndicator('syncing');
   const requestedSchoolId=activeSchoolId;
   const run=async()=>{
     if(activeSchoolId!==requestedSchoolId||!session||!session.approved)return {ok:false,error:'تغير حساب المدرسة أثناء المزامنة'};
@@ -540,6 +548,7 @@ async function syncStoreToCloud(){
     cloudMetaExists=true;
     cloudDirty=(localRevision!==revision);
     if(cloudDirty){
+      setSyncIndicator('syncing');
       clearTimeout(saveTimer);saveTimer=setTimeout(()=>syncStoreToCloud().catch(e=>console.error('Cloud follow-up save failed',e)),50);
     }else if(wroteMeta){
       // Read the committed revision back: another device may have written concurrently.
@@ -552,11 +561,13 @@ async function syncStoreToCloud(){
         }
       }catch(revisionError){console.error('Cloud revision confirmation failed',revisionError);}
     }
+    if(!cloudDirty)setSyncIndicator('synced');
     return {ok:true};
   };
   const queued=cloudWriteQueue.then(run,run);
   cloudWriteQueue=queued.then(()=>undefined,()=>undefined);
   return queued.catch(e=>{
+    setSyncIndicator('disconnected');
     cloudDirty=true;
     clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>syncStoreToCloud().catch(err=>console.error('Cloud retry failed',err)),3000);
@@ -792,12 +803,30 @@ if(auth){auth.onAuthStateChanged(async user=>{
 let syncTimer = null;
 let messageCountTimer = null;
 let guardianImportBusy = false;
+let syncIndicatorState='disconnected';
+function setSyncIndicator(state){
+  const normalized=['synced','syncing','disconnected'].includes(state)?state:'disconnected';
+  syncIndicatorState=normalized;
+  const indicator=document.getElementById('syncIndicator');
+  if(!indicator)return;
+  const labels={synced:'محدّث',syncing:'قيد التحديث',disconnected:'منقطع'};
+  indicator.dataset.state=normalized;
+  indicator.setAttribute('aria-label',labels[normalized]);
+}
+window.addEventListener('offline',()=>setSyncIndicator('disconnected'));
+window.addEventListener('online',()=>{
+  if(db&&activeSchoolId&&session&&session.approved){setSyncIndicator('syncing');checkCloudMetaAndPull();}
+  else setSyncIndicator('disconnected');
+});
 async function pushToServer(action,payload){
-  if(!db||!activeSchoolId||!session||!session.approved)return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};
+  if(!db||!activeSchoolId||!session||!session.approved){setSyncIndicator('disconnected');return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};}
+  setSyncIndicator('syncing');
   try{
     if(action==='saveAttendance'&&payload){
       clearTimeout(saveTimer);saveTimer=null;
-      return await syncAttendanceRecordToCloud(payload);
+      const result=await syncAttendanceRecordToCloud(payload);
+      setSyncIndicator(result.ok&&!cloudDirty?'synced':result.ok?'syncing':'disconnected');
+      return result;
     }
     if(action==='saveStudent'&&payload){
       const student=Object.assign({},payload);delete student.oldName;
@@ -805,6 +834,7 @@ async function pushToServer(action,payload){
       if(index>=0)store.students[index]=Object.assign({},store.students[index],student);else store.students.push(student);
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
       const result=await syncStudentRecordToCloud(student.id);
+      setSyncIndicator(result.ok&&!cloudDirty?'synced':result.ok?'syncing':'disconnected');
       if(!result.ok)return result;
       return {ok:true,updated:1};
     }
@@ -818,8 +848,10 @@ async function pushToServer(action,payload){
     }
     const result=await syncStoreToCloud();
     if(!result.ok)return result;
+    if(!cloudDirty)setSyncIndicator('synced');
     return {ok:true,phone:action==='saveGuardian'?normalizePhoneClient(payload&&payload.phone):undefined,added:action==='importGuardians'&&payload&&Array.isArray(payload.guardians)?payload.guardians.length:undefined,updated:0};
   }catch(e){
+    setSyncIndicator('disconnected');
     console.error('Firebase sync failed:',action,e);
     return {ok:false,error:e&&e.message?e.message:'تعذر حفظ البيانات في Firebase'};
   }
@@ -910,7 +942,7 @@ async function pullFromServer(silent){
     else {cloudDirty=false;await syncStoreToCloud();}
     if(!silent)render();
     return false;
-  }catch(e){console.error('Cloud load failed',e);return false;}
+  }catch(e){setSyncIndicator('disconnected');console.error('Cloud load failed',e);return false;}
 }
 let syncListenersBound = false;
 async function checkCloudMetaAndPull(){
@@ -930,13 +962,15 @@ async function checkCloudMetaAndPull(){
       if(pulled&&!editing&&!document.querySelector('.overlay'))render();
       return pulled;
     }
-  }catch(e){console.error('Cloud revision check failed',e);}
+  }catch(e){setSyncIndicator('disconnected');console.error('Cloud revision check failed',e);}
   return false;
 }
 function startAutoSync(){
   if(syncTimer) clearInterval(syncTimer);
   if(messageCountTimer) clearInterval(messageCountTimer);
-  if(!db || !activeSchoolId) return;
+  if(!db || !activeSchoolId){setSyncIndicator('disconnected');return;}
+  if(!navigator.onLine){setSyncIndicator('disconnected');return;}
+  setSyncIndicator('synced');
   syncTimer = setInterval(()=>checkCloudMetaAndPull(), 4000);
   if(session&&session.type==='admin'){
     refreshMessageBadge();
@@ -1057,6 +1091,7 @@ function render(){
   }
   applyGenderLanguage(document.getElementById('topnav'));
   applyGenderLanguage(app);
+  setSyncIndicator(syncIndicatorState);
   if(focusInfo){
     const el = document.getElementById(focusInfo.id);
     if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
@@ -1076,7 +1111,7 @@ function renderTopnav(){
     links += `<a class="nav-btn ${route.name==='guardians'?'active':''}" data-nav="guardians">أولياء الأمور</a>`;
     links += `<a class="nav-btn ${route.name==='absenceReport'?'active':''}" data-nav="absenceReport">التقارير</a>`;
     links += `<a class="nav-btn ${route.name==='settings'?'active':''}" data-nav="settings">الإعدادات</a>`;
-    links += `<a class="nav-btn message-nav ${route.name==='messages'?'active':''}" data-nav="messages" aria-label="الرسائل" title="الرسائل"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span class="message-count" id="messageCount">0</span></a>`;
+    links += `<a class="nav-btn message-nav ${route.name==='messages'?'active':''}" data-nav="messages" aria-label="الرسائل" title="الرسائل"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span class="message-nav-label">الرسائل</span><span class="message-count" id="messageCount">0</span></a>`;
   }
   nav.innerHTML = `
     ${links}
@@ -1333,7 +1368,7 @@ function viewDashboard(){
     <div class="page-title">
       <div><h2>لوحة التحكم</h2><p>${esc(SCHOOL_NAME)}</p></div>
       <div style="display:flex; gap:8px;">
-        <button class="btn btn-outline btn-sm" id="refreshNowBtn">↻ تحديث الآن</button>
+        <button class="btn btn-outline btn-sm" id="refreshNowBtn"><span class="refresh-icon-wrap" aria-hidden="true">↻<span id="syncIndicator" class="sync-indicator" data-state="disconnected"></span></span> تحديث الآن</button>
         ${session.type==='admin' ? `<button class="btn btn-gold" id="addClassBtn">+ إضافة فصل</button>` : ''}
       </div>
     </div>
@@ -1456,8 +1491,8 @@ function cleanClassName(name, number){
 }
 function classDisplayName(c){
   const name=cleanClassName(c && c.name, c && c.number);
-  const number=String(c && c.number != null ? c.number : '').trim();
-  return number ? (name ? name+' '+number : number) : String(c && c.name || '');
+  const grade=Number(String(c && c.gradeNumber != null ? c.gradeNumber : '').trim());
+  return Number.isSafeInteger(grade) && grade>0 ? `صف ${grade} — ${name}` : (name || String(c && c.name || ''));
 }
 function nextClassNumber(className, excludeId){
   const numbers=(store.classes || []).filter(c=>!excludeId || c.id!==excludeId).map(c=>{
@@ -1476,7 +1511,8 @@ function openClassModal(existing){
       <div class="modal-head"><h3>${existing? 'تعديل فصل':'إضافة فصل جديد وإدارة الطلاب والطالبات'}</h3><button class="modal-close" id="cl">✕</button></div>
       <div class="modal-body">
         <div class="two-col">
-          <div class="field"><label>اسم الصف</label><input id="cName" value="${existing? esc(cleanClassName(existing.name, existing.number)):''}" placeholder="مثال: أول متوسط"></div>
+          <div class="field"><label for="cName">اسم الفصل</label><input id="cName" value="${existing? esc(cleanClassName(existing.name, existing.number)):''}" placeholder="مثال: أول متوسط"></div>
+          <div class="field"><label for="cGrade">رقم الصف <span style="color:#8299a6;font-weight:500">(اختياري)</span></label><input id="cGrade" type="number" min="0" step="1" inputmode="numeric" value="${existing && Number(existing.gradeNumber)>0?esc(existing.gradeNumber):'0'}" placeholder="0"><small style="display:block;color:#8299a6;font-size:.72rem;margin-top:4px">اتركه صفرًا أو فارغًا ليظهر اسم الفصل فقط</small></div>
           <input id="cNum" type="hidden" value="${existing? esc(existing.number):''}">
         </div>
         ${existing ? `
@@ -1543,10 +1579,12 @@ function openClassModal(existing){
           <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
           <div class="row-actions">
             <button class="icon-btn" data-edit-student-inline="${s.id}">✎</button>
+            <button class="icon-btn" data-move-student-inline="${s.id}" title="نقل الطالبة إلى فصل آخر" aria-label="نقل ${esc(s.name)} إلى فصل آخر">↔</button>
             <button class="icon-btn del" data-del-student-inline="${s.id}">🗑</button>
           </div>
         </div>`).join('') || `<div class="empty"><b>لا توجد طالبات مطابقة</b></div>`;
       document.querySelectorAll('[data-edit-student-inline]').forEach(b=> b.onclick = ()=> openStudentFormModal(existing.id, store.students.find(s=>s.id===b.dataset.editStudentInline), ()=> drawEditStudents(document.getElementById('editSearchS').value.trim())));
+      document.querySelectorAll('[data-move-student-inline]').forEach(b=> b.onclick = ()=> openStudentMoveModal(b.dataset.moveStudentInline, ()=> drawEditStudents(document.getElementById('editSearchS').value.trim())));
       document.querySelectorAll('[data-del-student-inline]').forEach(b=> b.onclick = async ()=>{
         if(!confirm('حذف هذا الطالب/ة؟')) return;
         const snapshot=cloneStoreSnapshot();
@@ -1621,26 +1659,30 @@ function openClassModal(existing){
 
   const classNameInput=document.getElementById('cName');
   const classNumberInput=document.getElementById('cNum');
+  const classGradeInput=document.getElementById('cGrade');
   if(existing) classNameInput.value=cleanClassName(existing.name, existing.number);
   if(existing) classNumberInput.value=existing.number;
   document.getElementById('save').onclick = async ()=>{
     const name = classNameInput.value.trim();
+    const gradeRaw=String(classGradeInput.value||'').trim();
+    const gradeNumber=gradeRaw===''?0:Number(gradeRaw);
     let number = existing ? String(existing.number||'').trim() : nextClassNumber(name);
     if(!name){ toast('يرجى إدخال اسم الصف', true); return; }
+    if(!/^\d+$/.test(gradeRaw||'0') || !Number.isSafeInteger(gradeNumber) || gradeNumber<0){ toast('رقم الصف يجب أن يكون عددًا صحيحًا موجبًا أو صفرًا', true); return; }
     if(!number) number=nextClassNumber(name, existing && existing.id);
     if(!/^\d+$/.test(number)){ toast('رقم الفصل يجب أن يكون رقمًا صحيحًا', true); return; }
-    const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && String(c.number).trim()===number);
-    if(duplicate){ toast('هذا الصف ورقم الفصل موجودان مسبقًا', true); return; }
+    const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && Number(c.gradeNumber||0)===gradeNumber);
+    if(duplicate){ toast('هذا الفصل ورقم الصف موجودان مسبقًا', true); return; }
     const snapshot=cloneStoreSnapshot();
     if(existing){
-      existing.number = number; existing.name = name;
+      existing.number = number; existing.gradeNumber=gradeNumber; existing.name = name;
       saveStore();
       const result=await persistStoreMutation('saveClass', existing,snapshot);
       if(!result.ok){close();render();toast('تعذر حفظ تعديل الفصل في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
       toast('تم تحديث الفصل وحفظه في قاعدة البيانات');
     }else{
       const classId = uid();
-      const classObj = { id: classId, number, name };
+      const classObj = { id: classId, number, gradeNumber, name };
       const newStudents = tempStudents.map((n,i)=>({ id: uid(), classId, number: String(i+1), name: n }));
       store.classes.push(classObj);
       store.students.push(...newStudents);
@@ -1773,6 +1815,7 @@ function openStudentsModal(classId){
         <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
         <div class="row-actions">
           <button class="icon-btn" data-edit-student="${s.id}">✎</button>
+          <button class="icon-btn" data-move-student="${s.id}" title="نقل الطالبة إلى فصل آخر" aria-label="نقل ${esc(s.name)} إلى فصل آخر">↔</button>
           <button class="icon-btn del" data-del-student="${s.id}">🗑</button>
         </div>
       </div>`).join('') || `<div class="empty"><b>لا توجد طالبات</b></div>`;
@@ -1797,6 +1840,7 @@ function openStudentsModal(classId){
   document.getElementById('addS').onclick = ()=> openStudentFormModal(classId, null, ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); });
   function bindStudentRowEvents(){
     document.querySelectorAll('[data-edit-student]').forEach(b=> b.onclick = ()=> openStudentFormModal(classId, store.students.find(s=>s.id===b.dataset.editStudent), ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); }));
+    document.querySelectorAll('[data-move-student]').forEach(b=> b.onclick = ()=> openStudentMoveModal(b.dataset.moveStudent, ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); }));
     document.querySelectorAll('[data-del-student]').forEach(b=> b.onclick = async ()=>{
       if(!confirm('حذف هذا الطالب/ة؟')) return;
       const snapshot=cloneStoreSnapshot();
@@ -1818,6 +1862,43 @@ function nextStudentNumber(classId, excludeId){
   return String(Math.max(0, ...numbers)+1);
 }
 
+function openStudentMoveModal(studentId,onDone){
+  const student=store.students.find(s=>String(s.id)===String(studentId));
+  if(!student){toast('تعذر العثور على الطالبة لنقلها',true);return;}
+  const destinations=store.classes.filter(c=>String(c.id)!==String(student.classId));
+  if(!destinations.length){toast('أضيفي فصلًا آخر أولًا حتى تتمكني من نقل الطالبة',true);return;}
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`
+    <div class="overlay" id="moveStudentOverlay" style="z-index:120;">
+      <div class="modal">
+        <div class="modal-head"><h3>نقل الطالبة إلى فصل آخر</h3><button class="modal-close" id="closeMoveStudent" aria-label="إغلاق">✕</button></div>
+        <div class="modal-body">
+          <p style="margin-top:0"><b>${esc(student.name)}</b></p>
+          <div class="field"><label for="moveStudentClass">الفصل الجديد</label><select id="moveStudentClass">${destinations.map(c=>`<option value="${esc(c.id)}">${esc(classDisplayName(c))}</option>`).join('')}</select></div>
+          <p style="color:#607d8b;font-size:.82rem;line-height:1.7;margin-bottom:0">سيُحدَّد رقمها تلقائيًا في الفصل الجديد، وتبقى سجلات الرصد السابقة محفوظة.</p>
+        </div>
+        <div class="modal-foot"><button class="btn btn-outline" id="cancelMoveStudent">إلغاء</button><button class="btn btn-primary" id="confirmMoveStudent">نقل الطالبة</button></div>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close=()=>{if(wrap.parentNode)wrap.parentNode.removeChild(wrap);};
+  wrap.querySelector('#closeMoveStudent').onclick=close;
+  wrap.querySelector('#cancelMoveStudent').onclick=close;
+  wrap.querySelector('#moveStudentOverlay').onclick=e=>{if(e.target.id==='moveStudentOverlay')close();};
+  wrap.querySelector('#confirmMoveStudent').onclick=async()=>{
+    const targetClassId=wrap.querySelector('#moveStudentClass').value;
+    const targetClass=store.classes.find(c=>String(c.id)===String(targetClassId));
+    const current=store.students.find(s=>String(s.id)===String(studentId));
+    if(!targetClass||!current){toast('تعذر العثور على الفصل أو الطالبة',true);return;}
+    const button=wrap.querySelector('#confirmMoveStudent');button.disabled=true;
+    const snapshot=cloneStoreSnapshot();
+    const updated=Object.assign({},current,{classId:targetClass.id,number:nextStudentNumber(targetClass.id,current.id)});
+    const result=await persistStoreMutation('saveStudent',updated,snapshot);
+    if(!result.ok){button.disabled=false;toast('تعذر نقل الطالبة إلى الفصل الجديد؛ أُعيدت البيانات كما كانت',true);return;}
+    close();onDone&&onDone();renderTopnav();toast(`تم نقل ${current.name} إلى ${classDisplayName(targetClass)} مع ترقيمها تلقائيًا`);
+  };
+}
+
 function openStudentFormModal(classId, existing, onDone){
   const host = document.getElementById('modalHost');
   const prevHTML = host.innerHTML;
@@ -1829,10 +1910,7 @@ function openStudentFormModal(classId, existing, onDone){
       <div class="modal-head"><h3>${existing?'تعديل طالبة':'إضافة طالبة'}</h3><button class="modal-close" id="cl2">✕</button></div>
       <div class="modal-body">
         <div class="field"><label>الفصل</label><select id="sClass">${classOptions}</select></div>
-        <div class="two-col">
-          <div class="field"><label>رقم الطالب/ة</label><input id="sNum" value="${existing?esc(existing.number):esc(nextStudentNumber(classId))}" readonly><small style="display:block;color:#8299a6;font-size:.72rem;margin-top:4px;">يُحدد تلقائياً حسب ترتيب الفصل</small></div>
-          <div class="field"><label>الاسم الكامل</label><input id="sName" value="${existing?esc(existing.name):''}"></div>
-        </div>
+        <div class="field"><label>الاسم الكامل</label><input id="sName" value="${existing?esc(existing.name):''}"></div>
         <div class="field"><label>رقم جوال ولي الأمر <span style="color:#8299a6;font-weight:500;">(اختياري)</span></label><input id="sGuardian" inputmode="tel" placeholder="05xxxxxxxx" value="${existing?esc(guardianPhoneForStudent(existing)):''}"></div>
       </div>
       <div class="modal-foot"><button class="btn btn-outline" id="cancel2">إلغاء</button><button class="btn btn-primary" id="save2">حفظ</button></div>
@@ -1843,14 +1921,6 @@ function openStudentFormModal(classId, existing, onDone){
   wrap.querySelector('#cl2').onclick = close;
   wrap.querySelector('#cancel2').onclick = close;
   wrap.querySelector('#ov2').onclick = (e)=>{ if(e.target.id==='ov2') close(); };
-  wrap.querySelector('#sClass').onchange = ()=>{
-    const selectedClassId = wrap.querySelector('#sClass').value;
-    if(!existing || selectedClassId!==existing.classId){
-      wrap.querySelector('#sNum').value = nextStudentNumber(selectedClassId, existing&&existing.id);
-    }else{
-      wrap.querySelector('#sNum').value = existing.number;
-    }
-  };
   wrap.querySelector('#save2').onclick = async ()=>{
     const name = wrap.querySelector('#sName').value.trim();
     const clsId = wrap.querySelector('#sClass').value;
@@ -1896,7 +1966,7 @@ function viewScan(classId){
   <div class="scan-wrap">
     ${session ? `<button class="btn btn-outline" style="margin-bottom:14px;" onclick="navigate('dashboard')">→ العودة للوحة التحكم</button>` : ''}
     <div class="scan-head glow">
-      <h2>رصد الغياب والحضور — فصل ${esc(cls.name)}</h2>
+      <h2>رصد الغياب والحضور — فصل ${esc(classDisplayName(cls))}</h2>
       <p>${esc(SCHOOL_NAME)} — ${todayStr()}</p>
       <div class="teacher-field" style="display:flex; gap:8px; align-items:stretch;">
         <input id="teacherSelect" list="teacherNamesList" placeholder="اسم المعلم/ة (اختياري)" value="${esc(defaultTeacher)}" autocomplete="off" style="flex:1;">
@@ -1933,7 +2003,7 @@ function viewScanConfirm(cls, att){
     <div class="confirm-wrap">
       <div class="confirm-icon">✔</div>
       <h2>تم رصد الغياب بنجاح</h2>
-      <p style="color:#5b7382; font-size:.85rem;">فصل ${esc(cls.name)} — رصدتها: ${esc(att.teacher||'—')} — الساعة ${esc(att.time||'')}</p>
+      <p style="color:#5b7382; font-size:.85rem;">فصل ${esc(classDisplayName(cls))} — رصدتها: ${esc(att.teacher||'—')} — الساعة ${esc(att.time||'')}</p>
       <div class="confirm-nums">
         <div class="cn"><b>${present}</b>حاضر/ة</div>
         <div class="cn absent"><b>${absentees.length}</b>غائب/ة</div>
@@ -2429,7 +2499,7 @@ async function printAllClassesAbsenceReport(){
     rows=sortAbsentFirst(rows);
     const absentCount=rows.filter(r=>statusRank(r.status)===0).length; totalAbsent+=absentCount;
     const color=st=>statusRank(st)===0?'#dc2626':statusRank(st)===1?'#16a34a':'#8299a6';
-    sections+=`<section style="page-break-after:always;margin-bottom:25px;"><h2>${esc(cls.name)}</h2><p>${esc(SCHOOL_NAME)} — التاريخ: ${esc(date)} — الغياب: <b>${absentCount}</b> من ${rows.length}</p><table style="width:100%;border-collapse:collapse;" border="1" cellpadding="7"><thead><tr><th>#</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${rows.map((r,j)=>`<tr><td>${j+1}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td style="color:${color(r.status)};font-weight:700;">${esc(r.status)}</td></tr>`).join('')}</tbody></table></section>`;
+    sections+=`<section style="page-break-after:always;margin-bottom:25px;"><h2>${esc(classDisplayName(cls))}</h2><p>${esc(SCHOOL_NAME)} — التاريخ: ${esc(date)} — الغياب: <b>${absentCount}</b> من ${rows.length}</p><table style="width:100%;border-collapse:collapse;" border="1" cellpadding="7"><thead><tr><th>#</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${rows.map((r,j)=>`<tr><td>${j+1}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td style="color:${color(r.status)};font-weight:700;">${esc(r.status)}</td></tr>`).join('')}</tbody></table></section>`;
   });
   printElement(`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain;"><div><h1 style="color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2>تقرير الغياب — جميع الفصول</h2><p>التاريخ الميلادي: ${reportGregorianForDate(date)} — التاريخ الهجري: ${reportHijriForDate(date)} — الساعة: ${nowTimeStr()}</p><p>التاريخ: ${esc(date)} — إجمالي الغياب: <b>${totalAbsent}</b></p></div></header>${sections}${reportSignatureFooter()}`,`تقرير غياب جميع الفصول — ${date}`);
 }
@@ -2522,10 +2592,10 @@ function exportClassExcel(classId){
     };
   });
   const sign=store.reportSignatures||{};
-  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+cls.name],['التاريخ الميلادي: '+reportDateLabels().greg],['التاريخ الهجري: '+reportDateLabels().hijri],['الساعة: '+nowTimeStr()],[],['رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r['رقم الطالب/ة'],r['اسم الطالب/ة'],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']]);
+  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+classDisplayName(cls)],['التاريخ الميلادي: '+reportDateLabels().greg],['التاريخ الهجري: '+reportDateLabels().hijri],['الساعة: '+nowTimeStr()],[],['رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r['رقم الطالب/ة'],r['اسم الطالب/ة'],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'الغياب');
-  XLSX.writeFile(wb, `تقرير_غياب_${cls.name}_${todayStr()}.xlsx`);
+  XLSX.writeFile(wb, `تقرير_غياب_${classDisplayName(cls)}_${todayStr()}.xlsx`);
 }
 function exportClassPDF(classId){
   const cls = store.classes.find(c=>c.id===classId);
@@ -2541,7 +2611,7 @@ function exportClassPDF(classId){
   }).join('');
   const html = `
   <div style="font-family:'Cairo',sans-serif; direction:rtl; padding:10px;">
-    <header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain;"><div><h1 style="font-size:22px;color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2 style="color:#102a43;margin:5px 0;">تقرير غياب — ${esc(cls.name)}</h2></div></header>
+    <header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain;"><div><h1 style="font-size:22px;color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2 style="color:#102a43;margin:5px 0;">تقرير غياب — ${esc(classDisplayName(cls))}</h2></div></header>
     <p style="color:#555; font-size:13px;">${esc(SCHOOL_NAME)} — التاريخ الميلادي: ${reportDateLabels().greg} — التاريخ الهجري: ${reportDateLabels().hijri} — الساعة: ${nowTimeStr()} ${att? '— المعلمة: '+esc(att.teacher)+' — وقت الرصد: '+esc(att.time):''}</p>
     <table style="width:100%; border-collapse:collapse; margin-top:14px;" border="1" cellpadding="8">
       <thead style="background:#102a43; color:#fff;"><tr><th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead>
@@ -2549,7 +2619,7 @@ function exportClassPDF(classId){
     </table>
     ${reportSignatureFooter()}
   </div>`;
-  printElement(html, `تقرير غياب ${cls.name}`);
+  printElement(html, `تقرير غياب ${classDisplayName(cls)}`);
 }
 
 /* ==========================================================================
