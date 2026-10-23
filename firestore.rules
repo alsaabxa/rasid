@@ -2,26 +2,166 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isOwner() {
-      return request.auth != null && request.auth.token.email == 'ahiixd6@gmail.com';
+      return request.auth != null
+        && request.auth.token.email == 'ahiixd6@gmail.com'
+        && request.auth.token.email_verified == true;
     }
+
     function profile(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
-    match /users/{uid} {
-      allow create: if request.auth != null && request.auth.uid == uid
+
+    function isApprovedSchool(schoolId) {
+      return request.auth != null
+        && profile(request.auth.uid).status == 'approved'
+        && profile(request.auth.uid).schoolId == schoolId;
+    }
+
+    function trialAllowsAccess(schoolId) {
+      let schoolPath = /databases/$(database)/documents/schools/$(schoolId);
+      return exists(schoolPath) && trialIsOpen(schoolPath);
+    }
+
+    function trialIsOpen(schoolPath) {
+      let school = get(schoolPath).data;
+      let hasTrialStatus = school.keys().hasAny(['trialStatus']);
+      let hasTrialEnd = school.keys().hasAny(['trialEndsAt']);
+      return (!hasTrialStatus || school.trialStatus != 'cancelled')
+        && (!hasTrialEnd || request.time < school.trialEndsAt);
+    }
+
+    function validRegistration() {
+      return request.resource.data.keys().hasOnly([
+          'email', 'schoolName', 'schoolId', 'schoolType', 'status',
+          'provider', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'email', 'schoolName', 'schoolId', 'schoolType', 'status', 'createdAt'
+        ])
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.schoolName is string
+        && request.resource.data.schoolName.size() >= 2
+        && request.resource.data.schoolName.size() <= 160
+        && request.resource.data.schoolId == request.auth.uid
+        && request.resource.data.schoolType in ['boys', 'girls']
         && request.resource.data.status == 'pending'
-        && request.resource.data.schoolId == uid;
+        && request.resource.data.createdAt == request.time
+        && (!request.resource.data.keys().hasAny(['provider'])
+          || request.resource.data.provider in ['google', 'emailPassword']);
+    }
+
+    function validSchoolMeta() {
+      return request.resource.data.keys().hasOnly([
+          'kind', 'schemaVersion', 'schoolType', 'teacherNames',
+          'reportSignatures', 'revision', 'updatedAt'
+        ])
+        && request.resource.data.kind == 'meta'
+        && request.resource.data.schemaVersion == 2
+        && request.resource.data.schoolType in ['boys', 'girls']
+        && request.resource.data.teacherNames is list
+        && request.resource.data.teacherNames.size() <= 500
+        && request.resource.data.reportSignatures is map
+        && request.resource.data.reportSignatures.keys().hasOnly(['manager', 'attendance'])
+        && request.resource.data.revision is int;
+    }
+
+    function validSchoolRecord() {
+      return request.resource.data.keys().hasOnly([
+          'kind', 'recordType', 'record', 'order', 'schemaVersion', 'updatedAt'
+        ])
+        && request.resource.data.kind == 'record'
+        && request.resource.data.recordType in [
+          'classes', 'students', 'staff', 'attendance', 'guardians', 'whatsappContacts'
+        ]
+        && request.resource.data.record is map
+        && request.resource.data.order is int
+        && request.resource.data.order >= 0
+        && request.resource.data.order <= 100000
+        && request.resource.data.schemaVersion == 2;
+    }
+
+    function validPrivateWrite(docId) {
+      return (docId == 'appMeta' && validSchoolMeta())
+        || (docId.matches('v2_(classes|students|staff|attendance|guardians|whatsappContacts)_.+')
+          && validSchoolRecord());
+    }
+
+    function validSchoolMessage(schoolId, messageId) {
+      return request.resource.data.keys().hasOnly([
+          'subject', 'body', 'category', 'senderRole', 'senderLabel',
+          'sentAt', 'readAt', 'schemaVersion', 'attachment'
+        ])
+        && request.resource.data.keys().hasAll([
+          'subject', 'body', 'category', 'senderRole', 'senderLabel',
+          'sentAt', 'readAt', 'schemaVersion'
+        ])
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() >= 1
+        && request.resource.data.subject.size() <= 160
+        && request.resource.data.body is string
+        && request.resource.data.body.size() >= 1
+        && request.resource.data.body.size() <= 5000
+        && request.resource.data.category in ['update', 'request', 'alert']
+        && request.resource.data.senderRole in ['support', 'admin']
+        && request.resource.data.senderLabel in ['دعم راصد', 'إدارة المنصة']
+        && ((request.resource.data.senderRole == 'support'
+            && request.resource.data.senderLabel == 'دعم راصد')
+          || (request.resource.data.senderRole == 'admin'
+            && request.resource.data.senderLabel == 'إدارة المنصة'))
+        && request.resource.data.sentAt == request.time
+        && request.resource.data.readAt == null
+        && request.resource.data.schemaVersion == 1
+        && (!request.resource.data.keys().hasAny(['attachment'])
+          || (request.resource.data.attachment is map
+            && request.resource.data.attachment.keys().hasOnly(['name', 'contentType', 'size', 'path'])
+            && request.resource.data.attachment.keys().hasAll(['name', 'contentType', 'size', 'path'])
+            && request.resource.data.attachment.name is string
+            && request.resource.data.attachment.name.size() >= 1
+            && request.resource.data.attachment.name.size() <= 180
+            && request.resource.data.attachment.contentType in ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+            && request.resource.data.attachment.size is int
+            && request.resource.data.attachment.size > 0
+            && request.resource.data.attachment.size <= 10485760
+            && request.resource.data.attachment.path is string
+            && request.resource.data.attachment.path.split('/').size() == 4
+            && request.resource.data.attachment.path.split('/')[0] == 'school-messages'
+            && request.resource.data.attachment.path.split('/')[1] == schoolId
+            && request.resource.data.attachment.path.split('/')[2] == messageId));
+    }
+
+    match /users/{uid} {
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && validRegistration();
       allow get: if request.auth != null && (request.auth.uid == uid || isOwner());
       allow list: if isOwner();
       allow update, delete: if isOwner();
     }
+
     match /schools/{schoolId} {
-      allow read, write: if isOwner();
+      allow get: if isOwner() || isApprovedSchool(schoolId);
+      allow list, create, update, delete: if isOwner();
       match /private/{docId} {
-        allow read, write: if request.auth != null && (
-          isOwner() || (profile(request.auth.uid).status == 'approved'
-            && profile(request.auth.uid).schoolId == schoolId)
-        );
+        allow read: if isOwner()
+          || (isApprovedSchool(schoolId) && trialAllowsAccess(schoolId));
+        allow create, update: if isOwner()
+          || (isApprovedSchool(schoolId)
+            && trialAllowsAccess(schoolId)
+            && validPrivateWrite(docId));
+        allow delete: if isOwner()
+          || (isApprovedSchool(schoolId) && trialAllowsAccess(schoolId));
+      }
+      match /messages/{messageId} {
+        allow get, list: if isOwner()
+          || isApprovedSchool(schoolId);
+        allow create: if isOwner() && validSchoolMessage(schoolId, messageId);
+        allow update: if isOwner()
+          || (isApprovedSchool(schoolId)
+            && resource.data.readAt == null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+            && request.resource.data.readAt == request.time);
+        allow delete: if isOwner() || isApprovedSchool(schoolId);
       }
     }
   }

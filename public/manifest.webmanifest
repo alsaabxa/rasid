@@ -1,0 +1,37 @@
+{
+  "id": "/",
+  "name": "منصة راصد للغياب",
+  "short_name": "راصد",
+  "description": "منصة متابعة الحضور والغياب للمدارس",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#102a43",
+  "background_color": "#f3f8f8",
+  "icons": [
+    {
+      "src": "/assets/rasid-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/rasid-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "إدارة المدارس",
+      "short_name": "الإدارة",
+      "url": "/admin",
+      "icons": [{"src": "/assets/rasid-icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    }
+  ]
+}

@@ -1,63 +1,45 @@
 {
-  "hosting": [
-    {
-      "target": "rasid-main",
-      "public": ".",
-      "ignore": [
-        "firebase.json",
-        "firestore.rules",
-        "README.md",
-        ".firebaserc",
-        ".*",
-        "**/node_modules/**"
-      ],
-      "cleanUrls": true,
-      "headers": [
-        {
-          "source": "**",
-          "headers": [
-            {
-              "key": "X-Content-Type-Options",
-              "value": "nosniff"
-            },
-            {
-              "key": "Referrer-Policy",
-              "value": "strict-origin-when-cross-origin"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "target": "rasid-legacy",
-      "public": ".",
-      "ignore": [
-        "firebase.json",
-        "firestore.rules",
-        "README.md",
-        ".firebaserc",
-        ".*",
-        "**/node_modules/**"
-      ],
-      "cleanUrls": true,
-      "headers": [
-        {
-          "source": "**",
-          "headers": [
-            {
-              "key": "X-Content-Type-Options",
-              "value": "nosniff"
-            },
-            {
-              "key": "Referrer-Policy",
-              "value": "strict-origin-when-cross-origin"
-            }
-          ]
-        }
-      ]
-    }
-  ],
+  "hosting": {
+    "site": "rasid-n2026",
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "README.md",
+      ".firebaserc",
+      ".*",
+      "**/node_modules/**"
+    ],
+    "cleanUrls": true,
+    "headers": [
+      {
+        "source": "/service-worker.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          }
+        ]
+      }
+    ]
+  },
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

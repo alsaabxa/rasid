@@ -1,0 +1,47 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return signedIn()
+        && request.auth.token.email == 'ahiixd6@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isApprovedSchool(schoolId) {
+      return signedIn()
+        && firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.status == 'approved'
+        && firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.schoolId == schoolId;
+    }
+
+    function isRegisteredMessageAttachment(schoolId, messageId, fileName) {
+      return firestore.get(
+        /databases/(default)/documents/schools/$(schoolId)/messages/$(messageId)
+      ).data.attachment.path
+        == 'school-messages/' + schoolId + '/' + messageId + '/' + fileName;
+    }
+
+    match /school-messages/{schoolId}/{messageId}/{fileName} {
+      allow read: if isOwner()
+        || (isApprovedSchool(schoolId)
+          && isRegisteredMessageAttachment(schoolId, messageId, fileName));
+      allow create: if isOwner()
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in [
+          'application/pdf', 'image/jpeg', 'image/png', 'image/webp'
+        ];
+      allow update: if false;
+      allow delete: if isOwner()
+        || (isApprovedSchool(schoolId)
+          && isRegisteredMessageAttachment(schoolId, messageId, fileName));
+    }
+  }
+}

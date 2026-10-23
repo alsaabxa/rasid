@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#102a43"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/assets/rasid-icon-192.png">
+<title>إدارة المدارس — راصد</title>
+<script>
+let rasidInstallPrompt=null;
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();rasidInstallPrompt=event;document.documentElement.classList.add('pwa-install-available');});
+window.addEventListener('appinstalled',()=>{rasidInstallPrompt=null;document.documentElement.classList.remove('pwa-install-available');});
+async function installRasidApp(){if(!rasidInstallPrompt)return;rasidInstallPrompt.prompt();await rasidInstallPrompt.userChoice;rasidInstallPrompt=null;document.documentElement.classList.remove('pwa-install-available');}
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#102a43;--teal:#0f766e;--line:#dbe6ec;--muted:#607d8b;--bg:#f3f8f8;--red:#b91c1c;--green:#15803d}*{box-sizing:border-box}body{font-family:Cairo,sans-serif;background:radial-gradient(ellipse at 85% 0,#d7f1eb 0,transparent 32%),var(--bg);color:#183247;margin:0;padding:24px}.shell{max-width:1180px;margin:0 auto}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 8px 28px #102a4310;margin-bottom:18px}h1,h2,h3{color:var(--navy);margin-top:0}.muted{color:var(--muted);font-size:.9rem}.field{margin:12px 0}.field input,.field select,.field textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:9px;font:inherit}.field textarea{min-height:120px;resize:vertical}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}button{font:inherit;border:0;border-radius:9px;padding:9px 15px;background:var(--teal);color:white;cursor:pointer;margin:2px}button:hover{filter:brightness(.95)}button:disabled{opacity:.55;cursor:wait}.secondary{background:#e7f0f1;color:var(--navy)}.danger{background:var(--red)}.success{background:var(--green)}.dashboard{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:16px 0}.metric{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:16px;padding:18px;background:linear-gradient(145deg,#fff,#f6fbfa);box-shadow:0 6px 18px #102a4308}.metric:after{content:"";position:absolute;width:90px;height:90px;border-radius:50%;background:#0f766e0c;left:-26px;bottom:-36px}.metric b{display:block;font-size:2rem;color:var(--teal);line-height:1.3;margin-top:8px}.section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 10px}.row{border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:14px;background:#fff}.row-info{min-width:0}.row-info b{display:block;color:var(--navy)}.row-info .muted{overflow-wrap:anywhere}.badge{display:inline-block;border-radius:99px;padding:3px 10px;font-size:.76rem;font-weight:700;background:#e8f5ec;color:var(--green);margin-top:6px}.badge.off{background:#fee2e2;color:var(--red)}#message{color:var(--navy);background:#e7f0f1;border-radius:9px;padding:10px 12px;min-height:0;margin-top:12px}#message:empty{display:none}.login{max-width:500px;margin:8vh auto}.dashboard-hero{padding:24px;background:linear-gradient(120deg,#102a43,#0f766e);color:#fff;border:0}.dashboard-hero h1,.dashboard-hero .muted{color:#fff}.dashboard-hero .muted{opacity:.82}.file-note{font-size:.8rem;color:var(--muted);margin-top:5px}.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.summary-tile{position:relative;display:block;min-height:96px;padding:13px 15px;border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:0 4px 14px #102a4308}.summary-tile .muted{display:block;font-size:.78rem;line-height:1.35}.summary-tile b{display:block;color:var(--teal);font-size:1.6rem;line-height:1.2;margin:4px 0}.admin-tabs{display:flex;gap:7px;overflow-x:auto;padding:4px 2px 10px;margin:2px 0 8px}.admin-tab{flex:0 0 auto;display:flex;align-items:center;gap:8px;background:#e7f0f1;color:var(--navy);border:1px solid transparent;padding:9px 13px}.admin-tab[aria-selected="true"]{background:var(--navy);color:#fff}.tab-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:#d1fae5;color:#065f46;font-size:.78rem;font-weight:800}.admin-tab[aria-selected="true"] .tab-count{background:#fff;color:var(--teal)}.admin-panel[hidden]{display:none!important}.request-bell{position:relative;width:42px;height:42px;padding:8px;display:grid;place-items:center;background:#ffffff20;color:#fff;border:1px solid #ffffff45}.request-bell svg{width:22px;height:22px}.bell-count{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 5px;display:grid;place-items:center;border:2px solid #102a43;border-radius:99px;background:#dc2626;color:white;font-size:.7rem;font-weight:800}.bell-count[hidden]{display:none!important}@media(max-width:760px){body{padding:12px}.card{padding:16px}.dashboard{grid-template-columns:1fr}.summary-grid{gap:7px}.summary-tile{min-height:88px;padding:10px 9px}.summary-tile .muted{font-size:.7rem}.summary-tile b{font-size:1.4rem}.row{align-items:flex-start;flex-direction:column}.actions{width:100%}.actions button{flex:1}}
+</style>
+</head>
+<body><main class="shell">
+<section class="card login" id="loginCard"><h1>إدارة المدارس</h1><p class="muted">سجّل ببريد مدير المنصة الموثّق في Firebase.</p><div class="field"><input id="email" type="email" placeholder="البريد الإلكتروني" autocomplete="username"></div><div class="field"><input id="password" type="password" placeholder="كلمة المرور" autocomplete="current-password"></div><div class="actions"><button id="signIn">دخول الإدارة</button><button class="secondary" id="googleSignIn" type="button">دخول المالك باستخدام Google</button><button class="secondary pwa-install-btn" id="installAppLogin" type="button" hidden>تثبيت التطبيق</button></div></section>
+<section id="panel" hidden>
+  <header class="card toolbar dashboard-hero"><div><h1 style="margin-bottom:3px">لوحة إدارة المدارس</h1><span class="muted">متابعة الطلبات والمدارس المعتمدة وحالة الحسابات</span></div><div class="actions"><button class="request-bell" id="requestBell" type="button" aria-label="طلبات المدارس" title="طلبات المدارس"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><span class="bell-count" id="pendingBellCount" hidden>0</span></button><button class="secondary pwa-install-btn" id="installAppPanel" type="button" hidden>تثبيت التطبيق</button><button class="secondary" id="reload">تحديث البيانات</button><button class="danger" id="signOut">خروج</button></div></header>
+  <div class="summary-grid" aria-label="ملخص المدارس"><div class="summary-tile"><span class="muted">طلبات بانتظار المراجعة</span><b id="pendingCount">—</b><span class="muted">تحتاج إلى مراجعتك</span></div><div class="summary-tile"><span class="muted">مدارس مفعّلة</span><b id="activeCount">—</b><span class="muted">تستطيع استخدام المنصة</span></div><div class="summary-tile"><span class="muted">مدارس موقوفة</span><b id="disabledCount">—</b><span class="muted">بياناتها محفوظة</span></div></div>
+  <nav class="admin-tabs" role="tablist" aria-label="أقسام الإدارة"><button class="admin-tab" id="tabPending" type="button" role="tab" data-admin-tab="pending" aria-controls="pendingPanel" aria-selected="true">طلبات المدارس <span class="tab-count" id="pendingTabCount">0</span></button><button class="admin-tab" id="tabApproved" type="button" role="tab" data-admin-tab="approved" aria-controls="approvedPanel" aria-selected="false">المدارس المعتمدة</button><button class="admin-tab" id="tabDisabled" type="button" role="tab" data-admin-tab="disabled" aria-controls="disabledPanel" aria-selected="false">المدارس الموقوفة</button><button class="admin-tab" id="tabMessages" type="button" role="tab" data-admin-tab="messages" aria-controls="messagesPanel" aria-selected="false">الرسائل</button></nav>
+  <section class="card admin-panel" id="pendingPanel" role="tabpanel" aria-labelledby="tabPending" data-admin-panel="pending"><div class="section-title"><h2>طلبات المدارس</h2></div><div id="pendingSchools"></div></section>
+  <section class="card admin-panel" id="approvedPanel" role="tabpanel" aria-labelledby="tabApproved" data-admin-panel="approved" hidden><div class="section-title"><h2>المدارس المعتمدة</h2></div><div id="activeSchools"></div></section>
+  <section class="card admin-panel" id="disabledPanel" role="tabpanel" aria-labelledby="tabDisabled" data-admin-panel="disabled" hidden><div class="section-title"><h2>المدارس الموقوفة</h2></div><div id="disabledSchools"></div></section>
+  <section class="card admin-panel" id="messagesPanel" role="tabpanel" aria-labelledby="tabMessages" data-admin-panel="messages" hidden><div class="section-title"><h2>إرسال رسالة إلى مدرسة</h2></div><p class="muted">تظهر الرسالة في صندوق الوارد داخل حساب المدرسة.</p><div class="field"><label for="messageRecipient">المدرسة المستقبلة</label><select id="messageRecipient"><option value="">جارٍ تحميل المدارس…</option></select></div><div class="dashboard" style="grid-template-columns:repeat(2,minmax(0,1fr));margin:0"><div class="field"><label for="messageSender">المرسل</label><select id="messageSender"><option value="admin">إدارة المنصة</option><option value="support">دعم راصد</option></select></div><div class="field"><label for="messageCategory">نوع الرسالة</label><select id="messageCategory"><option value="update">تحديث</option><option value="request">طلب</option><option value="alert">تنبيه</option></select></div></div><div class="field"><label for="messageSubject">العنوان</label><input id="messageSubject" maxlength="160" placeholder="عنوان مختصر"></div><div class="field"><label for="messageBody">نص الرسالة</label><textarea id="messageBody" maxlength="5000" placeholder="اكتب تفاصيل الرسالة للمدرسة"></textarea></div><div class="field"><label for="messageAttachment">مرفق اختياري</label><input id="messageAttachment" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"><div class="file-note">PDF أو صورة (PNG، JPG، WebP)، حتى 10 ميجابايت.</div></div><button id="sendSchoolMessage">إرسال الرسالة</button></section>
+</section>
+<p id="message" role="status" aria-live="polite"></p>
+</main>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="./firebase-config.js"></script>
+<script>
+let auth,db,storage,activeSchoolProfiles=[],pendingRequestsUnsubscribe=null;
+try{const adminApp=firebase.initializeApp(window.RASID_FIREBASE_CONFIG,'rasid-admin');auth=adminApp.auth();db=adminApp.firestore();storage=adminApp.storage()}catch(e){document.querySelector('#message').textContent='تعذر تهيئة Firebase. تحقق من إعداد المشروع.'}
+const owner='ahiixd6@gmail.com',msg=t=>document.querySelector('#message').textContent=t,el=id=>document.getElementById(id);
+window.addEventListener('beforeinstallprompt',()=>{['installAppLogin','installAppPanel'].forEach(id=>{const b=el(id);if(b)b.hidden=false})});
+window.addEventListener('appinstalled',()=>{['installAppLogin','installAppPanel'].forEach(id=>{const b=el(id);if(b)b.hidden=true})});
+['installAppLogin','installAppPanel'].forEach(id=>{const b=el(id);if(b)b.onclick=installRasidApp});
+if(rasidInstallPrompt)['installAppLogin','installAppPanel'].forEach(id=>{const b=el(id);if(b)b.hidden=false});
+auth&&auth.onAuthStateChanged(u=>{
+  const matchesOwner=u&&u.email&&u.email.toLowerCase()===owner,ok=!!(matchesOwner&&u.emailVerified);
+  el('loginCard').hidden=ok;el('panel').hidden=!ok;
+  if(!ok&&pendingRequestsUnsubscribe){pendingRequestsUnsubscribe();pendingRequestsUnsubscribe=null}
+  if(u&&!matchesOwner){auth.signOut();msg('هذا الحساب لا يملك صلاحية إدارة المنصة.');return}
+  if(matchesOwner&&!u.emailVerified){auth.signOut();msg('تحقق من بريد مدير المنصة قبل إدارة الطلبات.');return}
+  if(ok){load();watchPendingRequests()}
+});
+auth&&auth.getRedirectResult().catch(e=>msg('تعذر الدخول باستخدام Google: '+e.message));
+el('signIn').onclick=async()=>{try{await auth.signInWithEmailAndPassword(el('email').value.trim(),el('password').value)}catch(e){msg('تعذر الدخول: '+e.message)}};
+el('googleSignIn').onclick=async()=>{try{await auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider())}catch(e){msg('تعذر الدخول باستخدام Google: '+e.message)}};
+el('signOut').onclick=()=>auth.signOut();el('reload').onclick=load;
+function activateAdminTab(name){
+  document.querySelectorAll('[data-admin-tab]').forEach(button=>{const active=button.dataset.adminTab===name;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1});
+  document.querySelectorAll('[data-admin-panel]').forEach(panel=>{panel.hidden=panel.dataset.adminPanel!==name});
+}
+document.querySelectorAll('[data-admin-tab]').forEach(button=>button.onclick=()=>activateAdminTab(button.dataset.adminTab));
+el('requestBell').onclick=()=>{activateAdminTab('pending');el('pendingPanel').scrollIntoView({behavior:'smooth',block:'start'})};
+function updateRequestCount(count){
+  const value=Number(count)||0;el('pendingCount').textContent=String(value);el('pendingTabCount').textContent=String(value);
+  const badge=el('pendingBellCount');badge.textContent=String(value);badge.hidden=value===0;
+  el('requestBell').setAttribute('aria-label',value?`طلبات المدارس الجديدة: ${value}`:'طلبات المدارس');
+}
+function watchPendingRequests(){
+  if(pendingRequestsUnsubscribe||!db)return;
+  pendingRequestsUnsubscribe=db.collection('users').where('status','==','pending').onSnapshot(snapshot=>{
+    updateRequestCount(snapshot.size);renderList('pendingSchools',snapshot,'pending','لا توجد طلبات جديدة.');
+  },error=>console.warn('تعذر تحديث تنبيهات طلبات المدارس مباشرة:',error));
+}
+function emptyMessage(root,text){root.replaceChildren();const p=document.createElement('p');p.className='muted';p.textContent=text;root.append(p)}
+function schoolRow(doc,status){
+  const p=doc.data()||{},row=document.createElement('article');row.className='row';
+  const info=document.createElement('div');info.className='row-info';
+  const title=document.createElement('b');title.textContent=p.schoolName||p.name||'مدرسة بلا اسم';
+  const detail=document.createElement('div');detail.className='muted';detail.textContent=(p.email||'بلا بريد مسجل')+' — '+(p.schoolType==='boys'?'بنين':'بنات');
+  const badge=document.createElement('span');badge.className='badge'+(status==='disabled'?' off':'');badge.textContent=status==='disabled'?'موقوفة':status==='approved'?'مفعّلة':'بانتظار المراجعة';
+  info.append(title,detail,badge);row.append(info);
+  const actions=document.createElement('div');actions.className='actions';
+  if(status==='pending'){
+    const approve=document.createElement('button');approve.textContent='اعتماد';approve.onclick=()=>decide(doc.id,p,true);
+    const reject=document.createElement('button');reject.className='danger';reject.textContent='رفض';reject.onclick=()=>decide(doc.id,p,false);actions.append(approve,reject);
+  }else{
+    const toggle=document.createElement('button');toggle.className=status==='disabled'?'success':'danger';toggle.textContent=status==='disabled'?'تفعيل المدرسة':'إيقاف المدرسة';toggle.onclick=()=>setSchoolActive(doc.id,p,status==='disabled');
+    const reset=document.createElement('button');reset.className='secondary';reset.textContent='إرسال رابط استعادة كلمة المرور';reset.onclick=()=>sendPasswordReset(p.email);actions.append(toggle,reset);
+  }
+  row.append(actions);return row;
+}
+function renderList(rootId,snapshot,status,empty){const root=el(rootId);root.replaceChildren();if(snapshot.empty){emptyMessage(root,empty);return}snapshot.forEach(doc=>root.append(schoolRow(doc,status)))}
+function populateMessageRecipients(){
+  const select=el('messageRecipient'),current=select.value;select.replaceChildren();
+  const all=document.createElement('option');all.value='__all__';all.textContent='كل المدارس المفعّلة';select.append(all);
+  activeSchoolProfiles.forEach(p=>{const option=document.createElement('option');option.value=p.schoolId||p.id;option.textContent=p.schoolName||p.email||'مدرسة بلا اسم';select.append(option)});
+  if(current&&Array.from(select.options).some(o=>o.value===current))select.value=current;
+}
+async function load(){
+  if(!auth.currentUser||!auth.currentUser.email||auth.currentUser.email.toLowerCase()!==owner||!auth.currentUser.emailVerified)return;
+  msg('');el('reload').disabled=true;
+  try{
+    const [pending,approved,disabled]=await Promise.all([
+      db.collection('users').where('status','==','pending').get(),
+      db.collection('users').where('status','==','approved').get(),
+      db.collection('users').where('status','==','disabled').get()
+    ]);
+    updateRequestCount(pending.size);el('activeCount').textContent=String(approved.size);el('disabledCount').textContent=String(disabled.size);
+    activeSchoolProfiles=approved.docs.map(d=>({id:d.id,...(d.data()||{})}));populateMessageRecipients();
+    renderList('pendingSchools',pending,'pending','لا توجد طلبات جديدة.');renderList('activeSchools',approved,'approved','لا توجد مدارس معتمدة حاليًا.');renderList('disabledSchools',disabled,'disabled','لا توجد مدارس موقوفة.');
+  }catch(e){msg('تعذر تحميل بيانات المدارس: '+e.message)}finally{el('reload').disabled=false}
+}
+async function decide(uid,p,approved){
+  try{
+    const batch=db.batch(),userRef=db.collection('users').doc(uid),schoolRef=db.collection('schools').doc(p.schoolId||uid);
+    batch.update(userRef,{status:approved?'approved':'rejected',reviewedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    if(approved)batch.set(schoolRef,{name:p.schoolName,schoolType:p.schoolType==='boys'?'boys':'girls',ownerUid:uid,status:'approved',createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    await batch.commit();msg(approved?'تم اعتماد المدرسة.':'تم رفض الطلب.');await load();
+  }catch(e){msg('تعذر تحديث الطلب: '+e.message)}
+}
+async function setSchoolActive(uid,p,activate){
+  if(!activate&&!confirm('سيُمنع حساب المدرسة من الدخول والمزامنة حتى إعادة تفعيله. هل تريد إيقاف المدرسة؟'))return;
+  try{
+    const schoolId=p.schoolId||uid,batch=db.batch(),now=firebase.firestore.FieldValue.serverTimestamp();
+    batch.update(db.collection('users').doc(uid),{status:activate?'approved':'disabled',reviewedAt:now});
+    batch.set(db.collection('schools').doc(schoolId),{name:p.schoolName||'مدرسة',schoolType:p.schoolType==='boys'?'boys':'girls',ownerUid:uid,status:activate?'approved':'disabled',updatedAt:now},{merge:true});
+    await batch.commit();msg(activate?'تم تفعيل المدرسة.':'تم إيقاف المدرسة دون حذف بياناتها.');await load();
+  }catch(e){msg('تعذر تغيير حالة المدرسة: '+e.message)}
+}
+async function sendPasswordReset(email){
+  if(!email){msg('لا يوجد بريد إلكتروني مسجل لهذه المدرسة.');return}
+  try{await auth.sendPasswordResetEmail(email);msg('أُرسل رابط استعادة كلمة المرور إلى '+email+'. إذا كان الحساب يسجل عبر Google فقط، فليتابع الدخول باستخدام Google.');}
+  catch(e){msg(e.code==='auth/user-not-found'?'لم يوجد حساب بكلمة مرور لهذا البريد؛ يمكن للمدرسة استخدام Google إذا كانت سجلت به.':'تعذر إرسال رابط الاستعادة: '+e.message)}
+}
+el('sendSchoolMessage').onclick=async()=>{
+  const recipient=el('messageRecipient').value,subject=el('messageSubject').value.trim(),body=el('messageBody').value.trim(),senderRole=el('messageSender').value,category=el('messageCategory').value,button=el('sendSchoolMessage'),attachment=el('messageAttachment').files[0]||null;
+  if(!recipient){msg('اختر المدرسة المستقبلة أولًا.');return}if(!subject||!body){msg('أدخل عنوان الرسالة ونصها.');return}
+  const allowedTypes=['application/pdf','image/jpeg','image/png','image/webp'];
+  if(attachment&&(!allowedTypes.includes(attachment.type)||attachment.size>10*1024*1024||attachment.size===0)){msg('المرفق يجب أن يكون PDF أو صورة PNG/JPG/WebP وألا يتجاوز 10 ميجابايت.');return}
+  const recipients=recipient==='__all__'?activeSchoolProfiles:activeSchoolProfiles.filter(p=>(p.schoolId||p.id)===recipient);
+  if(!recipients.length){msg('لا توجد مدارس مفعّلة لإرسال الرسالة إليها.');return}
+  if(recipient==='__all__'&&!confirm(`سيتم إرسال الرسالة إلى ${recipients.length} مدرسة مفعّلة. متابعة؟`))return;
+  button.disabled=true;
+  try{
+    const senderLabel=senderRole==='support'?'دعم راصد':'إدارة المنصة';
+    msg(`جارٍ إرسال الرسالة إلى ${recipients.length} مدرسة…`);
+    const results=await Promise.allSettled(recipients.map(async p=>{
+      const schoolId=p.schoolId||p.id,messageRef=db.collection('schools').doc(schoolId).collection('messages').doc();
+      let attachmentMeta=null,uploadedPath=null;
+      if(attachment){
+        const extension=attachment.type==='application/pdf'?'pdf':attachment.type==='image/png'?'png':attachment.type==='image/webp'?'webp':'jpg';
+        uploadedPath=`school-messages/${schoolId}/${messageRef.id}/attachment.${extension}`;
+        try{
+          await storage.ref(uploadedPath).put(attachment,{contentType:attachment.type,customMetadata:{schoolId,messageId:messageRef.id}});
+          attachmentMeta={name:attachment.name.slice(0,180),contentType:attachment.type,size:attachment.size,path:uploadedPath};
+        }catch(uploadError){throw uploadError;}
+      }
+      try{
+        const message={subject,body,category,senderRole,senderLabel,sentAt:firebase.firestore.FieldValue.serverTimestamp(),readAt:null,schemaVersion:1};
+        if(attachmentMeta)message.attachment=attachmentMeta;
+        await messageRef.set(message);
+      }catch(writeError){if(uploadedPath)await storage.ref(uploadedPath).delete().catch(()=>{});throw writeError;}
+    }));
+    const sent=results.filter(r=>r.status==='fulfilled').length,failed=results.length-sent,errors=results.filter(r=>r.status==='rejected').map(r=>r.reason),storageFailures=attachment&&errors.length>0&&errors.every(e=>String(e&&e.code||'').startsWith('storage/'));
+    msg(storageFailures?'تعذر رفع المرفق. يلزم تفعيل Cloud Storage للمشروع ونشر قواعد الملفات أولًا. لم تُرسل الرسالة.':failed?`أُرسلت إلى ${sent} مدرسة وتعذر الإرسال إلى ${failed}. راجع المدارس المفعّلة وسجّل النتيجة قبل إعادة الإرسال.`:`تم إرسال الرسالة إلى ${sent} مدرسة.`);
+    if(!failed){el('messageSubject').value='';el('messageBody').value='';el('messageAttachment').value='';}
+  }catch(e){
+    const storageError=String(e.code||'').startsWith('storage/');
+    msg(storageError?'تعذر رفع المرفق. يلزم تفعيل Cloud Storage للمشروع ونشر قواعد الملفات أولًا. لم تُرسل الرسالة.':'تعذر إرسال الرسالة: '+e.message);
+  }finally{button.disabled=false}
+};
+</script>
+<script>if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(e=>console.warn('PWA offline shell unavailable',e)));</script>
+</body></html>

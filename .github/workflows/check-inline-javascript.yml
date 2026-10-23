@@ -46,7 +46,7 @@ jobs:
                       self.external = False
 
           parser = Scripts()
-          parser.feed(Path("index.html").read_text(encoding="utf-8"))
+          parser.feed(Path("public/index.html").read_text(encoding="utf-8"))
           if not parser.inline:
               raise SystemExit("No inline JavaScript blocks were found.")
           out = Path("/tmp/inline-js")
