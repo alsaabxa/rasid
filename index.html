@@ -1261,8 +1261,8 @@ function cleanClassName(name, number){
 }
 function classDisplayName(c){
   const name=cleanClassName(c && c.name, c && c.number);
-  const number=String(c && c.number != null ? c.number : '').trim();
-  return number ? (name ? name+' '+number : number) : String(c && c.name || '');
+  const gradeNumber=String(c && c.gradeNumber != null ? c.gradeNumber : '').trim();
+  return gradeNumber ? name+' '+gradeNumber : String(c && c.name || '');
 }
 function nextClassNumber(className, excludeId){
   const target=String(className || '').trim().toLocaleLowerCase();
@@ -1286,7 +1286,7 @@ function openClassModal(existing){
       <div class="modal-body">
         <div class="two-col">
           <div class="field"><label>اسم الصف</label><input id="cName" value="${existing? esc(cleanClassName(existing.name, existing.number)):''}" placeholder="مثال: أول متوسط"></div>
-          <div class="field"><label>رقم الفصل</label><input id="cNum" value="${existing? esc(existing.number):''}" inputmode="numeric" placeholder="يُحدَّد تلقائيًا"></div>
+          <div class="field"><label>رقم الصف (اختياري)</label><input id="cGradeNum" value="${existing? esc(existing.gradeNumber||''):''}" inputmode="numeric" placeholder="مثال: 1"></div>
         </div>
         ${existing ? `
         <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
@@ -1429,36 +1429,26 @@ function openClassModal(existing){
   }
 
   const classNameInput=document.getElementById('cName');
-  const classNumberInput=document.getElementById('cNum');
-  let numberManuallyEdited=false;
-  classNumberInput.addEventListener('input', ()=>{ numberManuallyEdited=true; });
-  classNameInput.addEventListener('input', ()=>{
-    if(!numberManuallyEdited && classNameInput.value.trim()){
-      classNumberInput.value=nextClassNumber(classNameInput.value.trim(), existing && existing.id);
-    } else if(!classNameInput.value.trim() && !numberManuallyEdited){
-      classNumberInput.value='';
-    }
-  });
+  const classGradeNumberInput=document.getElementById('cGradeNum');
   if(existing) classNameInput.value=cleanClassName(existing.name, existing.number);
-  if(existing) classNumberInput.value=existing.number;
   document.getElementById('save').onclick = async ()=>{
     const name = classNameInput.value.trim();
-    let number = classNumberInput.value.trim();
+    const gradeNumber = classGradeNumberInput.value.trim();
     if(!name){ toast('يرجى إدخال اسم الصف', true); return; }
-    if(!number) number=nextClassNumber(name, existing && existing.id);
-    if(!/^\d+$/.test(number)){ toast('رقم الفصل يجب أن يكون رقمًا صحيحًا', true); return; }
+    if(gradeNumber && !/^\d+$/.test(gradeNumber)){ toast('رقم الصف يجب أن يكون رقمًا صحيحًا', true); return; }
+    const number=existing ? String(existing.number) : nextClassNumber(name);
     const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && String(c.number).trim()===number);
     if(duplicate){ toast('هذا الصف ورقم الفصل موجودان مسبقًا', true); return; }
     const snapshot=cloneStoreSnapshot();
     if(existing){
-      existing.number = number; existing.name = name;
+      existing.name = name; existing.gradeNumber = gradeNumber;
       saveStore();
       const result=await persistStoreMutation('saveClass', existing,snapshot);
       if(!result.ok){close();render();toast('تعذر حفظ تعديل الفصل في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
       toast('تم تحديث الفصل وحفظه في قاعدة البيانات');
     }else{
       const classId = uid();
-      const classObj = { id: classId, number, name };
+      const classObj = { id: classId, number, name, gradeNumber };
       const newStudents = tempStudents.map((n,i)=>({ id: uid(), classId, number: String(i+1), name: n }));
       store.classes.push(classObj);
       store.students.push(...newStudents);
