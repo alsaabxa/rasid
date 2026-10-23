@@ -1492,7 +1492,7 @@ function cleanClassName(name, number){
 function classDisplayName(c){
   const name=cleanClassName(c && c.name, c && c.number);
   const grade=Number(String(c && c.gradeNumber != null ? c.gradeNumber : '').trim());
-  return Number.isSafeInteger(grade) && grade>0 ? `صف ${grade} — ${name}` : (name || String(c && c.name || ''));
+  return Number.isSafeInteger(grade) && grade>0 ? `${name} ${grade}` : (name || String(c && c.name || ''));
 }
 function nextClassNumber(className, excludeId){
   const numbers=(store.classes || []).filter(c=>!excludeId || c.id!==excludeId).map(c=>{
