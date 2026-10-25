@@ -2190,7 +2190,7 @@ async function loadPublicClass(schoolId,classId){
     if(!snap.exists)throw new Error('رابط الفصل غير مفعّل. افتحي صفحة أكواد QR من المنصة أولاً.');
     const data=snap.data()||{},studentMap=data.students||{};
     store.classes=[{id:classId,name:String(data.className||'الفصل')}];
-    store.students=Object.keys(studentMap).map(id=>({id,classId,name:String(studentMap[id]||'')}));
+    store.students=Object.keys(studentMap).map((id,index)=>({id,classId,name:String(studentMap[id]||''),number:String(index+1)}));
     store.schoolType=data.schoolType==='boys'?'boys':'girls';SCHOOL_NAME=String(data.schoolName||'مدرسة');
     route.publicMode=true;route.schoolId=schoolId;route.publicLoading=false;
     if(data.lastAttendanceDate===todayStr()){route.publicClosed=true;render();return;}
