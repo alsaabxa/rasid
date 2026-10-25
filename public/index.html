@@ -2034,8 +2034,14 @@ function viewScanConfirm(cls, att){
   </div>`;
 }
 
-function viewPublicVoteThanks(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>شكراً لمشاركتك 🌷❤️</h2><p style="color:#5b7382;margin-top:10px">تم إرسال التصويت لهذا الفصل اليوم.</p><p style="color:#5b7382;margin-top:8px">للتعديل، استخدمي منصة راصد.</p></div></div>`;}
-function viewPublicVoteClosed(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>تم تسجيل الرصد لهذا الفصل اليوم</h2><p style="margin-top:8px;color:var(--teal);font-weight:800">شكراً لكم 🌷❤️</p><p style="color:#5b7382;margin-top:8px">التعديل متاح من منصة راصد فقط.</p></div></div>`;}
+function publicAttendanceResultMarkup(){
+  const students=studentsOfClass(route.classId),absent=students.filter(st=>scanAbsentSet.has(String(st.id)));
+  const present=Math.max(0,students.length-absent.length),girl=store.schoolType!=='boys';
+  const className=(store.classes.find(c=>String(c.id)===String(route.classId))||{}).name||'الفصل';
+  return `<p style="color:#5b7382;margin-top:8px">نتيجة رصد ${esc(className)}</p><div class="confirm-counts"><div class="cn"><b>${present}</b>${girl?'حاضرة':'حاضر'}</div><div class="cn absent"><b>${absent.length}</b>${girl?'غائبة':'غائب'}</div></div>${absent.length?`<ul class="absent-names">${absent.map(st=>`<li>${esc(st.name)}</li>`).join('')}</ul>`:`<p style="color:var(--success);font-weight:700">الجميع ${girl?'حاضرات':'حاضرون'} 🎉</p>`}`;
+}
+function viewPublicVoteThanks(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>شكراً لمشاركتك 🌷❤️</h2>${publicAttendanceResultMarkup()}<p style="color:#5b7382;margin-top:8px">للتعديل، استخدمي منصة راصد.</p></div></div>`;}
+function viewPublicVoteClosed(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>تم تسجيل الرصد لهذا الفصل اليوم</h2>${publicAttendanceResultMarkup()}<p style="margin-top:8px;color:var(--teal);font-weight:800">شكراً لكم 🌷❤️</p><p style="color:#5b7382;margin-top:8px">التعديل متاح من منصة راصد فقط.</p></div></div>`;}
 
 let scanAbsentSet = new Set();
 let scanAbsentContext = null;
@@ -2132,7 +2138,7 @@ async function submitScan(){
   if(saveResult.ok) toast('تم حفظ الرصد في قاعدة البيانات');
   else { console.warn('saveAttendance failed:', saveResult); toast('تعذر حفظ الرصد في قاعدة البيانات — تحقق من الاتصال', true); }
   speakThanks(teacher, absentCount);
-  if(saveResult.ok&&db&&activeSchoolId){db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(classId).set({lastAttendanceDate:todayStr(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.warn('Could not close public class link',e));}
+  if(saveResult.ok&&db&&activeSchoolId){db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(classId).set({lastAttendanceDate:todayStr(),lastAttendanceAbsentIds:records.filter(r=>statusRank(r.status)===0).map(r=>String(r.studentId)),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.warn('Could not close public class link',e));}
   route.editing = false;
   render();
 }
@@ -2176,7 +2182,8 @@ async function publishPublicClass(cls){
   const names={};studentsOfClass(cls.id).forEach(st=>{if(st.id&&st.name)names[String(st.id)]=String(st.name).slice(0,160);});
   if(Object.keys(names).length>500)throw new Error('لا يمكن نشر رابط لفصل يتجاوز 500 طالب/ة.');
   const data={classId:String(cls.id),className:String(classDisplayName(cls)).slice(0,160),schoolName:String(SCHOOL_NAME).slice(0,160),schoolType:store.schoolType==='boys'?'boys':'girls',students:names,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
-  if(attendanceOf(cls.id,todayStr()))data.lastAttendanceDate=todayStr();
+  const existingAttendance=attendanceOf(cls.id,todayStr());
+  if(existingAttendance){data.lastAttendanceDate=todayStr();data.lastAttendanceAbsentIds=(existingAttendance.records||[]).filter(r=>statusRank(r.status)===0).map(r=>String(r.studentId));}
   await db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(String(cls.id)).set(data,{merge:true});
   await db.collection('publicClassLinks').doc(String(cls.id)).set({classId:String(cls.id),schoolId:String(activeSchoolId),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
 }
@@ -2193,9 +2200,9 @@ async function loadPublicClass(schoolId,classId){
     store.students=Object.keys(studentMap).map((id,index)=>({id,classId,name:String(studentMap[id]||''),number:String(index+1)}));
     store.schoolType=data.schoolType==='boys'?'boys':'girls';SCHOOL_NAME=String(data.schoolName||'مدرسة');
     route.publicMode=true;route.schoolId=schoolId;route.publicLoading=false;
-    if(data.lastAttendanceDate===todayStr()){route.publicClosed=true;render();return;}
+    if(data.lastAttendanceDate===todayStr()){scanAbsentSet=new Set((data.lastAttendanceAbsentIds||[]).map(String));route.publicClosed=true;render();return;}
     const vote=await db.collection('schools').doc(schoolId).collection('publicAttendance').doc(publicVoteDocumentId(classId,todayStr())).get();
-    if(vote.exists){route.publicClosed=true;render();return;}
+    if(vote.exists){scanAbsentSet=new Set(((vote.data()||{}).absentIds||[]).map(String));route.publicClosed=true;render();return;}
     render();
   }catch(e){console.error('Public class load failed',e);route.publicLoading=false;document.getElementById('app').innerHTML=`<div class="scan-wrap"><div class="empty"><b>تعذر فتح رابط الفصل</b>${esc(e&&e.message||'تحققي من الاتصال أو افتحي الرابط من جديد.')}</div></div>`;}
 }
