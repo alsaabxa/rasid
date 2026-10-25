@@ -41,5 +41,10 @@
   },
   "storage": {
     "rules": "storage.rules"
+  },
+  "auth": {
+    "providers": {
+      "anonymous": true
+    }
   }
 }

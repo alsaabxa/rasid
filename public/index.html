@@ -787,6 +787,7 @@ if(auth){auth.onAuthStateChanged(async user=>{
     }
     return;
   }
+  if(user.isAnonymous){return;}
   schoolDataReady=false;
   try{
     const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();
@@ -865,6 +866,7 @@ async function pullFromServer(silent){
   const revisionAtStart=localRevision;
   try{
     const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').get();
+    const publicVotes=await db.collection('schools').doc(requestedSchoolId).collection('publicAttendance').get();
     if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||cloudDirty)return false;
     const docs=snap.docs||[];
     const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
@@ -885,14 +887,14 @@ async function pullFromServer(silent){
         next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
         next[kind]=next[kind].map(x=>x.__record);
       });
-      store=normalizeCloudStore(next);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
+      store=normalizeCloudStore(next);mergePublicAttendanceIntoStore(requestedSchoolId,publicVotes);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       if(!silent)render();
       return true;
     }
     // One-time, backward-compatible migration from the previous appData document.
     if(legacy){
-      store=normalizeCloudStore(legacy.data().store);
+      store=normalizeCloudStore(legacy.data().store);mergePublicAttendanceIntoStore(requestedSchoolId,publicVotes);
       // Treat any partial V2 records as the previous cloud snapshot so stale partial records are deleted.
       const partial=emptyCloudStore();
       recordDocs.forEach(d=>{
@@ -927,7 +929,7 @@ async function pullFromServer(silent){
           }
         });
       });
-      store=normalizeCloudStore(merged);
+      store=normalizeCloudStore(merged);mergePublicAttendanceIntoStore(requestedSchoolId,publicVotes);
       cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
       localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
       await syncStoreToCloud();
@@ -946,6 +948,7 @@ async function pullFromServer(silent){
   }catch(e){setSyncIndicator('disconnected');console.error('Cloud load failed',e);return false;}
 }
 let syncListenersBound = false;
+let publicAttendanceUnsubscribe = null;
 async function checkCloudMetaAndPull(){
   if(!db||!activeSchoolId||cloudDirty)return false;
   const requestedSchoolId=activeSchoolId;
@@ -969,11 +972,18 @@ async function checkCloudMetaAndPull(){
 function startAutoSync(){
   if(syncTimer) clearInterval(syncTimer);
   if(messageCountTimer) clearInterval(messageCountTimer);
+  if(publicAttendanceUnsubscribe){publicAttendanceUnsubscribe();publicAttendanceUnsubscribe=null;}
   if(!db || !activeSchoolId){setSyncIndicator('disconnected');return;}
   if(!navigator.onLine){setSyncIndicator('disconnected');return;}
   setSyncIndicator('synced');
   syncTimer = setInterval(()=>checkCloudMetaAndPull(), 4000);
   if(session&&session.type==='admin'){
+    const schoolId=activeSchoolId;
+    publicAttendanceUnsubscribe=db.collection('schools').doc(schoolId).collection('publicAttendance').onSnapshot(snapshot=>{
+      if(activeSchoolId!==schoolId||!session||session.type!=='admin')return;
+      const before=store.attendance.length;mergePublicAttendanceIntoStore(schoolId,snapshot);
+      if(store.attendance.length!==before){localStorage.setItem(STORAGE_KEY,JSON.stringify(store));const active=document.activeElement;const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);if(!editing&&!document.querySelector('.overlay'))render();}
+    },error=>console.warn('Public attendance updates unavailable',error));
     refreshMessageBadge();
     messageCountTimer=setInterval(refreshMessageBadge,20000);
   }
@@ -1056,6 +1066,9 @@ function visibleClasses(){
    العرض الرئيسي
    ========================================================================== */
 function render(){
+  if(route.name==='scanDeep'&&route.publicLoading){document.getElementById('app').innerHTML='<div class="scan-wrap"><div class="empty"><b>جارٍ تحميل رابط الفصل…</b></div></div>';return;}
+  if(route.name==='scanDeep'&&route.publicDone){document.getElementById('app').innerHTML=viewPublicVoteThanks();return;}
+  if(route.name==='scanDeep'&&route.publicClosed){document.getElementById('app').innerHTML=viewPublicVoteClosed();return;}
   document.body.classList.toggle('school-boys',store.schoolType==='boys');
   if(auth&&session&&session.type==='admin'&&!schoolDataReady){
     document.title='منصة راصد للغياب';
@@ -1971,12 +1984,12 @@ function viewScan(classId){
     <div class="scan-head glow">
       <h2>رصد الغياب والحضور — فصل ${esc(classDisplayName(cls))}</h2>
       <p>${esc(SCHOOL_NAME)} — ${todayStr()}</p>
-      <div class="teacher-field" style="display:flex; gap:8px; align-items:stretch;">
+      ${route.publicMode ? `<p style="font-size:.9rem;color:#fff;margin:8px 0">اختاري الغائبات ثم أرسلي التصويت مرة واحدة لهذا الفصل اليوم.</p>` : `<div class="teacher-field" style="display:flex; gap:8px; align-items:stretch;">
         <input id="teacherSelect" list="teacherNamesList" placeholder="اسم المعلم/ة (اختياري)" value="${esc(defaultTeacher)}" autocomplete="off" style="flex:1;">
         <datalist id="teacherNamesList">${staffOptions}</datalist>
         <button type="button" id="addTeacherNameBtn" title="إضافة اسم معلم/ة جديد للقائمة" style="flex-shrink:0; width:42px; border-radius:10px; background:rgba(255,255,255,.16); color:#fff; font-weight:800; font-size:1.1rem;">+</button>
       </div>
-      <p style="font-size:.72rem; color:#cfe0e8; margin-top:6px; position:relative;">اختياري — يمكنك اختيار اسمك من القائمة أو كتابته أو تركه فارغاً</p>
+      <p style="font-size:.72rem; color:#cfe0e8; margin-top:6px; position:relative;">اختياري — يمكنك اختيار اسم المعلم/ة من القائمة أو كتابته أو تركه فارغاً</p>`}
     </div>
     ${students.length ? `
     <div class="field" style="margin:16px 0 0;">
@@ -2006,6 +2019,7 @@ function viewScanConfirm(cls, att){
     <div class="confirm-wrap">
       <div class="confirm-icon">✔</div>
       <h2>تم رصد الغياب بنجاح</h2>
+      <p style="margin-top:8px;color:var(--teal);font-weight:800">شكراً لمشاركتك 🌷❤️</p>
       <p style="color:#5b7382; font-size:.85rem;">فصل ${esc(classDisplayName(cls))} — رصدتها: ${esc(att.teacher||'—')} — الساعة ${esc(att.time||'')}</p>
       <div class="confirm-nums">
         <div class="cn"><b>${present}</b>حاضر/ة</div>
@@ -2013,12 +2027,15 @@ function viewScanConfirm(cls, att){
       </div>
       ${absentees.length ? `<ul class="absent-names">${absentees.map(a=>`<li>${esc(a.studentName)}</li>`).join('')}</ul>` : `<p style="color:var(--success); font-weight:700;">جميع الطلاب والطالبات حاضرون/حاضرات 🎉</p>`}
       <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
-        <button class="btn btn-outline" id="editScanBtn">تعديل الرصد</button>
+        ${route.publicMode ? '' : `<button class="btn btn-outline" id="editScanBtn">تعديل الرصد</button>`}
         ${session ? `<button class="btn btn-primary" onclick="navigate('dashboard')">لوحة التحكم</button>` : ''}
       </div>
     </div>
   </div>`;
 }
+
+function viewPublicVoteThanks(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>شكراً لمشاركتك 🌷❤️</h2><p style="color:#5b7382;margin-top:10px">تم إرسال التصويت لهذا الفصل اليوم.</p><p style="color:#5b7382;margin-top:8px">للتعديل، استخدمي منصة راصد.</p></div></div>`;}
+function viewPublicVoteClosed(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>تم تسجيل الرصد لهذا الفصل اليوم</h2><p style="margin-top:8px;color:var(--teal);font-weight:800">شكراً لكم 🌷❤️</p><p style="color:#5b7382;margin-top:8px">التعديل متاح من منصة راصد فقط.</p></div></div>`;}
 
 let scanAbsentSet = new Set();
 let scanAbsentContext = null;
@@ -2098,6 +2115,7 @@ function bindEditBtn(){
   if(editBtn) editBtn.onclick = ()=>{ route.editing = true; render(); };
 }
 async function submitScan(){
+  if(route.publicMode)return submitPublicScan();
   const classId = route.classId;
   const teacherSel = document.getElementById('teacherSelect');
   const teacher = (teacherSel ? teacherSel.value.trim() : '') || 'غير محدد';
@@ -2114,8 +2132,27 @@ async function submitScan(){
   if(saveResult.ok) toast('تم حفظ الرصد في قاعدة البيانات');
   else { console.warn('saveAttendance failed:', saveResult); toast('تعذر حفظ الرصد في قاعدة البيانات — تحقق من الاتصال', true); }
   speakThanks(teacher, absentCount);
+  if(saveResult.ok&&db&&activeSchoolId){db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(classId).set({lastAttendanceDate:todayStr(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.warn('Could not close public class link',e));}
   route.editing = false;
   render();
+}
+function publicVoteDocumentId(classId,date){return String(classId)+'_'+String(date);}
+async function submitPublicScan(){
+  const finishBtn=document.getElementById('finishScan');if(finishBtn)finishBtn.disabled=true;
+  try{
+    if(!firebaseReady||!auth||!db)throw new Error('التصويت غير متاح حالياً.');
+    if(!auth.currentUser)await auth.signInAnonymously();
+    const date=todayStr(),schoolId=route.schoolId,classId=route.classId;
+    const absentIds=Array.from(scanAbsentSet).map(String);
+    const ref=db.collection('schools').doc(schoolId).collection('publicAttendance').doc(publicVoteDocumentId(classId,date));
+    await ref.set({classId,date,absentIds,votedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    route.publicDone=true;render();
+  }catch(e){
+    console.error('Public attendance vote failed',e);
+    if(e&&e.code==='firestore/already-exists'){route.publicClosed=true;render();return;}
+    toast(e&&e.code==='permission-denied'?'تم تسجيل الرصد لهذا الفصل اليوم أو أن الرابط لم يعد صالحاً.':'تعذر إرسال التصويت. تحققي من الاتصال ثم أعيدي المحاولة.',true);
+    if(finishBtn)finishBtn.disabled=false;
+  }
 }
 function speakThanks(teacher, absentCount){
   try{
@@ -2132,6 +2169,42 @@ function speakThanks(teacher, absentCount){
     speechSynthesis.cancel();
     speechSynthesis.speak(utter);
   }catch(e){}
+}
+
+async function publishPublicClass(cls){
+  if(!db||!activeSchoolId||!session||!session.approved)return;
+  const names={};studentsOfClass(cls.id).forEach(st=>{if(st.id&&st.name)names[String(st.id)]=String(st.name).slice(0,160);});
+  if(Object.keys(names).length>500)throw new Error('لا يمكن نشر رابط لفصل يتجاوز 500 طالب/ة.');
+  const data={classId:String(cls.id),className:String(classDisplayName(cls)).slice(0,160),schoolName:String(SCHOOL_NAME).slice(0,160),schoolType:store.schoolType==='boys'?'boys':'girls',students:names,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  if(attendanceOf(cls.id,todayStr()))data.lastAttendanceDate=todayStr();
+  await db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(String(cls.id)).set(data,{merge:true});
+}
+async function loadPublicClass(schoolId,classId){
+  try{
+    if(!db||!schoolId||!classId)throw new Error('رابط الفصل غير مكتمل.');
+    const ref=db.collection('schools').doc(schoolId).collection('publicClasses').doc(classId),snap=await ref.get();
+    if(!snap.exists)throw new Error('رابط الفصل غير مفعّل. افتحي صفحة أكواد QR من المنصة أولاً.');
+    const data=snap.data()||{},studentMap=data.students||{};
+    store.classes=[{id:classId,name:String(data.className||'الفصل')}];
+    store.students=Object.keys(studentMap).map(id=>({id,classId,name:String(studentMap[id]||'')}));
+    store.schoolType=data.schoolType==='boys'?'boys':'girls';SCHOOL_NAME=String(data.schoolName||'مدرسة');
+    route.publicMode=true;route.schoolId=schoolId;route.publicLoading=false;
+    if(data.lastAttendanceDate===todayStr()){route.publicClosed=true;render();return;}
+    const vote=await db.collection('schools').doc(schoolId).collection('publicAttendance').doc(publicVoteDocumentId(classId,todayStr())).get();
+    if(vote.exists){route.publicClosed=true;render();return;}
+    render();
+  }catch(e){console.error('Public class load failed',e);route.publicLoading=false;document.getElementById('app').innerHTML=`<div class="scan-wrap"><div class="empty"><b>تعذر فتح رابط الفصل</b>${esc(e&&e.message||'تحققي من الاتصال أو افتحي الرابط من جديد.')}</div></div>`;}
+}
+function mergePublicAttendanceIntoStore(schoolId,snapshot){
+  (snapshot.docs||[]).forEach(doc=>{
+    const vote=doc.data()||{},classId=String(vote.classId||''),date=String(vote.date||'');
+    if(!classId||!date||store.attendance.some(a=>String(a.classId)===classId&&String(a.date)===date))return;
+    const cls=store.classes.find(c=>String(c.id)===classId);if(!cls)return;
+    const absent=new Set((vote.absentIds||[]).map(String)),boys=store.schoolType==='boys';
+    const records=studentsOfClass(classId).map(st=>({studentId:st.id,studentName:st.name,status:absent.has(String(st.id))?(boys?'غائب':'غائبة'):(boys?'حاضر':'حاضرة')}));
+    let time='—';try{const d=vote.votedAt&&vote.votedAt.toDate?vote.votedAt.toDate():null;if(d)time=d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){}
+    store.attendance.push({id:classId+'|'+date,classId,date,teacher:'تصويت عبر الرابط',time,records});
+  });
 }
 
 /* ==========================================================================
@@ -2165,14 +2238,14 @@ function viewQR(){
 }
 function classScanUrl(classId){
   const url = new URL(window.location.href);
-  url.search = '?class=' + encodeURIComponent(classId);
+  url.search = '?class=' + encodeURIComponent(classId) + '&school=' + encodeURIComponent(activeSchoolId||'');
   url.hash = '';
   return url.toString();
 }
 function bindQR(){
   visibleClasses().forEach(c=>{
     const box = document.getElementById('qrbox-'+c.id);
-    if(box && window.QRCode) new QRCode(box, { text: classScanUrl(c.id), width:150, height:150, colorDark:'#102a43', colorLight:'#ffffff' });
+    publishPublicClass(c).then(()=>{const target=document.getElementById('qrbox-'+c.id);if(target&&window.QRCode)new QRCode(target,{text:classScanUrl(c.id),width:150,height:150,colorDark:'#102a43',colorLight:'#ffffff'});}).catch(e=>{console.error('Public class link publish failed',e);toast('تعذر تجهيز رابط الفصل للتصويت دون تسجيل دخول',true);});
   });
   document.querySelectorAll('[data-copy]').forEach(b=> b.onclick = ()=>{
     navigator.clipboard.writeText(classScanUrl(b.dataset.copy)).then(()=> toast('تم نسخ الرابط')).catch(()=> toast('تعذّر النسخ', true));
@@ -2632,8 +2705,10 @@ function init(){
   const params = new URLSearchParams(window.location.search);
   const cid = params.get('class');
   if(cid){
-    route = { name:'scanDeep', classId:cid };
-    pullFromServer(false).finally(render);
+    const schoolId=params.get('school');
+    route={name:'scanDeep',classId:cid,schoolId,publicLoading:true,publicMode:true};
+    if(auth)auth.signInAnonymously().then(()=>loadPublicClass(schoolId,cid)).catch(e=>{console.error('Anonymous access unavailable',e);route.publicLoading=false;document.getElementById('app').innerHTML='<div class="scan-wrap"><div class="empty"><b>تعذر تفعيل التصويت دون تسجيل دخول</b>تحققي من تفعيل تسجيل الدخول المجهول في Firebase Authentication.</div></div>';});
+    else{route.publicLoading=false;render();}
   }else{
     if(session) startAutoSync();
     render();
@@ -2645,3 +2720,4 @@ init();
 <script>if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(e=>console.warn('PWA offline shell unavailable',e)));</script>
 </body>
 </html>
+

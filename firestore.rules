@@ -17,6 +17,50 @@ service cloud.firestore {
         && profile(request.auth.uid).schoolId == schoolId;
     }
 
+    function isAnonymousVoter() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function validPublicClass(classId) {
+      return request.resource.data.keys().hasOnly([
+          'classId', 'className', 'schoolName', 'schoolType', 'students',
+          'lastAttendanceDate', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'classId', 'className', 'schoolName', 'schoolType', 'students', 'updatedAt'
+        ])
+        && request.resource.data.classId == classId
+        && request.resource.data.className is string
+        && request.resource.data.className.size() <= 160
+        && request.resource.data.schoolName is string
+        && request.resource.data.schoolName.size() <= 160
+        && request.resource.data.schoolType in ['boys', 'girls']
+        && request.resource.data.students is map
+        && request.resource.data.students.size() <= 500
+        && request.resource.data.updatedAt == request.time
+        && (!request.resource.data.keys().hasAny(['lastAttendanceDate'])
+          || request.resource.data.lastAttendanceDate is string);
+    }
+
+    function validPublicVote(schoolId, classId, voteId) {
+      let classPath = /databases/$(database)/documents/schools/$(schoolId)/publicClasses/$(classId);
+      let publicClass = get(classPath).data;
+      return exists(classPath)
+        && request.resource.data.keys().hasOnly(['classId', 'date', 'absentIds', 'votedAt'])
+        && request.resource.data.keys().hasAll(['classId', 'date', 'absentIds', 'votedAt'])
+        && request.resource.data.classId == classId
+        && request.resource.data.date is string
+        && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && voteId == classId + '_' + request.resource.data.date
+        && request.resource.data.absentIds is list
+        && request.resource.data.absentIds.size() <= 500
+        && request.resource.data.absentIds.hasOnly(publicClass.students.keys())
+        && request.resource.data.votedAt == request.time
+        && (!publicClass.keys().hasAny(['lastAttendanceDate'])
+          || publicClass.lastAttendanceDate != request.resource.data.date);
+    }
+
     function trialAllowsAccess(schoolId) {
       let schoolPath = /databases/$(database)/documents/schools/$(schoolId);
       return exists(schoolPath) && trialIsOpen(schoolPath);
@@ -142,6 +186,19 @@ service cloud.firestore {
     match /schools/{schoolId} {
       allow get: if isOwner() || isApprovedSchool(schoolId);
       allow list, create, update, delete: if isOwner();
+      match /publicClasses/{classId} {
+        allow get: if isAnonymousVoter();
+        allow list: if false;
+        allow create, update: if isApprovedSchool(schoolId) && validPublicClass(classId);
+        allow delete: if isApprovedSchool(schoolId);
+      }
+      match /publicAttendance/{voteId} {
+        allow get: if isAnonymousVoter() || isOwner() || isApprovedSchool(schoolId);
+        allow list: if isOwner() || isApprovedSchool(schoolId);
+        allow create: if isAnonymousVoter()
+          && validPublicVote(schoolId, request.resource.data.classId, voteId);
+        allow update, delete: if false;
+      }
       match /private/{docId} {
         allow read: if isOwner()
           || (isApprovedSchool(schoolId) && trialAllowsAccess(schoolId));
@@ -166,3 +223,4 @@ service cloud.firestore {
     }
   }
 }
+
