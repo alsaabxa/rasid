@@ -2178,10 +2178,14 @@ async function publishPublicClass(cls){
   const data={classId:String(cls.id),className:String(classDisplayName(cls)).slice(0,160),schoolName:String(SCHOOL_NAME).slice(0,160),schoolType:store.schoolType==='boys'?'boys':'girls',students:names,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
   if(attendanceOf(cls.id,todayStr()))data.lastAttendanceDate=todayStr();
   await db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(String(cls.id)).set(data,{merge:true});
+  await db.collection('publicClassLinks').doc(String(cls.id)).set({classId:String(cls.id),schoolId:String(activeSchoolId),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
 }
 async function loadPublicClass(schoolId,classId){
   try{
-    if(!db||!schoolId||!classId)throw new Error('رابط الفصل غير مكتمل.');
+    if(!db||!classId)throw new Error('رابط الفصل غير مكتمل.');
+    if(!schoolId){const link=await db.collection('publicClassLinks').doc(classId).get();if(!link.exists)throw new Error('رابط الفصل غير مفعّل. افتحي صفحة أكواد QR من المنصة أولاً.');schoolId=String((link.data()||{}).schoolId||'');}
+    if(!schoolId)throw new Error('رابط الفصل غير مكتمل.');
+    route.schoolId=schoolId;
     const ref=db.collection('schools').doc(schoolId).collection('publicClasses').doc(classId),snap=await ref.get();
     if(!snap.exists)throw new Error('رابط الفصل غير مفعّل. افتحي صفحة أكواد QR من المنصة أولاً.');
     const data=snap.data()||{},studentMap=data.students||{};

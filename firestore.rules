@@ -61,6 +61,14 @@ service cloud.firestore {
           || publicClass.lastAttendanceDate != request.resource.data.date);
     }
 
+    function validPublicClassLink(classId) {
+      return request.resource.data.keys().hasOnly(['classId', 'schoolId', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['classId', 'schoolId', 'updatedAt'])
+        && request.resource.data.classId == classId
+        && request.resource.data.schoolId is string
+        && request.resource.data.updatedAt == request.time;
+    }
+
     function trialAllowsAccess(schoolId) {
       let schoolPath = /databases/$(database)/documents/schools/$(schoolId);
       return exists(schoolPath) && trialIsOpen(schoolPath);
@@ -220,6 +228,14 @@ service cloud.firestore {
             && request.resource.data.readAt == request.time);
         allow delete: if isOwner() || isApprovedSchool(schoolId);
       }
+    }
+
+    match /publicClassLinks/{classId} {
+      allow get: if isAnonymousVoter();
+      allow list: if false;
+      allow create, update: if validPublicClassLink(classId)
+        && isApprovedSchool(request.resource.data.schoolId);
+      allow delete: if isApprovedSchool(resource.data.schoolId);
     }
   }
 }
