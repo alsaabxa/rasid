@@ -2641,6 +2641,15 @@ function exportPeriodReportExcel(rows,classId,periodLabel,dateLabel){
   XLSX.utils.book_append_sheet(wb,ws,'تقرير الحضور');
   XLSX.writeFile(wb,`تقرير_${periodLabel}_${(isAll?'كل_الفصول':cls?.name||'الفصل').replace(/[\\/:*?"<>|]/g,'_')}_${dateLabel.replace(/[^0-9-]/g,'_')}.xlsx`);
 }
+function printPeriodReport(rows,classId,periodLabel,dateLabel,period){
+  const cls=store.classes.find(c=>String(c.id)===String(classId));
+  const studentTerms=reportStudentTerms();
+  const body=rows.map((r,i)=>`<tr><td>${i+1}</td>${classId==='__all__'? `<td>${esc(r.className)}</td>`:''}${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td>${esc(r.status)}</td></tr>`).join('');
+  const dateHead=period==='daily'?'':'<th>التاريخ</th>';
+  const isAll=classId==='__all__',classHead=isAll?'<th>الفصل</th>':'';
+  const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${isAll?'كل الفصول':esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p><p style="margin:4px 0 0">التاريخ الهجري: ${reportHijriForDate(route.date||todayStr())} — الميلادي: ${reportGregorianForDate(route.date||todayStr())} — الساعة: ${nowTimeStr()}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${classHead}${dateHead}<th>${studentTerms.studentNumber}</th><th>${studentTerms.studentName}</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</b></p>${reportSignatureFooter()}`;
+  printElement(html,`تقرير ${periodLabel} ${isAll?'كل الفصول':cls?.name||''} ${dateLabel}`);
+}
 function exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period){
   const cls=store.classes.find(c=>String(c.id)===String(classId));
   const studentTerms=reportStudentTerms();
