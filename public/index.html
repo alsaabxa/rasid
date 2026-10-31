@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 50425)
-Total output lines: 2813
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -754,7 +751,1573 @@ function bindNotificationBell(){
     const absentLabel=store.schoolType==='boys'?'غائبون':'غائبات';
     panel.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 4px 10px;border-bottom:1px solid var(--line)"><b>تنبيهات اليوم</b><button id="closeNotificationPanel" class="icon-btn">✕</button></div>`+(list.length?list.map(x=>`<button data-notify-class="${esc(x.classId||'')}" style="display:block;width:100%;text-align:right;border:0;border-bottom:1px solid var(--line);background:#fff;padding:12px 6px;cursor:pointer"><b>${esc(x.className)}</b><div style="font-size:.78rem;color:#607d8b;margin-top:4px">${esc(x.time||'')} ${x.teacher?'— '+esc(x.teacher):''} — ${absentLabel}: ${x.absent}</div></button>`).join(''):'<div style="padding:22px 8px;text-align:center;color:#8299a6">لا يوجد رصد اليوم</div>');
     panel.querySelector('#closeNotificationPanel').onclick=()=>panel.remove();
-    panel.querySelectorAll('[data-notify…25425 tokens truncated…chool=' + encodeURIComponent(activeSchoolId||'');
+    panel.querySelectorAll('[data-notify-class]').forEach(el=>el.onclick=()=>{panel.remove();navigate('scan',{classId:el.dataset.notifyClass});});
+  };
+}
+
+function toast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.className='toast', 2600);
+}
+
+/* ---------- clock ---------- */
+function tickClock(){
+  const now = new Date();
+  const time = now.toLocaleTimeString('ar-SA-u-nu-latn', {hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true});
+  let hijri = '—', greg = '—';
+  try{
+    hijri = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
+  }catch(e){}
+  try{
+    greg = new Intl.DateTimeFormat('ar-SA-u-ca-gregory-nu-latn', {day:'numeric', month:'long', year:'numeric'}).format(now);
+  }catch(e){}
+  document.getElementById('clockTime').textContent = time;
+  document.getElementById('clockHijri').textContent = hijri;
+  document.getElementById('clockGregorian').textContent = greg;
+}
+setInterval(tickClock, 1000); tickClock();
+if(auth){auth.onAuthStateChanged(async user=>{
+  if(pendingRegistration)return;
+  if(!user){
+    if(session&&session.type==='admin'){
+      stopAutoSync();session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();
+    }
+    return;
+  }
+  if(user.isAnonymous){return;}
+  schoolDataReady=false;
+  try{
+    const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();
+    if(!p||p.status!=='approved'||!p.schoolId){await auth.signOut();stopAutoSync();session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();return;}
+    activeSchoolId=p.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='rasid_store_v1_'+activeSchoolId;store=loadStore();store.schoolType=p.schoolType==='boys'?'boys':'girls';SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);
+    schoolDataReady=true;startAutoSync();render();
+  }catch(e){console.error(e);if(activeSchoolId){schoolDataReady=true;render();}else{session=null;schoolDataReady=true;route={name:'login'};render();}}
+});}
+
+
+/* ==========================================================================
+   المزامنة مع Firebase Cloud Firestore
+   ========================================================================== */
+let messageCountTimer = null;
+const MESSAGE_BADGE_REFRESH_MS = 5 * 60 * 1000; // عدّاد الرسائل: كل 5 دقائق
+// المزامنة اللحظية لمستندات schools/{id}/private
+let privateUnsubscribe = null;     // دالة إلغاء الاشتراك
+let privateSyncSchoolId = null;    // المدرسة التي يخدمها الاشتراك الحالي
+let privateDocs = new Map();       // آخر حالة معروفة للمستندات (تشمل كتاباتنا المحلية المعلّقة)
+let privateChangedIds = new Set(); // معرّفات المستندات التي وصل تغييرها ولم تُطبَّق بعد
+let privateFlushTimer = null;      // إعادة محاولة محلية فقط (بدون قراءة من الشبكة) أثناء وجود تعديلات محلية
+let privateFromCache = false;
+let publicAttendanceSnapshot = null;
+let guardianImportBusy = false;
+let syncIndicatorState='disconnected';
+function setSyncIndicator(state){
+  const normalized=['synced','syncing','disconnected'].includes(state)?state:'disconnected';
+  syncIndicatorState=normalized;
+  const indicator=document.getElementById('syncIndicator');
+  if(!indicator)return;
+  const labels={synced:'محدّث',syncing:'قيد التحديث',disconnected:'منقطع'};
+  indicator.dataset.state=normalized;
+  indicator.setAttribute('aria-label',labels[normalized]);
+}
+window.addEventListener('offline',()=>setSyncIndicator('disconnected'));
+window.addEventListener('online',()=>{
+  if(db&&activeSchoolId&&session&&session.approved){setSyncIndicator('syncing');applyPrivateChanges();}
+  else setSyncIndicator('disconnected');
+});
+async function pushToServer(action,payload){
+  if(!db||!activeSchoolId||!session||!session.approved){setSyncIndicator('disconnected');return {ok:false,offline:true,error:'Firebase غير متصل أو المدرسة غير محددة'};}
+  setSyncIndicator('syncing');
+  try{
+    if(action==='saveAttendance'&&payload){
+      clearTimeout(saveTimer);saveTimer=null;
+      const result=await syncAttendanceRecordToCloud(payload);
+      setSyncIndicator(result.ok&&!cloudDirty?'synced':result.ok?'syncing':'disconnected');
+      return result;
+    }
+    if(action==='saveStudent'&&payload){
+      const student=Object.assign({},payload);delete student.oldName;
+      const index=(store.students||[]).findIndex(x=>x.id===student.id);
+      if(index>=0)store.students[index]=Object.assign({},store.students[index],student);else store.students.push(student);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
+      const result=await syncStudentRecordToCloud(student.id);
+      setSyncIndicator(result.ok&&!cloudDirty?'synced':result.ok?'syncing':'disconnected');
+      if(!result.ok)return result;
+      return {ok:true,updated:1};
+    }
+    if(action==='saveGuardian'&&payload){
+      const id=normalizeNameClient(payload.name),phone=normalizePhoneClient(payload.phone);
+      if(!phone)return {ok:false,error:'رقم الجوال السعودي غير صالح'};
+      const guardian={id,name:String(payload.name||'').trim(),phone};
+      store.guardians=(store.guardians||[]).filter(g=>g.id!==id);store.guardians.push(guardian);
+      store.students=(store.students||[]).map(st=>normalizeNameClient(st.name)===id?Object.assign({},st,{guardianPhone:phone}):st);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));localRevision++;cloudDirty=true;
+    }
+    const result=await syncStoreToCloud();
+    if(!result.ok)return result;
+    if(!cloudDirty)setSyncIndicator('synced');
+    return {ok:true,phone:action==='saveGuardian'?normalizePhoneClient(payload&&payload.phone):undefined,added:action==='importGuardians'&&payload&&Array.isArray(payload.guardians)?payload.guardians.length:undefined,updated:0};
+  }catch(e){
+    setSyncIndicator('disconnected');
+    console.error('Firebase sync failed:',action,e);
+    return {ok:false,error:e&&e.message?e.message:'تعذر حفظ البيانات في Firebase'};
+  }
+}
+async function pullFromServer(silent){
+  if(!db||!activeSchoolId)return false;
+  // Never replace unsaved local edits with a polling response.
+  if(cloudDirty)return false;
+  const requestedSchoolId=activeSchoolId;
+  const revisionAtStart=localRevision;
+  try{
+    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').get();
+    const publicVotes=await db.collection('schools').doc(requestedSchoolId).collection('publicAttendance').get();
+    if(activeSchoolId!==requestedSchoolId||localRevision!==revisionAtStart||cloudDirty)return false;
+    const docs=snap.docs||[];
+    const metaDoc=docs.find(d=>d.id==='appMeta'&&d.data()&&d.data().schemaVersion===2);
+    const recordDocs=docs.filter(d=>d.id.indexOf('v2_')===0&&d.data()&&d.data().kind==='record');
+    const legacy=docs.find(d=>d.id==='appData'&&d.data()&&d.data().store);
+    // Only appMeta marks a complete V2 snapshot. Without it, reconcile partial writes below.
+    if(metaDoc){
+      const meta=metaDoc?metaDoc.data():{};
+      const next=emptyCloudStore();
+      next.schoolType=meta.schoolType||'girls';
+      next.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
+      next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')next[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:next[kind].length,__record:record});
+      });
+      ['classes','students','staff','attendance','guardians','whatsappContacts'].forEach(kind=>{
+        next[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        next[kind]=next[kind].map(x=>x.__record);
+      });
+      store=normalizeCloudStore(next);mergePublicAttendanceIntoStore(requestedSchoolId,publicVotes);cloudBaseline=cloneStoreSnapshot();cloudMetaExists=!!metaDoc;cloudRevision=metaDoc&&Number.isFinite(meta.revision)?meta.revision:0;cloudDirty=false;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      if(!silent)render();
+      return true;
+    }
+    // One-time, backward-compatible migration from the previous appData document.
+    if(legacy){
+      store=normalizeCloudStore(legacy.data().store);mergePublicAttendanceIntoStore(requestedSchoolId,publicVotes);
+      // Treat any partial V2 records as the previous cloud snapshot so stale partial records are deleted.
+      const partial=emptyCloudStore();
+      recordDocs.forEach(d=>{
+        const data=d.data(),kind=data.recordType||data.kind,record=data.record;
+        if(CLOUD_ARRAY_FIELDS.includes(kind)&&record&&typeof record==='object')partial[kind].push({__cloudOrder:Number.isFinite(data.order)?data.order:partial[kind].length,__record:record});
+      });
+      ['classes','students','staff','attendance','guardians','whatsappContacts'].forEach(kind=>{
+        partial[kind].sort((a,b)=>a.__cloudOrder-b.__cloudOrder);
+        partial[kind]=partial[kind].map(x=>x.__record);
+      });
+      cloudBaseline=normalizeCloudStore(partial);cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // Recover an interrupted first-time upload when records exist but appMeta does not.
+    if(recordDocs.length){
+      const merged=normalizeCloudStore(store);
+      ['classes','students','staff','attendance','guardians','whatsappContacts'].forEach(kind=>{
+        const docsForKind=recordDocs.filter(d=>(d.data().recordType||d.data().kind)===kind).sort((a,b)=>{
+          const ao=Number.isFinite(a.data().order)?a.data().order:0;
+          const bo=Number.isFinite(b.data().order)?b.data().order:0;
+          return ao-bo;
+        });
+        const known=new Set(merged[kind].map((item,index)=>cloudRecordId(kind,item,index)));
+        docsForKind.forEach(d=>{
+          const data=d.data(),record=data.record;
+          if(record&&typeof record==='object'&&!known.has(d.id)){
+            merged[kind].push(record);
+            known.add(d.id);
+          }
+        });
+      });
+      store=normalizeCloudStore(merged);mergePublicAttendanceIntoStore(requestedSchoolId,publicVotes);
+      cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;cloudDirty=true;
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(store));
+      await syncStoreToCloud();
+      if(!silent)render();
+      return true;
+    }
+    // No cloud data yet: keep this school's local data and upload it in the new format.
+    cloudBaseline=emptyCloudStore();cloudMetaExists=false;cloudRevision=0;
+    const local=normalizeCloudStore(store);
+    const hasLocalData=CLOUD_ARRAY_FIELDS.some(k=>local[k].length)||local.teacherNames.length||
+      local.reportSignatures.manager||local.reportSignatures.attendance;
+    if(hasLocalData){cloudDirty=true;await syncStoreToCloud();}
+    else {cloudDirty=false;await syncStoreToCloud();}
+    if(!silent)render();
+    return false;
+  }catch(e){setSyncIndicator('disconnected');console.error('Cloud load failed',e);return false;}
+}
+let syncListenersBound = false;
+let publicAttendanceUnsubscribe = null;
+function recordKindFromId(id){const m=/^v2_([^_]+)_/.exec(String(id));return m?m[1]:null;}
+function privateRecordsOf(kind){
+  const prefix='v2_'+kind+'_',rows=[];
+  privateDocs.forEach((data,id)=>{
+    if(id.indexOf(prefix)!==0||!data||data.kind!=='record'||data.recordType!==kind)return;
+    if(!data.record||typeof data.record!=='object')return;
+    rows.push({order:Number.isFinite(data.order)?data.order:rows.length,record:data.record});
+  });
+  rows.sort((a,b)=>a.order-b.order);
+  return rows.map(r=>r.record);
+}
+// تطبيق ما وصل من docChanges (added/modified/removed) على المخزن المحلي.
+function applyPrivateChanges(){
+  clearTimeout(privateFlushTimer);privateFlushTimer=null;
+  const schoolId=privateSyncSchoolId;
+  if(!schoolId||!privateChangedIds.size||!db||activeSchoolId!==schoolId||!session)return false;
+  // حماية التعديلات المحلية: لا نستبدل شيئًا ما دامت هناك تعديلات غير محفوظة.
+  // التغييرات الواردة تبقى في privateChangedIds وتُطبَّق بعد اكتمال الحفظ (فحص محلي فقط).
+  if(cloudDirty){privateFlushTimer=setTimeout(applyPrivateChanges,1000);return false;}
+  if(privateFromCache)return false;
+  // appMeta يُكتب في آخر دفعة، فهو علامة اكتمال اللقطة؛ ننتظره قبل التطبيق.
+  const meta=privateDocs.get('appMeta');
+  if(!meta||meta.schemaVersion!==2)return false;
+  const revision=Number(meta.revision)||0;
+  const changed=privateChangedIds;privateChangedIds=new Set();
+  // نفس المراجعة المعروفة = صدى لكتابتنا نحن أو لا جديد.
+  if(revision===cloudRevision)return false;
+  const kinds=new Set();let metaChanged=false;
+  changed.forEach(id=>{
+    if(id==='appMeta'){metaChanged=true;return;}
+    const kind=recordKindFromId(id);
+    if(kind&&CLOUD_ARRAY_FIELDS.includes(kind))kinds.add(kind);
+  });
+  const next=cloneStoreSnapshot();
+  kinds.forEach(kind=>{next[kind]=privateRecordsOf(kind);});
+  if(metaChanged){
+    next.schoolType=meta.schoolType||'girls';
+    next.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
+    next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
+  }
+  store=normalizeCloudStore(next);
+  // إعادة دمج تصويتات الروابط العامة لأن إعادة بناء الحضور تُسقط ما كان مدمجًا في الذاكرة فقط
+  if(kinds.has('attendance')&&publicAttendanceSnapshot)mergePublicAttendanceIntoStore(schoolId,publicAttendanceSnapshot);
+  cloudBaseline=cloneStoreSnapshot();cloudMetaExists=true;cloudRevision=revision;cloudDirty=false;
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Local save failed',e);}
+  setSyncIndicator('synced');
+  // أعد الرسم دون مقاطعة نموذج أو نافذة يعمل عليها المستخدم الآن
+  const active=document.activeElement;
+  const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
+  if(!editing&&!document.querySelector('.overlay'))render();
+  return true;
+}
+function stopPrivateListener(){
+  if(privateUnsubscribe){try{privateUnsubscribe();}catch(e){console.warn('Private listener cleanup failed',e);}privateUnsubscribe=null;}
+  clearTimeout(privateFlushTimer);privateFlushTimer=null;
+  privateSyncSchoolId=null;privateDocs=new Map();privateChangedIds=new Set();privateFromCache=false;
+}
+function startPrivateListener(schoolId){
+  stopPrivateListener();
+  privateSyncSchoolId=schoolId;
+  privateUnsubscribe=db.collection('schools').doc(schoolId).collection('private').onSnapshot(snapshot=>{
+    if(privateSyncSchoolId!==schoolId||activeSchoolId!==schoolId||!session)return;
+    snapshot.docChanges().forEach(change=>{
+      const id=change.doc.id;
+      if(change.type==='removed')privateDocs.delete(id);
+      else privateDocs.set(id,change.doc.data()||{});
+      privateChangedIds.add(id);
+    });
+    privateFromCache=!!snapshot.metadata.fromCache;
+    if(!privateFromCache&&!cloudDirty&&syncIndicatorState==='disconnected')setSyncIndicator('synced');
+    applyPrivateChanges();
+  },error=>{setSyncIndicator('disconnected');console.warn('Realtime school sync unavailable',error);});
+}
+// إيقاف كل الاشتراكات والمؤقتات (تبديل المدرسة / تسجيل الخروج / إعادة التشغيل)
+function stopAutoSync(){
+  if(messageCountTimer){clearInterval(messageCountTimer);messageCountTimer=null;}
+  if(publicAttendanceUnsubscribe){publicAttendanceUnsubscribe();publicAttendanceUnsubscribe=null;}
+  publicAttendanceSnapshot=null;
+  stopPrivateListener();
+}
+function startAutoSync(){
+  stopAutoSync();
+  if(!db || !activeSchoolId){setSyncIndicator('disconnected');return;}
+  if(!navigator.onLine){setSyncIndicator('disconnected');return;}
+  setSyncIndicator('synced');
+  const schoolId=activeSchoolId;
+  startPrivateListener(schoolId);
+  if(session&&session.type==='admin'){
+    publicAttendanceUnsubscribe=db.collection('schools').doc(schoolId).collection('publicAttendance').onSnapshot(snapshot=>{
+      if(activeSchoolId!==schoolId||!session||session.type!=='admin')return;
+      publicAttendanceSnapshot=snapshot;
+      const before=store.attendance.length;mergePublicAttendanceIntoStore(schoolId,snapshot);
+      if(store.attendance.length!==before){localStorage.setItem(STORAGE_KEY,JSON.stringify(store));const active=document.activeElement;const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);if(!editing&&!document.querySelector('.overlay'))render();}
+    },error=>console.warn('Public attendance updates unavailable',error));
+    refreshMessageBadge();
+    messageCountTimer=setInterval(refreshMessageBadge,MESSAGE_BADGE_REFRESH_MS);
+  }
+  if(!syncListenersBound){
+    syncListenersBound = true;
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){applyPrivateChanges();refreshMessageBadge();} });
+    window.addEventListener('focus', ()=>{applyPrivateChanges();refreshMessageBadge();});
+  }
+}
+
+/* ==========================================================================
+   المصادقة
+   ========================================================================== */
+async function sha256Hex(s){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(s)));
+  return Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+// التحقق يتم على الخادم. إن رفض الخادم صراحةً (error:'invalid') نرفض؛ وإن تعذر الوصول إليه أو كان إصداراً قديماً نستخدم الاحتياط المحلي.
+async function doLoginAdmin(){ return false; }
+async function verifyAdminPassword(){ return false; }
+async function doLoginStaff(){ return false; }
+function logout(){
+  stopAutoSync();
+  session = null; sessionStorage.removeItem(SESSION_KEY);
+  if(auth) auth.signOut(); activeSchoolId=null;
+  navigate('login');
+}
+
+/* ==========================================================================
+   التنقل
+   ========================================================================== */
+function navigate(name, params){
+  if(name==='staff') name='settings';
+  const nextRoute=Object.assign({name}, params||{});
+  const wasScanning=route&&(route.name==='scan'||route.name==='scanDeep');
+  const willScan=nextRoute.name==='scan'||nextRoute.name==='scanDeep';
+  if(!wasScanning||!willScan||String(route.classId)!==String(nextRoute.classId)){
+    scanAbsentSet=new Set();
+    scanAbsentContext=null;
+  }
+  route = nextRoute;
+  render();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ==========================================================================
+   الحسابات المساعدة
+   ========================================================================== */
+function studentUniqueKey(st){
+  const cls=String(st.classId||'');
+  const name=normalizeNameClient(st.name||'');
+  return cls+'|'+(name || String(st.id||''));
+}
+function dedupeStudents(list){
+  const seen=new Set(); const out=[];
+  (list||[]).forEach(st=>{
+    const key=studentUniqueKey(st);
+    if(seen.has(key)) return;
+    seen.add(key); out.push(st);
+  });
+  return out;
+}
+function studentsOfClass(classId){ return dedupeStudents(store.students.filter(s=>s.classId===classId)); }
+function attendanceOf(classId, date){ return store.attendance.find(a=>a.classId===classId && a.date===(date||todayStr())); }
+function classStats(cls){
+  const total = studentsOfClass(cls.id).length;
+  const att = attendanceOf(cls.id);
+  const marked = att ? att.records.length : 0;
+  const absent = att ? att.records.filter(r=>statusRank(r.status)===0).length : 0;
+  const present = marked - absent;
+  const pct = total ? Math.round((present/total)*100) : 0;
+  return { total, marked, absent, present, pct };
+}
+function visibleClasses(){
+  if(!session) return [];
+  if(session.type==='admin') return store.classes;
+  return store.classes.filter(c=> (session.classes||[]).includes(c.id));
+}
+
+/* ==========================================================================
+   العرض الرئيسي
+   ========================================================================== */
+function render(){
+  if(route.name==='scanDeep'&&route.publicLoading){document.getElementById('app').innerHTML='<div class="scan-wrap"><div class="empty"><b>جارٍ تحميل رابط الفصل…</b></div></div>';return;}
+  if(route.name==='scanDeep'&&route.publicDone){document.getElementById('app').innerHTML=viewPublicVoteThanks();return;}
+  if(route.name==='scanDeep'&&route.publicClosed){document.getElementById('app').innerHTML=viewPublicVoteClosed();return;}
+  document.body.classList.toggle('school-boys',store.schoolType==='boys');
+  if(auth&&session&&session.type==='admin'&&!schoolDataReady){
+    document.title='منصة راصد للغياب';
+    const brandSchoolName=document.getElementById('brandSchoolName');
+    if(brandSchoolName)brandSchoolName.textContent='إدارة المدارس بحساب معتمد';
+    document.getElementById('topnav').innerHTML='';
+    document.getElementById('app').innerHTML='<div class="container"><div class="empty"><b>جارٍ تحميل بيانات المدرسة…</b></div></div>';
+    return;
+  }
+  document.title = session ? `منصة راصد للغياب — ${SCHOOL_NAME}` : 'منصة راصد للغياب';
+  const brandSchoolName = document.getElementById('brandSchoolName');
+  if(brandSchoolName) brandSchoolName.textContent = session ? SCHOOL_NAME : 'إدارة المدارس بحساب معتمد';
+  const active = document.activeElement;
+  let focusInfo = null;
+  if(active && active.id && (active.tagName==='INPUT' || active.tagName==='TEXTAREA')){
+    focusInfo = { id: active.id, selStart: active.selectionStart, selEnd: active.selectionEnd };
+  }
+  renderTopnav();
+  const app = document.getElementById('app');
+  if(route.name==='scanDeep'){ app.innerHTML = viewScan(route.classId); bindScan(); }
+  else if(!session){ app.innerHTML = viewLogin(); bindLogin(); }
+  else{
+    switch(route.name){
+      case 'dashboard': app.innerHTML = viewDashboard(); bindDashboard(); break;
+      case 'scan': app.innerHTML = viewScan(route.classId); bindScan(); break;
+      case 'qr': app.innerHTML = viewQR(); bindQR(); break;
+      case 'staff': app.innerHTML = viewSchoolSettings(); bindSchoolSettings(); break;
+      case 'guardians': app.innerHTML = viewGuardians(); bindGuardians(); break;
+      case 'absenceReport': app.innerHTML = viewAbsenceReport(); bindAbsenceReport(); break;
+      case 'messages': app.innerHTML = viewMessages(); bindMessages(); break;
+      case 'settings': app.innerHTML = viewSchoolSettings(); bindSchoolSettings(); break;
+      default: app.innerHTML = viewDashboard(); bindDashboard();
+    }
+  }
+  applyGenderLanguage(document.getElementById('topnav'));
+  applyGenderLanguage(app);
+  setSyncIndicator(syncIndicatorState);
+  if(focusInfo){
+    const el = document.getElementById(focusInfo.id);
+    if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')){
+      el.focus();
+      try{ el.setSelectionRange(focusInfo.selStart, focusInfo.selEnd); }catch(e){}
+    }
+  }
+}
+function renderTopnav(){
+  const nav = document.getElementById('topnav');
+  const menuToggle=document.getElementById('menuToggle');
+  if(menuToggle)menuToggle.hidden=!session;
+  if(!session){ nav.innerHTML=''; nav.classList.remove('mobile-open'); return; }
+  let links = `<a class="nav-btn ${route.name==='dashboard'?'active':''}" data-nav="dashboard">لوحة التحكم</a>`;
+  links += `<a class="nav-btn ${route.name==='qr'?'active':''}" data-nav="qr">أكواد QR</a>`;
+  if(session.type==='admin'){
+    links += `<a class="nav-btn ${route.name==='guardians'?'active':''}" data-nav="guardians">أولياء الأمور</a>`;
+    links += `<a class="nav-btn ${route.name==='absenceReport'?'active':''}" data-nav="absenceReport">التقارير</a>`;
+    links += `<a class="nav-btn ${route.name==='settings'?'active':''}" data-nav="settings">الإعدادات</a>`;
+    links += `<a class="nav-btn message-nav ${route.name==='messages'?'active':''}" data-nav="messages" aria-label="الرسائل" title="الرسائل"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></svg><span class="message-nav-label">الرسائل</span><span class="message-count" id="messageCount">0</span></a>`;
+  }
+  nav.innerHTML = `
+    ${links}
+    <button class="nav-btn pwa-install-btn" id="installAppBtn" type="button" hidden>⬇ تثبيت التطبيق</button>
+    <button class="notification-bell no-print" id="notificationBell" title="تنبيهات الرصد" aria-label="تنبيهات الرصد">🔔<span class="bell-count" id="bellCount">0</span></button>
+    <button class="nav-btn logout-btn" id="logoutBtn">خروج</button>
+  `;
+  const menuIsOpen=nav.classList.contains('mobile-open');
+  const toggle=document.getElementById('menuToggle');
+  if(toggle){toggle.setAttribute('aria-expanded',String(menuIsOpen));toggle.setAttribute('aria-label',menuIsOpen?'إغلاق قائمة التنقل':'فتح قائمة التنقل');toggle.onclick=()=>{const open=nav.classList.toggle('mobile-open');toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'إغلاق قائمة التنقل':'فتح قائمة التنقل');};}
+  nav.querySelectorAll('[data-nav]').forEach(el=> el.onclick = ()=> {nav.classList.remove('mobile-open');navigate(el.dataset.nav);});
+  const installBtn=document.getElementById('installAppBtn');if(installBtn&&rasidInstallPrompt){installBtn.hidden=false;installBtn.onclick=installRasidApp;}
+  document.getElementById('logoutBtn').onclick = logout;
+  refreshMessageBadge();
+  bindNotificationBell();
+}
+
+/* ==========================================================================
+   إعدادات المدرسة واللغة
+   ========================================================================== */
+function viewSchoolSettings(){
+  const type = store.schoolType === 'boys' ? 'boys' : 'girls';
+  return `<div class="container">
+    <div class="page-title"><div><h2>الإعدادات</h2><p>تخصيص نوع المدرسة وأسماء التوقيع أسفل التقارير المصدّرة</p></div></div>
+    <div class="modal wide" style="position:relative;margin:0 auto;max-width:720px">
+      <div class="modal-head"><h3>إعدادات المدرسة والتقارير</h3></div>
+      <div class="modal-body">
+        <p style="color:#5b7382;margin-bottom:18px">يتغير أسلوب العبارات الظاهرة في المنصة تلقائيًا حسب اختيارك. لا يتم تعديل أسماء الطلاب أو سجلات الحضور والغياب.</p>
+        <div class="field">
+          <label for="schoolTypeSelect">اختر نوع المدرسة</label>
+          <select id="schoolTypeSelect">
+            <option value="boys" ${type==='boys'?'selected':''}>مدرسة بنين</option>
+            <option value="girls" ${type==='girls'?'selected':''}>مدرسة بنات</option>
+          </select>
+        </div>
+
+        <div style="border-top:1px solid var(--line);margin:22px 0 16px;padding-top:18px">
+          <h3 style="font-size:1rem;color:var(--navy);margin-bottom:6px">أسماء المعلمين للرصد</h3>
+          <p style="color:#607d8b;font-size:.82rem;margin-bottom:12px">تظهر الأسماء كاقتراحات عند تسجيل الغياب، ولا تنشئ حسابات أو صلاحيات منفصلة.</p>
+          <div class="field" style="max-width:520px;display:flex;gap:8px;align-items:flex-end">
+            <div style="flex:1"><label for="quickTeacherName">اسم المعلم/ة</label><input id="quickTeacherName" maxlength="120" placeholder="اكتب الاسم ثم اضغط إضافة"></div>
+            <button class="btn btn-primary" id="addQuickTeacherBtn" type="button">+ إضافة</button>
+          </div>
+          <div class="chip-list" id="teacherNamesChips" style="margin-top:12px">
+            ${(store.teacherNames||[]).length ? store.teacherNames.map(n=>`<button class="chip" type="button" data-teacher-name="${esc(n)}" title="حذف الاسم">${esc(n)} ✕</button>`).join('') : '<span style="color:#8299a6;font-size:.85rem">لا توجد أسماء مضافة بعد</span>'}
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--line);margin:22px 0 16px;padding-top:18px">
+          <h3 style="font-size:1rem;color:var(--navy);margin-bottom:12px">الأسماء أسفل التقارير المصدّرة</h3>
+          <div class="two-col">
+            <div class="field"><label for="reportManagerName">مدير / ة المدرسة</label><input id="reportManagerName" maxlength="120" value="${esc(store.reportSignatures?.manager||'')}" placeholder="اسم مدير/ة المدرسة"></div>
+            <div class="field"><label for="reportAttendanceName">مسؤول / ة الرصد</label><input id="reportAttendanceName" maxlength="120" value="${esc(store.reportSignatures?.attendance||'')}" placeholder="اسم مسؤول/ة الرصد"></div>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="saveSchoolType">حفظ الإعدادات</button>
+        <span id="schoolTypeSaved" style="margin-right:10px;color:var(--success);font-weight:700"></span>
+      </div>
+    </div>
+  </div>`;
+}
+function bindSchoolSettings(){
+  const select = document.getElementById('schoolTypeSelect');
+  const saved = document.getElementById('schoolTypeSaved');
+  if(!select) return;
+  const addQuickBtn=document.getElementById('addQuickTeacherBtn'),quickInput=document.getElementById('quickTeacherName');
+  const addQuickName=()=>{
+    const name=(quickInput?.value||'').trim();if(!name)return;
+    if(!Array.isArray(store.teacherNames))store.teacherNames=[];
+    if(store.teacherNames.includes(name)){toast('هذا الاسم موجود بالفعل',true);return;}
+    store.teacherNames.push(name);saveStore();render();
+  };
+  if(addQuickBtn)addQuickBtn.onclick=addQuickName;
+  if(quickInput)quickInput.addEventListener('keypress',e=>{if(e.key==='Enter'){e.preventDefault();addQuickName();}});
+  document.querySelectorAll('[data-teacher-name]').forEach(chip=>chip.onclick=()=>{
+    const name=chip.dataset.teacherName;if(!confirm(`حذف "${name}" من قائمة أسماء المعلمين للرصد؟`))return;
+    store.teacherNames=(store.teacherNames||[]).filter(item=>item!==name);saveStore();render();
+  });
+  select.onchange = ()=>{ saved.textContent = ''; };
+  document.getElementById('saveSchoolType').onclick = ()=>{
+    store.schoolType = select.value === 'boys' ? 'boys' : 'girls';
+    store.reportSignatures = {
+      manager: (document.getElementById('reportManagerName')?.value||'').trim(),
+      attendance: (document.getElementById('reportAttendanceName')?.value||'').trim()
+    };
+    saveStore();
+    saved.textContent = 'تم حفظ الإعدادات';
+    render();
+  };
+}
+function applyGenderLanguage(root){
+  if(!root || store.schoolType !== 'boys') return;
+  const pairs = [
+    ['الطلاب والطالبات','الطلاب'],
+    ['الطالبات','الطلاب'],
+    ['الطالبة','الطالب'],
+    ['الطالب/ة','الطالب'],
+    ['ابنتكم','ابنكم'],
+    ['المعلمات','المعلمين'],
+    ['المعلمة','المعلم'],
+    ['الإداريات','الإداريين'],
+    ['الإدارية','الإداري'],
+    ['اسحبي','اسحب'],
+    ['امسحي','امسح'],
+    ['اكتبي','اكتب'],
+    ['ابحثي','ابحث'],
+    ['اضغطي','اضغط'],
+    ['حاضرات','حاضرون'],
+    ['غائبات','غائبون'],
+    ['حاضرة','حاضر'],
+    ['غائبة','غائب'],
+    ['غائبات:','غائبون:'],
+    ['امسحي الكود','امسح الكود'],
+    ['أضيفي','أضف'],
+    ['اختاري','اختر'],
+    ['أدخلي','أدخل'],
+    ['اكتبي','اكتب']
+  ];
+  const translate = value => {
+    let out = value;
+    for(const [from,to] of pairs) out = out.split(from).join(to);
+    return out;
+  };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while(walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node=>{ node.nodeValue = translate(node.nodeValue); });
+  root.querySelectorAll('[placeholder],[title],[aria-label]').forEach(el=>{
+    ['placeholder','title','aria-label'].forEach(attr=>{
+      const val=el.getAttribute(attr);
+      if(val) el.setAttribute(attr,translate(val));
+    });
+  });
+}
+
+/* ==========================================================================
+   شاشة الدخول
+   ========================================================================== */
+function viewLogin(){
+  return `<div class="login-wrap"><div class="login-card"><div class="brand-mark">ر</div><h2>منصة راصد للغياب</h2><p class="sub">إدارة المدارس بحساب معتمد</p>
+  <div class="login-tabs"><button id="loginTab" class="active">تسجيل الدخول</button><button id="registerTab">تسجيل مدرسة جديدة</button></div>
+  <div class="login-error" id="loginErr"></div><form id="loginForm">
+   <div class="field" id="schoolField" style="display:none"><label>اسم المدرسة</label><input id="schoolName" autocomplete="organization"><label for="registrationSchoolType" style="display:block;margin-top:10px">نوع المدرسة</label><select id="registrationSchoolType"><option value="girls">بنات</option><option value="boys">بنين</option></select></div>
+   <div class="field"><label>البريد الإلكتروني</label><input id="lUser" type="email" required autocomplete="email"></div>
+   <div class="field"><label>كلمة المرور</label><input id="lPass" type="password" required minlength="6" autocomplete="current-password"></div>
+   <button class="btn btn-primary" style="width:100%;justify-content:center" type="submit">تسجيل الدخول</button>
+  </form><div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:#8299a6;font-size:.8rem"><span style="height:1px;background:#dbe6ec;flex:1"></span>أو<span style="height:1px;background:#dbe6ec;flex:1"></span></div>
+  <button class="btn btn-outline" id="googleLogin" type="button" style="width:100%;justify-content:center">المتابعة باستخدام Google</button>
+  <button class="btn btn-outline pwa-install-btn" id="installLoginBtn" type="button" style="width:100%;justify-content:center;margin-top:10px" hidden>⬇ تثبيت التطبيق</button>
+  <p style="margin-top:16px;color:#607d8b;font-size:.78rem">يُفعّل حساب المدرسة بعد مراجعة واعتماد الإدارة.</p></div></div>`;
+}
+function bindLogin(){
+ let registering=false; const loginTab=document.getElementById('loginTab'), registerTab=document.getElementById('registerTab');
+ const installButton=document.getElementById('installLoginBtn');if(installButton){installButton.hidden=!rasidInstallPrompt;installButton.onclick=installRasidApp;}
+ const setMode=value=>{registering=value;loginTab.classList.toggle('active',!value);registerTab.classList.toggle('active',value);document.getElementById('schoolField').style.display=value?'block':'none';document.getElementById('schoolName').required=value;document.querySelector('#loginForm button[type=submit]').textContent=value?'إرسال طلب التسجيل':'تسجيل الدخول';document.getElementById('googleLogin').textContent=value?'التسجيل باستخدام Google':'المتابعة باستخدام Google';document.getElementById('loginErr').textContent='';};
+ loginTab.onclick=()=>setMode(false); registerTab.onclick=()=>setMode(true);
+ document.getElementById('googleLogin').onclick=async()=>{
+  const btn=document.getElementById('googleLogin');btn.disabled=true;btn.textContent='جارٍ الاتصال بـ Google…';
+  try{
+   if(!firebaseReady)throw new Error('أكمل إعداد Firebase أولاً بملف firebase-config.js.');
+   const schoolName=document.getElementById('schoolName').value.trim();if(registering&&!schoolName)throw new Error('اكتب اسم المدرسة أولاً.');
+   pendingRegistration=true;const provider=new firebase.auth.GoogleAuthProvider();const cred=await auth.signInWithPopup(provider);const uid=cred.user.uid;
+   const snap=await db.collection('users').doc(uid).get();const profile=snap.exists?snap.data():null;
+   if(registering){
+    if(profile){await auth.signOut();pendingRegistration=false;throw new Error(profile.status==='approved'?'هذا الحساب مرتبط بمدرسة معتمدة. اختر تسجيل الدخول.':'لديك طلب تسجيل سابق. انتظر اعتماده أو تواصل مع إدارة المنصة.');}
+    await db.collection('users').doc(uid).set({email:cred.user.email,schoolName,schoolType:document.getElementById('registrationSchoolType').value,schoolId:uid,status:'pending',provider:'google',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await auth.signOut();pendingRegistration=false;document.getElementById('loginErr').textContent='تم إرسال طلب التسجيل. سيعمل الحساب بعد اعتماد المدرسة.';
+   }else{
+    if(!profile||profile.status!=='approved'||!profile.schoolId){await auth.signOut();pendingRegistration=false;throw new Error(profile?'طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.':'اختر «تسجيل مدرسة جديدة» أولاً لإرسال طلب الاعتماد.');}
+    activeSchoolId=profile.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='rasid_store_v1_'+activeSchoolId;store=loadStore();SCHOOL_NAME=profile.schoolName||'مدرستي';session={type:'admin',id:uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);schoolDataReady=true;
+    pendingRegistration=false;startAutoSync();navigate('dashboard');
+   }
+  }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/popup-closed-by-user'?'أُغلق تسجيل الدخول قبل اكتماله.':(err.message||'تعذر تسجيل الدخول باستخدام Google.');}
+  finally{btn.disabled=false;btn.textContent=registering?'التسجيل باستخدام Google':'المتابعة باستخدام Google';}
+ };
+ document.getElementById('loginForm').onsubmit=async e=>{e.preventDefault(); const email=document.getElementById('lUser').value.trim().toLowerCase(), password=document.getElementById('lPass').value, btn=e.target.querySelector('button[type=submit]'); btn.disabled=true; btn.textContent='جارٍ التحقق…';
+  try{
+   if(!firebaseReady) throw new Error('أكمل إعداد Firebase أولاً بملف firebase-config.js.');
+   if(registering){
+    const schoolName=document.getElementById('schoolName').value.trim(); if(!schoolName) throw new Error('اكتب اسم المدرسة.');
+    pendingRegistration=true; const cred=await auth.createUserWithEmailAndPassword(email,password); const uid=cred.user.uid;
+    await db.collection('users').doc(uid).set({email,schoolName,schoolType:document.getElementById('registrationSchoolType').value,schoolId:uid,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    await auth.signOut(); pendingRegistration=false; document.getElementById('loginErr').textContent='تم إرسال الطلب. سيعمل الحساب بعد اعتماد المدرسة.';
+   } else {
+    const cred=await auth.signInWithEmailAndPassword(email,password); const snap=await db.collection('users').doc(cred.user.uid).get(); const profile=snap.data();
+    if(!profile || profile.status!=='approved' || !profile.schoolId){await auth.signOut();throw new Error('طلب المدرسة ما زال بانتظار الاعتماد أو تم رفضه.');}
+    activeSchoolId=profile.schoolId; resetCloudSyncState(activeSchoolId); STORAGE_KEY='rasid_store_v1_'+activeSchoolId; store=loadStore(); store.schoolType=profile.schoolType==='boys'?'boys':'girls'; SCHOOL_NAME=profile.schoolName || 'مدرستي'; session={type:'admin',id:cred.user.uid,name:profile.schoolName||email,approved:true,schoolId:activeSchoolId};saveSession();
+    await pullFromServer(true);schoolDataReady=true;
+    startAutoSync(); navigate('dashboard');
+   }
+  }catch(err){pendingRegistration=false;document.getElementById('loginErr').textContent=err.code==='auth/email-already-in-use'?'هذا البريد مسجل مسبقًا.':err.code==='auth/invalid-credential'?'البريد أو كلمة المرور غير صحيحة.':err.code==='auth/weak-password'?'كلمة المرور يجب أن تكون 6 أحرف على الأقل.':(err.message||'تعذر إتمام الطلب.');}
+  finally{btn.disabled=false;btn.textContent=registering?'إرسال طلب التسجيل':'تسجيل الدخول';}
+ };
+}
+
+/* ==========================================================================
+   لوحة التحكم
+   ========================================================================== */
+function classCardHtml(c){
+  const s = classStats(c);
+  return `
+  <div class="class-card">
+    <div class="cc-top"></div>
+    <div class="cc-body">
+      <div class="cc-head">
+        <h3>${esc(classDisplayName(c))}</h3>
+        ${session.type==='admin' ? `
+        <div class="cc-menu">
+          <button class="cc-menu-btn" data-menu="${c.id}">⋮</button>
+          <div class="cc-menu-list" id="menu-${c.id}">
+            <button data-edit-class="${c.id}">تعديل الفصل</button>
+            <button data-manage-students="${c.id}">إدارة الطلاب والطالبات</button>
+            <button data-del-class="${c.id}">حذف الفصل</button>
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="progress-wrap"><div class="progress-bar" style="width:${s.pct}%"></div></div>
+      <div class="cc-nums"><span>نسبة الحضور <b>${s.pct}%</b></span><span>مرصود <b>${s.marked}/${s.total}</b></span></div>
+      <div class="cc-nums"><span>غياب اليوم <b style="color:var(--danger)">${s.absent}</b></span></div>
+      <div class="cc-actions">
+        <button class="primary" data-goto-scan="${c.id}">📋<span>رصد</span></button>
+        <button data-view-absent="${c.id}">🚫<span>الغائبات</span></button>
+        <button data-goto-qr="${c.id}">🔗<span>QR</span></button>
+        <button data-export-xlsx="${c.id}">📊<span>Excel</span></button>
+        <button data-export-pdf="${c.id}">📄<span>PDF</span></button>
+        ${session.type==='admin' ? `<button data-report-class="${c.id}">📱<span>تقرير الفصل</span></button>` : ''}
+        ${session.type==='admin' ? `<button data-del-today="${c.id}">↺<span>حذف اليوم</span></button>` : `<span></span>`}
+      </div>
+    </div>
+  </div>`;
+}
+function filteredDashboardClasses(){
+  const q = (dashboardQuery||'').trim();
+  const classes = visibleClasses();
+  if(!q) return classes;
+  return classes.filter(c=>{
+    if(classDisplayName(c).toLocaleLowerCase().includes(q.toLocaleLowerCase())) return true;
+    return studentsOfClass(c.id).some(s=> s.name.includes(q) || String(s.number||'').includes(q));
+  });
+}
+function viewDashboard(){
+  const allClasses = visibleClasses();
+  const classes = filteredDashboardClasses();
+  const totalClasses = allClasses.length;
+  const totalStudents = allClasses.reduce((a,c)=>a+studentsOfClass(c.id).length,0);
+  let markedToday=0, absentToday=0;
+  allClasses.forEach(c=>{ const s=classStats(c); markedToday+=s.marked; absentToday+=s.absent; });
+
+  const cards = classes.map(classCardHtml).join('');
+
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>لوحة التحكم</h2><p>${esc(SCHOOL_NAME)}</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline btn-sm refresh-status-button" id="refreshNowBtn"><span id="syncIndicator" class="sync-indicator" data-state="disconnected" aria-label="منقطع" role="status"></span>تحديث</button>
+        ${session.type==='admin' ? `<button class="btn btn-gold" id="addClassBtn">+ إضافة فصل</button>` : ''}
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card navy"><div class="num">${totalClasses}</div><div class="lbl">عدد الفصول</div></div>
+      <div class="stat-card"><div class="num">${totalStudents}</div><div class="lbl">عدد الطلاب والطالبات الكلي</div></div>
+      <div class="stat-card gold"><div class="num">${markedToday}</div><div class="lbl">رصد اليوم</div></div>
+      <div class="stat-card danger"><div class="num">${absentToday}</div><div class="lbl">الغياب اليوم</div></div>
+    </div>
+    <input class="searchbox" id="dashSearch" style="margin-bottom:16px; width:100%;" placeholder="🔍 ابحث باسم الطالب/ة أو باسم/رقم الفصل..." value="${esc(dashboardQuery)}">
+    <div class="classes-grid" id="classesGrid">
+      ${cards || `<div class="empty" style="grid-column:1/-1"><b>${dashboardQuery? 'لا توجد نتائج مطابقة':'لا توجد فصول بعد'}</b>${dashboardQuery? 'جربي كلمة بحث أخرى' : (session.type==='admin' ? 'اضغطي "إضافة فصل" للبدء' : 'لم يتم إسناد فصول لك بعد')}</div>`}
+    </div>
+  </div>
+  <div id="modalHost"></div>`;
+}
+
+function bindDashboard(){
+  bindClassCardEvents();
+  document.getElementById('addClassBtn') && (document.getElementById('addClassBtn').onclick = ()=> openClassModal());
+  const refreshBtn = document.getElementById('refreshNowBtn');
+  if(refreshBtn){
+    refreshBtn.onclick = async ()=>{
+      refreshBtn.disabled = true;setSyncIndicator('syncing');
+      try{
+        const ok = await pullFromServer(false);
+        if(ok===false){setSyncIndicator('disconnected');toast('تعذّر الاتصال بالخادم للمزامنة', true);}
+        else {setSyncIndicator('synced');toast('تم تحديث البيانات');}
+      }finally{if(refreshBtn.isConnected)refreshBtn.disabled=false;}
+    };
+  }
+  const dashSearch = document.getElementById('dashSearch');
+  if(dashSearch){
+    dashSearch.oninput = (e)=>{
+      dashboardQuery = e.target.value;
+      const classes = filteredDashboardClasses();
+      const cards = classes.map(classCardHtml).join('');
+      document.getElementById('classesGrid').innerHTML = cards || `<div class="empty" style="grid-column:1/-1"><b>${dashboardQuery? 'لا توجد نتائج مطابقة':'لا توجد فصول بعد'}</b>${dashboardQuery? 'جربي كلمة بحث أخرى' : ''}</div>`;
+      bindClassCardEvents();
+    };
+  }
+}
+
+function bindClassCardEvents(){
+  document.querySelectorAll('[data-menu]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      document.querySelectorAll('.cc-menu-list').forEach(m=>{ if(m.id!=='menu-'+btn.dataset.menu) m.classList.remove('open'); });
+      document.getElementById('menu-'+btn.dataset.menu).classList.toggle('open');
+    };
+  });
+  document.addEventListener('click', ()=> document.querySelectorAll('.cc-menu-list').forEach(m=>m.classList.remove('open')), {once:true});
+
+  document.querySelectorAll('[data-edit-class]').forEach(b=> b.onclick = ()=> openClassModal(store.classes.find(c=>c.id===b.dataset.editClass)));
+  document.querySelectorAll('[data-del-class]').forEach(b=> b.onclick = ()=> deleteClass(b.dataset.delClass));
+  document.querySelectorAll('[data-manage-students]').forEach(b=> b.onclick = ()=> openStudentsModal(b.dataset.manageStudents));
+  document.querySelectorAll('[data-goto-scan]').forEach(b=> b.onclick = ()=> navigate('scan', {classId:b.dataset.gotoScan}));
+  document.querySelectorAll('[data-goto-qr]').forEach(b=> b.onclick = ()=> navigate('qr', {focusClass:b.dataset.gotoQr}));
+  document.querySelectorAll('[data-view-absent]').forEach(b=> b.onclick = ()=> openAbsentModal(b.dataset.viewAbsent));
+  document.querySelectorAll('[data-export-xlsx]').forEach(b=> b.onclick = ()=> exportClassExcel(b.dataset.exportXlsx));
+  document.querySelectorAll('[data-export-pdf]').forEach(b=> b.onclick = ()=> exportClassPDF(b.dataset.exportPdf));
+  document.querySelectorAll('[data-report-class]').forEach(b=> b.onclick = ()=> navigate('absenceReport',{classId:b.dataset.reportClass}));
+  document.querySelectorAll('[data-del-today]').forEach(b=> b.onclick = ()=> deleteTodayAttendance(b.dataset.delToday));
+}
+
+function openAbsentModal(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const att = attendanceOf(classId);
+  const absentees = att ? att.records.filter(r=>statusRank(r.status)===0) : [];
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal">
+      <div class="modal-head"><h3>الغائبون/الغائبات في فصل ${esc(classDisplayName(cls))} — ${todayStr()}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        ${absentees.length ? absentees.map(a=>`<div class="list-row"><div class="info"><b>${esc(a.studentName)}</b></div><span style="color:var(--danger); font-weight:700; font-size:.8rem;">غائبة</span></div>`).join('') : `<div class="empty"><b>لا يوجد غياب مسجّل اليوم</b></div>`}
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('cl').onclick = ()=> host.innerHTML='';
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') host.innerHTML=''; };
+}
+
+async function deleteClass(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const count = studentsOfClass(classId).length;
+  const msg = count>0
+    ? `سيتم حذف فصل "${cls?cls.name:''}" مع جميع طالباته (${count}) وسجلات غيابه نهائياً. متابعة؟`
+    : 'تأكيد حذف الفصل؟';
+  if(!confirm(msg)) return;
+  if(!auth || !auth.currentUser || !activeSchoolId || !session || !session.approved){
+    toast('انتهت جلسة الدخول أو لا توجد صلاحية للحذف؛ سجلي الدخول مجددًا',true); return;
+  }
+  if(!confirm('تأكيد نهائي: سيتم حذف الفصل وبياناته من قاعدة البيانات. هل تريد المتابعة؟')) return;
+  const snapshot=cloneStoreSnapshot();
+  store.classes = store.classes.filter(c=>c.id!==classId);
+  store.students = store.students.filter(s=>s.classId!==classId);
+  store.attendance = store.attendance.filter(a=>a.classId!==classId);
+  saveStore();
+  const result=await persistStoreMutation('deleteClass', {id:classId},snapshot);
+  if(!result.ok){render();toast('تعذر حذف الفصل من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+  render(); toast('تم حذف الفصل وجميع طالباته');
+}
+async function deleteTodayAttendance(classId){
+  if(!confirm('حذف رصد اليوم لهذا الفصل؟')) return;
+  const snapshot=cloneStoreSnapshot();
+  store.attendance = store.attendance.filter(a=>!(a.classId===classId && a.date===todayStr()));
+  saveStore();
+  const result=await persistStoreMutation('deleteToday', {classId, date:todayStr()},snapshot);
+  if(!result.ok){render();toast('تعذر حذف الرصد من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+  render(); toast('تم حذف رصد اليوم');
+}
+
+/* ---------- إضافة / تعديل فصل ---------- */
+function cleanClassName(name, number){
+  let value=String(name || '').trim();
+  const num=String(number == null ? '' : number).trim();
+  if(num && /^\d+$/.test(num)){
+    value=value.replace(new RegExp('\\\\s*(?:[-/–—]\\\\s*|\\\\s+)'+num+'$'), '').trim();
+  }
+  return value;
+}
+function classDisplayName(c){
+  const name=cleanClassName(c && c.name, c && c.number);
+  const grade=Number(String(c && c.gradeNumber != null ? c.gradeNumber : '').trim());
+  return Number.isSafeInteger(grade) && grade>0 ? `${name} ${grade}` : (name || String(c && c.name || ''));
+}
+function nextClassNumber(className, excludeId){
+  const numbers=(store.classes || []).filter(c=>!excludeId || c.id!==excludeId).map(c=>{
+    const value=String(c && c.number != null ? c.number : '').trim();
+    if(!/^\d+$/.test(value)) return null;
+    const n=Number(value);
+    return Number.isSafeInteger(n) && n>=0 ? n : null;
+  }).filter(n=>n!==null);
+  return String((numbers.length ? Math.max(...numbers) : 0)+1);
+}
+function openClassModal(existing){
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal wide">
+      <div class="modal-head"><h3>${existing? 'تعديل فصل':'إضافة فصل جديد وإدارة الطلاب والطالبات'}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div class="two-col">
+          <div class="field"><label for="cName">اسم الفصل</label><input id="cName" value="${existing? esc(cleanClassName(existing.name, existing.number)):''}" placeholder="مثال: أول متوسط"></div>
+          <div class="field"><label for="cGrade">رقم الصف <span style="color:#8299a6;font-weight:500">(اختياري)</span></label><input id="cGrade" type="number" min="0" step="1" inputmode="numeric" value="${existing && Number(existing.gradeNumber)>0?esc(existing.gradeNumber):'0'}" placeholder="0"><small style="display:block;color:#8299a6;font-size:.72rem;margin-top:4px">اتركه صفرًا أو فارغًا ليظهر اسم الفصل فقط</small></div>
+          <input id="cNum" type="hidden" value="${existing? esc(existing.number):''}">
+        </div>
+        ${existing ? `
+        <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
+        <p style="font-weight:800; color:var(--navy); margin-bottom:10px;">طلاب/طالبات الفصل (<span id="editStudentCount">0</span>)</p>
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <input class="searchbox" style="margin:0;" id="editSearchS" placeholder="بحث بالاسم أو الرقم...">
+          <button class="btn btn-outline" id="editAddS" style="flex-shrink:0;">+ إضافة طالبة</button>
+        </div>
+        <div id="editStudentsList" style="max-height:280px; overflow:auto;"></div>
+        ` : ''}
+        ${!existing ? `
+        <hr style="border:none; border-top:1px solid var(--line); margin:16px 0;">
+        <p style="font-weight:800; color:var(--navy); margin-bottom:12px;">إضافة الطلاب والطالبات إلى الفصل (اختاري إحدى الطرق أو استخدميها معاً):</p>
+
+        <div class="field">
+          <label style="color:#5b7382;">1) إضافة اسم اسم</label>
+          <div style="display:flex; gap:8px;">
+            <input id="singleStudentName" placeholder="اكتبي اسم الطالب/ة واضغطي إضافة">
+            <button class="btn btn-outline" id="btnAddSingle" style="flex-shrink:0;">إضافة</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="color:#5b7382;">2) السحب والإسقاط (أي صيغة ملف)</label>
+          <div class="dropzone" id="dz">
+            <b>📥 اسحبي ملف الأسماء وأسقطيه هنا</b>
+            أو اضغطي لاختيار ملف من جهازك
+            <input type="file" id="fileInput" style="display:none">
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="color:#5b7382;">3) لصق قائمة أسماء كاملة (اسم واحد في كل سطر)</label>
+          <textarea id="bulkStudentsText" rows="3" style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid var(--line); background:var(--bg1); resize:vertical;" placeholder="ألصقي قائمة الأسماء هنا..."></textarea>
+          <button class="btn btn-sm btn-outline" id="btnParseText" style="margin-top:8px;">حفظ الأسماء</button>
+        </div>
+
+        <div style="margin-top:16px;">
+          <p style="font-weight:800; color:var(--navy); margin-bottom:8px;">قائمة الطلاب والطالبات المضافين (<span id="studentCount">0</span>)</p>
+          <div id="tempStudentList" style="max-height:220px; overflow:auto;"></div>
+        </div>
+        ` : ''}
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="cancel">إلغاء</button>
+        <button class="btn btn-primary" id="save">${existing? 'حفظ' : 'حفظ الفصل والطالبات'}</button>
+      </div>
+    </div>
+  </div>`;
+  let tempStudents = [];
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('cancel').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+
+  if(existing){
+    const drawEditStudents = (filter)=>{
+      let list = studentsOfClass(existing.id).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+      if(filter) list = list.filter(s=> s.name.includes(filter) || String(s.number).includes(filter));
+      document.getElementById('editStudentCount').textContent = studentsOfClass(existing.id).length;
+      document.getElementById('editStudentsList').innerHTML = list.map(s=>`
+        <div class="list-row">
+          <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
+          <div class="row-actions">
+            <button class="icon-btn" data-edit-student-inline="${s.id}">✎</button>
+            <button class="icon-btn" data-move-student-inline="${s.id}" title="نقل الطالبة إلى فصل آخر" aria-label="نقل ${esc(s.name)} إلى فصل آخر">↔</button>
+            <button class="icon-btn del" data-del-student-inline="${s.id}">🗑</button>
+          </div>
+        </div>`).join('') || `<div class="empty"><b>لا توجد طالبات مطابقة</b></div>`;
+      document.querySelectorAll('[data-edit-student-inline]').forEach(b=> b.onclick = ()=> openStudentFormModal(existing.id, store.students.find(s=>s.id===b.dataset.editStudentInline), ()=> drawEditStudents(document.getElementById('editSearchS').value.trim())));
+      document.querySelectorAll('[data-move-student-inline]').forEach(b=> b.onclick = ()=> openStudentMoveModal(b.dataset.moveStudentInline, ()=> drawEditStudents(document.getElementById('editSearchS').value.trim())));
+      document.querySelectorAll('[data-del-student-inline]').forEach(b=> b.onclick = async ()=>{
+        if(!confirm('حذف هذا الطالب/ة؟')) return;
+        const snapshot=cloneStoreSnapshot();
+        store.students = store.students.filter(s=>s.id!==b.dataset.delStudentInline); saveStore();
+        const result=await persistStoreMutation('deleteStudent', {id:b.dataset.delStudentInline},snapshot);
+        drawEditStudents(document.getElementById('editSearchS').value.trim());
+        if(!result.ok){toast('تعذر حذف الطالب/ة من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+        toast('تم حذف الطالب/ة');
+      });
+    };
+    drawEditStudents();
+    document.getElementById('editSearchS').oninput = (e)=> drawEditStudents(e.target.value.trim());
+    document.getElementById('editAddS').onclick = ()=> openStudentFormModal(existing.id, null, ()=> drawEditStudents(document.getElementById('editSearchS').value.trim()));
+  }
+
+  if(!existing){
+    const renderTemp = ()=>{
+      document.getElementById('studentCount').textContent = tempStudents.length;
+      document.getElementById('tempStudentList').innerHTML = tempStudents.map((name,i)=>`
+        <div class="list-row" style="margin-bottom:6px; padding:9px 12px;">
+          <div class="info"><b style="font-size:.88rem;">${esc(name)}</b></div>
+          <button class="icon-btn del" data-rm="${i}">🗑</button>
+        </div>`).join('') || `<p style="color:#8299a6; font-size:.85rem;">لم تتم إضافة أي طالبة بعد</p>`;
+      document.querySelectorAll('[data-rm]').forEach(b=> b.onclick = ()=>{ tempStudents.splice(Number(b.dataset.rm),1); renderTemp(); });
+    };
+    const addNames = (names)=>{
+      names.forEach(n=>{ if(n && !tempStudents.includes(n)) tempStudents.push(n); });
+      renderTemp();
+    };
+    renderTemp();
+
+    document.getElementById('btnAddSingle').onclick = ()=>{
+      const inp = document.getElementById('singleStudentName');
+      const val = inp.value.trim();
+      if(val){ addNames([val]); inp.value=''; inp.focus(); }
+    };
+    document.getElementById('singleStudentName').addEventListener('keypress', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnAddSingle').click(); }
+    });
+    document.getElementById('btnParseText').onclick = ()=>{
+      const text = document.getElementById('bulkStudentsText').value;
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      addNames(lines);
+      document.getElementById('bulkStudentsText').value='';
+    };
+
+    const dz = document.getElementById('dz');
+    dz.onclick = ()=> document.getElementById('fileInput').click();
+    dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+    dz.addEventListener('drop', e=>{
+      e.preventDefault(); dz.classList.remove('drag');
+      if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    document.getElementById('fileInput').onchange = (e)=>{ if(e.target.files[0]) handleFile(e.target.files[0]); };
+
+    async function handleFile(file){
+      try{
+        const imported = await readNamesImportFile(file);
+        let names = [];
+        if(imported.kind === 'excel'){
+          names = extractNamesFromExcel(imported.sheets || [imported.rows || []]);
+        }else{
+          names = imported.text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+        }
+        if(!names.length){ toast('لم يتم العثور على أسماء. تأكدي من أن ملف Excel يحتوي على عمود أسماء واضح.', true); return; }
+        addNames(names);
+        toast(`تم استيراد ${names.length} اسمًا من "${file.name}"`);
+      }catch(err){ toast(err && err.message ? err.message : 'تعذّرت قراءة الملف', true); }
+    }
+  }
+
+  const classNameInput=document.getElementById('cName');
+  const classNumberInput=document.getElementById('cNum');
+  const classGradeInput=document.getElementById('cGrade');
+  if(existing) classNameInput.value=cleanClassName(existing.name, existing.number);
+  if(existing) classNumberInput.value=existing.number;
+  document.getElementById('save').onclick = async ()=>{
+    const name = classNameInput.value.trim();
+    const gradeRaw=String(classGradeInput.value||'').trim();
+    const gradeNumber=gradeRaw===''?0:Number(gradeRaw);
+    let number = existing ? String(existing.number||'').trim() : nextClassNumber(name);
+    if(!name){ toast('يرجى إدخال اسم الصف', true); return; }
+    if(!/^\d+$/.test(gradeRaw||'0') || !Number.isSafeInteger(gradeNumber) || gradeNumber<0){ toast('رقم الصف يجب أن يكون عددًا صحيحًا موجبًا أو صفرًا', true); return; }
+    if(!number) number=nextClassNumber(name, existing && existing.id);
+    if(!/^\d+$/.test(number)){ toast('رقم الفصل يجب أن يكون رقمًا صحيحًا', true); return; }
+    const duplicate=(store.classes||[]).some(c=>c.id!==(existing&&existing.id) && cleanClassName(c.name,c.number).toLocaleLowerCase()===name.toLocaleLowerCase() && Number(c.gradeNumber||0)===gradeNumber);
+    if(duplicate){ toast('هذا الفصل ورقم الصف موجودان مسبقًا', true); return; }
+    const snapshot=cloneStoreSnapshot();
+    if(existing){
+      existing.number = number; existing.gradeNumber=gradeNumber; existing.name = name;
+      saveStore();
+      const result=await persistStoreMutation('saveClass', existing,snapshot);
+      if(!result.ok){close();render();toast('تعذر حفظ تعديل الفصل في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      toast('تم تحديث الفصل وحفظه في قاعدة البيانات');
+    }else{
+      const classId = uid();
+      const classObj = { id: classId, number, gradeNumber, name };
+      const newStudents = tempStudents.map((n,i)=>({ id: uid(), classId, number: String(i+1), name: n }));
+      store.classes.push(classObj);
+      store.students.push(...newStudents);
+      saveStore();
+      const result=await persistStoreMutation('saveClassWithStudents', { classObj, students: newStudents },snapshot);
+      if(!result.ok){close();render();toast('تعذر حفظ الفصل والطلاب في قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      toast('تم حفظ الفصل والطالبات في قاعدة البيانات');
+    }
+    close(); render();
+  };
+}
+
+
+/* قراءة ملفات الاستيراد حسب نوعها، لتجنب عرض محتوى PDF وWord الثنائي كرموز */
+function extractNamesFromExcel(sheets){
+  const found = [];
+  const seen = new Set();
+  const isName = value => {
+    const v = String(value ?? '').replace(/\s+/g,' ').trim();
+    return v.length >= 2 && /[\u0600-\u06FFa-zA-Z]/.test(v) && !/^\d+$/.test(v);
+  };
+  for(const rows of sheets){
+    if(!Array.isArray(rows) || !rows.length) continue;
+    let headerRow = -1, nameCol = -1;
+    for(let ri=0;ri<Math.min(rows.length,30);ri++){
+      const row = rows[ri] || [];
+      const ci = row.findIndex(v => /اسم\s*(الطالبة|الطالب|الاسم)|student\s*name|^name$/i.test(String(v ?? '').trim()));
+      if(ci>=0){headerRow=ri;nameCol=ci;break;}
+    }
+    if(nameCol>=0){
+      for(let ri=headerRow+1;ri<rows.length;ri++){
+        const value=String((rows[ri]||[])[nameCol] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(value) && !seen.has(value)){seen.add(value);found.push(value);}
+      }
+      continue;
+    }
+    const maxCols=Math.max(0,...rows.map(row=>(row||[]).length));
+    let bestCol=-1,bestScore=0;
+    for(let ci=0;ci<maxCols;ci++){
+      let score=0;
+      for(const row of rows){
+        const v=String((row||[])[ci] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(v) && !/^(الفصل|اسم الطالب\/ة|اسم الطالبة|اسم الطالب|رقم الطالب\/ة|رقم الطالبة|رقم الطالب|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(v)) score++;
+      }
+      if(score>bestScore){bestScore=score;bestCol=ci;}
+    }
+    if(bestCol>=0){
+      for(const row of rows){
+        const value=String((row||[])[bestCol] ?? '').replace(/\s+/g,' ').trim();
+        if(isName(value) && !/^(الفصل|اسم الطالب\/ة|اسم الطالبة|اسم الطالب|رقم الطالب\/ة|رقم الطالبة|رقم الطالب|الصف|القسم|العام|الفصل الدراسي|م|مادة)$/i.test(value) && !seen.has(value)){
+          seen.add(value);found.push(value);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+async function readNamesImportFile(file){
+  const name = String(file && file.name || '');
+  const ext = (name.match(/\.([^.]+)$/) || [,''])[1].toLowerCase();
+  if (['xlsx','xls'].includes(ext)) {
+    if (!window.XLSX) throw new Error('مكتبة Excel غير متاحة');
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, {type:'array'});
+    const sheets = wb.SheetNames.map(sheetName => XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''}));
+    return {kind:'excel', sheets};
+  }
+  if (ext === 'docx') {
+    if (!window.mammoth) throw new Error('تعذر تحميل قارئ Word');
+    const result = await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return {kind:'text', text:result.value || ''};
+  }
+  if (ext === 'pdf') {
+    if (!window.pdfjsLib) throw new Error('تعذر تحميل قارئ PDF');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf = await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    const lines = [];
+    for (let pageNo=1; pageNo<=pdf.numPages; pageNo++) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      const groups = new Map();
+      for (const item of content.items) {
+        if (!item.str || !item.str.trim()) continue;
+        const y = Math.round(item.transform[5]);
+        if (!groups.has(y)) groups.set(y, []);
+        groups.get(y).push({x:item.transform[4], text:item.str.trim()});
+      }
+      [...groups.keys()].sort((a,b)=>b-a).forEach(y=>{
+        const line = groups.get(y).sort((a,b)=>b.x-a.x).map(x=>x.text).join(' ').trim();
+        if (line) lines.push(line);
+      });
+    }
+    let text = lines.join('\n');
+    if (!text.trim()) {
+      if(!window.Tesseract) throw new Error('هذا PDF عبارة عن صور. تعذّر تحميل قارئ OCR؛ جرّبي نسخة PDF نصية أو ملف Word.');
+      const worker = await Tesseract.createWorker('ara');
+      try{
+        const ocrLines=[];
+        for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+          const page=await pdf.getPage(pageNo);
+          const viewport=page.getViewport({scale:2});
+          const canvas=document.createElement('canvas');
+          canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
+          const ctx=canvas.getContext('2d');
+          await page.render({canvasContext:ctx,viewport}).promise;
+          const result=await worker.recognize(canvas);
+          if(result && result.data && result.data.text) ocrLines.push(result.data.text);
+          canvas.width=canvas.height=1;
+        }
+        text=ocrLines.join('\n');
+      }finally{ await worker.terminate(); }
+      if(!text.trim()) throw new Error('لم يتمكن OCR من قراءة أسماء من هذا الملف. جرّبي نسخة أوضح أو ملف Excel/Word.');
+    }
+    return {kind:'text', text};
+  }
+  if (['txt','csv'].includes(ext)) return {kind:'text', text:await file.text()};
+  throw new Error('نوع الملف غير مدعوم. استخدمي PDF أو Excel أو Word بصيغة DOCX أو TXT أو CSV.');
+}
+
+/* ---------- إدارة الطلاب والطالبات ---------- */
+function openStudentsModal(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  const host = document.getElementById('modalHost');
+  const draw = (filter)=>{
+    let list = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+    if(filter) list = list.filter(s=> s.name.includes(filter) || String(s.number).includes(filter));
+    return list.map(s=>`
+      <div class="list-row">
+        <div class="info"><b>${esc(s.name)}</b><span>رقم ${esc(s.number)}${guardianPhoneForStudent(s)?` — <span class="guardian-phone">ولي الأمر: ${esc(guardianPhoneForStudent(s))}</span>`:''}</span></div>
+        <div class="row-actions">
+          <button class="icon-btn" data-edit-student="${s.id}">✎</button>
+          <button class="icon-btn" data-move-student="${s.id}" title="نقل الطالبة إلى فصل آخر" aria-label="نقل ${esc(s.name)} إلى فصل آخر">↔</button>
+          <button class="icon-btn del" data-del-student="${s.id}">🗑</button>
+        </div>
+      </div>`).join('') || `<div class="empty"><b>لا توجد طالبات</b></div>`;
+  };
+  host.innerHTML = `
+  <div class="overlay" id="ov">
+    <div class="modal wide">
+      <div class="modal-head"><h3>الطلاب والطالبات في فصل ${esc(classDisplayName(cls))}</h3><button class="modal-close" id="cl">✕</button></div>
+      <div class="modal-body">
+        <div style="display:flex; gap:10px; margin-bottom:14px;">
+          <input class="searchbox" style="margin:0;" id="searchS" placeholder="بحث بالاسم أو الرقم...">
+          <button class="btn btn-primary" id="addS" style="flex-shrink:0;">+ إضافة طالبة</button>
+        </div>
+        <div id="studentsList">${draw()}</div>
+      </div>
+    </div>
+  </div>`;
+  const close = ()=> host.innerHTML='';
+  document.getElementById('cl').onclick = close;
+  document.getElementById('ov').onclick = (e)=>{ if(e.target.id==='ov') close(); };
+  document.getElementById('searchS').oninput = (e)=>{ document.getElementById('studentsList').innerHTML = draw(e.target.value.trim()); bindStudentRowEvents(); };
+  document.getElementById('addS').onclick = ()=> openStudentFormModal(classId, null, ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); });
+  function bindStudentRowEvents(){
+    document.querySelectorAll('[data-edit-student]').forEach(b=> b.onclick = ()=> openStudentFormModal(classId, store.students.find(s=>s.id===b.dataset.editStudent), ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); }));
+    document.querySelectorAll('[data-move-student]').forEach(b=> b.onclick = ()=> openStudentMoveModal(b.dataset.moveStudent, ()=>{ document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents(); }));
+    document.querySelectorAll('[data-del-student]').forEach(b=> b.onclick = async ()=>{
+      if(!confirm('حذف هذا الطالب/ة؟')) return;
+      const snapshot=cloneStoreSnapshot();
+      store.students = store.students.filter(s=>s.id!==b.dataset.delStudent); saveStore();
+      const result=await persistStoreMutation('deleteStudent', {id:b.dataset.delStudent},snapshot);
+      document.getElementById('studentsList').innerHTML = draw(); bindStudentRowEvents();
+      if(!result.ok){toast('تعذر حذف الطالب/ة من قاعدة البيانات؛ أُعيدت البيانات كما كانت',true);return;}
+      renderTopnav(); toast('تم حذف الطالب/ة');
+    });
+  }
+  bindStudentRowEvents();
+}
+
+function nextStudentNumber(classId, excludeId){
+  const numbers = studentsOfClass(classId)
+    .filter(s=>s.id!==excludeId)
+    .map(s=>Number(String(s.number||'').trim()))
+    .filter(n=>Number.isSafeInteger(n) && n>0);
+  return String(Math.max(0, ...numbers)+1);
+}
+
+function openStudentMoveModal(studentId,onDone){
+  const student=store.students.find(s=>String(s.id)===String(studentId));
+  if(!student){toast('تعذر العثور على الطالبة لنقلها',true);return;}
+  const destinations=store.classes.filter(c=>String(c.id)!==String(student.classId));
+  if(!destinations.length){toast('أضيفي فصلًا آخر أولًا حتى تتمكني من نقل الطالبة',true);return;}
+  const wrap=document.createElement('div');
+  wrap.innerHTML=`
+    <div class="overlay" id="moveStudentOverlay" style="z-index:120;">
+      <div class="modal">
+        <div class="modal-head"><h3>نقل الطالبة إلى فصل آخر</h3><button class="modal-close" id="closeMoveStudent" aria-label="إغلاق">✕</button></div>
+        <div class="modal-body">
+          <p style="margin-top:0"><b>${esc(student.name)}</b></p>
+          <div class="field"><label for="moveStudentClass">الفصل الجديد</label><select id="moveStudentClass">${destinations.map(c=>`<option value="${esc(c.id)}">${esc(classDisplayName(c))}</option>`).join('')}</select></div>
+          <p style="color:#607d8b;font-size:.82rem;line-height:1.7;margin-bottom:0">سيُحدَّد رقمها تلقائيًا في الفصل الجديد، وتبقى سجلات الرصد السابقة محفوظة.</p>
+        </div>
+        <div class="modal-foot"><button class="btn btn-outline" id="cancelMoveStudent">إلغاء</button><button class="btn btn-primary" id="confirmMoveStudent">نقل الطالبة</button></div>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close=()=>{if(wrap.parentNode)wrap.parentNode.removeChild(wrap);};
+  wrap.querySelector('#closeMoveStudent').onclick=close;
+  wrap.querySelector('#cancelMoveStudent').onclick=close;
+  wrap.querySelector('#moveStudentOverlay').onclick=e=>{if(e.target.id==='moveStudentOverlay')close();};
+  wrap.querySelector('#confirmMoveStudent').onclick=async()=>{
+    const targetClassId=wrap.querySelector('#moveStudentClass').value;
+    const targetClass=store.classes.find(c=>String(c.id)===String(targetClassId));
+    const current=store.students.find(s=>String(s.id)===String(studentId));
+    if(!targetClass||!current){toast('تعذر العثور على الفصل أو الطالبة',true);return;}
+    const button=wrap.querySelector('#confirmMoveStudent');button.disabled=true;
+    const snapshot=cloneStoreSnapshot();
+    const updated=Object.assign({},current,{classId:targetClass.id,number:nextStudentNumber(targetClass.id,current.id)});
+    const result=await persistStoreMutation('saveStudent',updated,snapshot);
+    if(!result.ok){button.disabled=false;toast('تعذر نقل الطالبة إلى الفصل الجديد؛ أُعيدت البيانات كما كانت',true);return;}
+    close();onDone&&onDone();renderTopnav();toast(`تم نقل ${current.name} إلى ${classDisplayName(targetClass)} مع ترقيمها تلقائيًا`);
+  };
+}
+
+function openStudentFormModal(classId, existing, onDone){
+  const host = document.getElementById('modalHost');
+  const prevHTML = host.innerHTML;
+  const classOptions = store.classes.map(c=>`<option value="${c.id}" ${existing&&existing.classId===c.id?'selected':(c.id===classId?'selected':'')}>${esc(classDisplayName(c))}</option>`).join('');
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+  <div class="overlay" id="ov2" style="z-index:110;">
+    <div class="modal">
+      <div class="modal-head"><h3>${existing?'تعديل طالبة':'إضافة طالبة'}</h3><button class="modal-close" id="cl2">✕</button></div>
+      <div class="modal-body">
+        <div class="field"><label>الفصل</label><select id="sClass">${classOptions}</select></div>
+        <div class="field"><label>الاسم الكامل</label><input id="sName" value="${existing?esc(existing.name):''}"></div>
+        <div class="field"><label>رقم جوال ولي الأمر <span style="color:#8299a6;font-weight:500;">(اختياري)</span></label><input id="sGuardian" inputmode="tel" placeholder="05xxxxxxxx" value="${existing?esc(guardianPhoneForStudent(existing)):''}"></div>
+      </div>
+      <div class="modal-foot"><button class="btn btn-outline" id="cancel2">إلغاء</button><button class="btn btn-primary" id="save2">حفظ</button></div>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const close = ()=> document.body.removeChild(wrap);
+  wrap.querySelector('#cl2').onclick = close;
+  wrap.querySelector('#cancel2').onclick = close;
+  wrap.querySelector('#ov2').onclick = (e)=>{ if(e.target.id==='ov2') close(); };
+  wrap.querySelector('#save2').onclick = async ()=>{
+    const name = wrap.querySelector('#sName').value.trim();
+    const clsId = wrap.querySelector('#sClass').value;
+    const number = existing && clsId===existing.classId ? existing.number : nextStudentNumber(clsId, existing&&existing.id);
+    const rawGuardianPhone = wrap.querySelector('#sGuardian').value.trim();
+    const guardianPhone = rawGuardianPhone ? normalizePhoneClient(rawGuardianPhone) : '';
+    if(!name){ toast('أدخلي اسم الطالب/ة', true); return; }
+    if(rawGuardianPhone && !guardianPhone){ toast('رقم جوال ولي الأمر غير صالح؛ أدخلي رقمًا سعوديًا يبدأ بـ 05', true); return; }
+    const snapshot=cloneStoreSnapshot();
+    if(existing){
+      const oldName = existing.name;
+      const updated = Object.assign({}, existing, {name, number, classId:clsId, guardianPhone, oldName});
+      const result = await persistStoreMutation('saveStudent', updated,snapshot);
+      if(!result.ok) { toast('تعذر حفظ التعديل في قاعدة البيانات؛ أُعيدت البيانات كما كانت', true); return; }
+      toast('تم تحديث بيانات الطالب/ة ورقم ولي الأمر وحفظها في قاعدة البيانات');
+    }else{
+      const st = { id: uid(), classId: clsId, number, name, guardianPhone };
+      const result = await persistStoreMutation('saveStudent', st,snapshot);
+      if(!result.ok) { toast('تعذر حفظ الطالب/ة في قاعدة البيانات؛ أُعيدت البيانات كما كانت', true); return; }
+      toast('تمت إضافة الطالب/ة ورقم ولي الأمر وحفظهما في قاعدة البيانات');
+    }
+    close(); onDone && onDone(); renderTopnav();
+  };
+}
+
+/* ==========================================================================
+   صفحة الرصد
+   ========================================================================== */
+function viewScan(classId){
+  const cls = store.classes.find(c=>c.id===classId);
+  if(!cls){
+    return `<div class="scan-wrap"><div class="empty"><b>لم يتم العثور على هذا الفصل</b>تأكدي من رابط كود QR${session? `<div style="margin-top:14px;"><button class="btn btn-primary" onclick="navigate('dashboard')">العودة للوحة التحكم</button></div>`:''}</div></div>`;
+  }
+  const existing = attendanceOf(cls.id);
+  if(existing && !route.editing){
+    return viewScanConfirm(cls, existing);
+  }
+  const students = studentsOfClass(cls.id).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
+  const allTeacherNames = [...new Set([...store.staff.map(s=>s.name), ...(store.teacherNames||[])])].filter(Boolean);
+  const staffOptions = allTeacherNames.map(n=>`<option value="${esc(n)}"></option>`).join('');
+  const defaultTeacher = session && session.type==='staff' ? session.name : (existing? existing.teacher : '');
+  return `
+  <div class="scan-wrap">
+    ${session ? `<button class="btn btn-outline" style="margin-bottom:14px;" onclick="navigate('dashboard')">→ العودة للوحة التحكم</button>` : ''}
+    <div class="scan-head glow">
+      <h2>رصد الغياب والحضور — فصل ${esc(classDisplayName(cls))}</h2>
+      <p>${esc(SCHOOL_NAME)} — ${todayStr()}</p>
+      ${route.publicMode ? `<p style="font-size:.9rem;color:#fff;margin:8px 0">اختاري الغائبات ثم أرسلي التصويت مرة واحدة لهذا الفصل اليوم.</p>` : `<div class="teacher-field" style="display:flex; gap:8px; align-items:stretch;">
+        <input id="teacherSelect" list="teacherNamesList" placeholder="اسم المعلم/ة (اختياري)" value="${esc(defaultTeacher)}" autocomplete="off" style="flex:1;">
+        <datalist id="teacherNamesList">${staffOptions}</datalist>
+        <button type="button" id="addTeacherNameBtn" title="إضافة اسم معلم/ة جديد للقائمة" style="flex-shrink:0; width:42px; border-radius:10px; background:rgba(255,255,255,.16); color:#fff; font-weight:800; font-size:1.1rem;">+</button>
+      </div>
+      <p style="font-size:.72rem; color:#cfe0e8; margin-top:6px; position:relative;">اختياري — يمكنك اختيار اسم المعلم/ة من القائمة أو كتابته أو تركه فارغاً</p>`}
+    </div>
+    ${students.length ? `
+    <div class="field" style="margin:16px 0 0;">
+      <label style="font-weight:800; color:var(--navy);">البحث باسم الطالب/ة</label>
+      <input id="barcodeInput" placeholder="ابحثي باسم الطالب/ة..." autocomplete="off" style="text-align:center; font-weight:700;">
+    </div>` : ''}
+    <div id="studentsList">
+      ${students.length ? students.map(s=>`
+        <div class="student-item" data-id="${s.id}">
+          <div class="s-info"><div class="s-num">${esc(s.number)}</div><div class="s-name">${esc(s.name)}</div></div>
+          <button class="absent-toggle" data-toggle="${s.id}"></button>
+        </div>`).join('') : `<div class="empty"><b>لا يوجد طلاب أو طالبات في هذا الفصل بعد</b></div>`}
+    </div>
+    ${students.length ? `
+    <div class="scan-submit-bar">
+      <button class="btn btn-primary" id="finishScan">✅ إنهاء الرصد</button>
+    </div>` : ''}
+  </div>`;
+}
+
+function viewScanConfirm(cls, att){
+  const absentees = att.records.filter(r=>statusRank(r.status)===0);
+  const present = att.records.length - absentees.length;
+  return `
+  <div class="scan-wrap">
+    ${session ? `<button class="btn btn-outline" style="margin-bottom:14px;" onclick="navigate('dashboard')">→ العودة للوحة التحكم</button>` : ''}
+    <div class="confirm-wrap">
+      <div class="confirm-icon">✔</div>
+      <h2>تم رصد الغياب بنجاح</h2>
+      <p style="margin-top:8px;color:var(--teal);font-weight:800">شكراً لمشاركتك 🌷❤️</p>
+      <p style="color:#5b7382; font-size:.85rem;">فصل ${esc(classDisplayName(cls))} — رصدتها: ${esc(att.teacher||'—')} — الساعة ${esc(att.time||'')}</p>
+      <div class="confirm-nums">
+        <div class="cn"><b>${present}</b>حاضر/ة</div>
+        <div class="cn absent"><b>${absentees.length}</b>غائب/ة</div>
+      </div>
+      ${absentees.length ? `<ul class="absent-names">${absentees.map(a=>`<li>${esc(a.studentName)}</li>`).join('')}</ul>` : `<p style="color:var(--success); font-weight:700;">جميع الطلاب والطالبات حاضرون/حاضرات 🎉</p>`}
+      <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+        ${route.publicMode ? '' : `<button class="btn btn-outline" id="editScanBtn">تعديل الرصد</button>`}
+        ${session ? `<button class="btn btn-primary" onclick="navigate('dashboard')">لوحة التحكم</button>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function publicAttendanceResultMarkup(){
+  const students=studentsOfClass(route.classId),absent=students.filter(st=>scanAbsentSet.has(String(st.id)));
+  const present=Math.max(0,students.length-absent.length),girl=store.schoolType!=='boys';
+  const className=(store.classes.find(c=>String(c.id)===String(route.classId))||{}).name||'الفصل';
+  return `<p style="color:#5b7382;margin-top:8px">نتيجة رصد ${esc(className)}</p><div class="confirm-counts"><div class="cn"><b>${present}</b>${girl?'حاضرة':'حاضر'}</div><div class="cn absent"><b>${absent.length}</b>${girl?'غائبة':'غائب'}</div></div>${absent.length?`<ul class="absent-names">${absent.map(st=>`<li>${esc(st.name)}</li>`).join('')}</ul>`:`<p style="color:var(--success);font-weight:700">الجميع ${girl?'حاضرات':'حاضرون'} 🎉</p>`}`;
+}
+function viewPublicVoteThanks(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>شكراً لمشاركتك 🌷❤️</h2>${publicAttendanceResultMarkup()}<p style="color:#5b7382;margin-top:8px">للتعديل، استخدمي منصة راصد.</p></div></div>`;}
+function viewPublicVoteClosed(){return `<div class="scan-wrap"><div class="confirm-wrap"><div class="confirm-icon">✔</div><h2>تم تسجيل الرصد لهذا الفصل اليوم</h2>${publicAttendanceResultMarkup()}<p style="margin-top:8px;color:var(--teal);font-weight:800">شكراً لكم 🌷❤️</p><p style="color:#5b7382;margin-top:8px">التعديل متاح من منصة راصد فقط.</p></div></div>`;}
+
+let scanAbsentSet = new Set();
+let scanAbsentContext = null;
+function scanContextKey(){
+  return `${String(route.classId)}|${todayStr()}|${route.editing?'edit':'new'}`;
+}
+function absentStudentIds(attendance){
+  return new Set((attendance?.records||[]).filter(r=>statusRank(r.status)===0).map(r=>String(r.studentId)));
+}
+function toggleStudentAbsent(id){
+  id=String(id);
+  const btn = document.querySelector(`[data-toggle="${id}"]`);
+  if(!btn) return false;
+  const item = btn.closest('.student-item');
+  if(scanAbsentSet.has(id)){ scanAbsentSet.delete(id); btn.classList.remove('on'); item.classList.remove('absent'); }
+  else{ scanAbsentSet.add(id); btn.classList.add('on'); item.classList.add('absent'); }
+  return true;
+}
+function bindScan(){
+  const existing=attendanceOf(route.classId);
+  // Cloud polling can re-render this screen while another device is syncing.
+  // Keep unsaved taps for the current scan instead of resetting them on every render.
+  const context=scanContextKey();
+  if(scanAbsentContext!==context){
+    scanAbsentContext=context;
+    scanAbsentSet=route.editing&&existing ? absentStudentIds(existing) : new Set();
+  }
+  const list = document.getElementById('studentsList');
+  if(!list) { bindEditBtn(); return; }
+  list.querySelectorAll('[data-toggle]').forEach(btn=>{
+    if(!scanAbsentSet.has(String(btn.dataset.toggle)))return;
+    btn.classList.add('on');
+    btn.closest('.student-item')?.classList.add('absent');
+  });
+  list.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-toggle]');
+    if(!btn) return;
+    toggleStudentAbsent(btn.dataset.toggle);
+  });
+  const barcodeInput = document.getElementById('barcodeInput');
+  if(barcodeInput){
+    barcodeInput.addEventListener('input',()=>{
+      const query=normalizeNameClient(barcodeInput.value.trim());
+      document.querySelectorAll('#studentsList .student-item').forEach(item=>{
+        const name=normalizeNameClient(item.querySelector('.s-name')?.textContent||'');
+        item.style.display=query&&!name.includes(query)?'none':'';
+      });
+    });
+  }
+  const finishBtn = document.getElementById('finishScan');
+  if(finishBtn) finishBtn.onclick = submitScan;
+  const addNameBtn = document.getElementById('addTeacherNameBtn');
+  if(addNameBtn) addNameBtn.onclick = addTeacherNameQuick;
+  bindEditBtn();
+}
+async function addTeacherNameQuick(){
+  const name = (prompt('اكتبي اسم المعلم/ة لإضافته إلى القائمة:')||'').trim();
+  if(!name) return;
+  if(!store.teacherNames) store.teacherNames = [];
+  if(!store.teacherNames.includes(name)){
+    store.teacherNames.push(name);
+    saveStore();
+    // تُحفظ أسماء الاقتراحات ضمن بيانات المدرسة في Firestore.
+  }
+  // نحدّث القائمة المنسدلة وحقل الإدخال مباشرة دون إعادة رسم الصفحة
+  // حتى لا تُفقد حالة الطالبات المحددات كغائبات أثناء الرصد.
+  const list = document.getElementById('teacherNamesList');
+  if(list && !Array.from(list.options).some(o=>o.value===name)){
+    const opt = document.createElement('option'); opt.value = name; list.appendChild(opt);
+  }
+  const input = document.getElementById('teacherSelect');
+  if(input) input.value = name;
+  toast(`تمت إضافة "${name}" إلى قائمة المعلمين/المعلمات`);
+}
+function bindEditBtn(){
+  const editBtn = document.getElementById('editScanBtn');
+  if(editBtn) editBtn.onclick = ()=>{ route.editing = true; render(); };
+}
+async function submitScan(){
+  if(route.publicMode)return submitPublicScan();
+  const classId = route.classId;
+  const teacherSel = document.getElementById('teacherSelect');
+  const teacher = (teacherSel ? teacherSel.value.trim() : '') || 'غير محدد';
+  const students = studentsOfClass(classId);
+  const boys=store.schoolType==='boys';
+  const records = students.map(s=>({ studentId:s.id, studentName:s.name, status: scanAbsentSet.has(String(s.id))?(boys?'غائب':'غائبة'):(boys?'حاضر':'حاضرة') }));
+  const session_ = { id: classId+'|'+todayStr(), classId, date: todayStr(), teacher, time: nowTimeStr(), records };
+  store.attendance = store.attendance.filter(a=>!(a.classId===classId && a.date===todayStr()));
+  store.attendance.push(session_);
+  saveStore();
+  const saveResult = await pushToServer('saveAttendance', session_);
+  const absentCount = records.filter(r=>statusRank(r.status)===0).length;
+  playAttendanceBell(absentCount);
+  if(saveResult.ok) toast('تم حفظ الرصد في قاعدة البيانات');
+  else { console.warn('saveAttendance failed:', saveResult); toast('تعذر حفظ الرصد في قاعدة البيانات — تحقق من الاتصال', true); }
+  speakThanks(teacher, absentCount);
+  if(saveResult.ok&&db&&activeSchoolId){db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(classId).set({lastAttendanceDate:todayStr(),lastAttendanceAbsentIds:records.filter(r=>statusRank(r.status)===0).map(r=>String(r.studentId)),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.warn('Could not close public class link',e));}
+  route.editing = false;
+  render();
+}
+function publicVoteDocumentId(classId,date){return String(classId)+'_'+String(date);}
+async function submitPublicScan(){
+  const finishBtn=document.getElementById('finishScan');if(finishBtn)finishBtn.disabled=true;
+  try{
+    if(!firebaseReady||!auth||!db)throw new Error('التصويت غير متاح حالياً.');
+    if(!auth.currentUser)await auth.signInAnonymously();
+    const date=todayStr(),schoolId=route.schoolId,classId=route.classId;
+    const absentIds=Array.from(scanAbsentSet).map(String);
+    const ref=db.collection('schools').doc(schoolId).collection('publicAttendance').doc(publicVoteDocumentId(classId,date));
+    await ref.set({classId,date,absentIds,votedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    route.publicDone=true;render();
+  }catch(e){
+    console.error('Public attendance vote failed',e);
+    if(e&&e.code==='firestore/already-exists'){route.publicClosed=true;render();return;}
+    toast(e&&e.code==='permission-denied'?'تم تسجيل الرصد لهذا الفصل اليوم أو أن الرابط لم يعد صالحاً.':'تعذر إرسال التصويت. تحققي من الاتصال ثم أعيدي المحاولة.',true);
+    if(finishBtn)finishBtn.disabled=false;
+  }
+}
+function speakThanks(teacher, absentCount){
+  try{
+    const greeting = (teacher && teacher!=='غير محدد') ? `شكراً لك ${teacher}، ` : 'شكراً لك، ';
+    const girl=store.schoolType!=='boys';
+    const absentLabel=girl?'الغائبات':'الطلاب الغائبين';
+    const presentLabel=girl?'الطالبات':'الطلاب';
+    const presentWord=girl?'حاضرات':'حاضرون';
+    const msg = absentCount>0
+      ? `${greeting}تم رصد الغياب بنجاح. عدد ${absentLabel} ${absentCount}.`
+      : `${greeting}تم رصد الحضور. جميع ${presentLabel} ${presentWord}.`;
+    const utter = new SpeechSynthesisUtterance(msg);
+    utter.lang = 'ar-SA';
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  }catch(e){}
+}
+
+async function publishPublicClass(cls){
+  if(!db||!activeSchoolId||!session||!session.approved)return;
+  const names={};studentsOfClass(cls.id).forEach(st=>{if(st.id&&st.name)names[String(st.id)]=String(st.name).slice(0,160);});
+  if(Object.keys(names).length>500)throw new Error('لا يمكن نشر رابط لفصل يتجاوز 500 طالب/ة.');
+  const data={classId:String(cls.id),className:String(classDisplayName(cls)).slice(0,160),schoolName:String(SCHOOL_NAME).slice(0,160),schoolType:store.schoolType==='boys'?'boys':'girls',students:names,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  const existingAttendance=attendanceOf(cls.id,todayStr());
+  if(existingAttendance){data.lastAttendanceDate=todayStr();data.lastAttendanceAbsentIds=(existingAttendance.records||[]).filter(r=>statusRank(r.status)===0).map(r=>String(r.studentId));}
+  await db.collection('schools').doc(activeSchoolId).collection('publicClasses').doc(String(cls.id)).set(data,{merge:true});
+  await db.collection('publicClassLinks').doc(String(cls.id)).set({classId:String(cls.id),schoolId:String(activeSchoolId),updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+}
+async function loadPublicClass(schoolId,classId){
+  try{
+    if(!db||!classId)throw new Error('رابط الفصل غير مكتمل.');
+    if(!schoolId){const link=await db.collection('publicClassLinks').doc(classId).get();if(!link.exists)throw new Error('رابط الفصل غير مفعّل. افتحي صفحة أكواد QR من المنصة أولاً.');schoolId=String((link.data()||{}).schoolId||'');}
+    if(!schoolId)throw new Error('رابط الفصل غير مكتمل.');
+    route.schoolId=schoolId;
+    const ref=db.collection('schools').doc(schoolId).collection('publicClasses').doc(classId),snap=await ref.get();
+    if(!snap.exists)throw new Error('رابط الفصل غير مفعّل. افتحي صفحة أكواد QR من المنصة أولاً.');
+    const data=snap.data()||{},studentMap=data.students||{};
+    store.classes=[{id:classId,name:String(data.className||'الفصل')}];
+    store.students=Object.keys(studentMap).map((id,index)=>({id,classId,name:String(studentMap[id]||''),number:String(index+1)}));
+    store.schoolType=data.schoolType==='boys'?'boys':'girls';SCHOOL_NAME=String(data.schoolName||'مدرسة');
+    route.publicMode=true;route.schoolId=schoolId;route.publicLoading=false;
+    if(data.lastAttendanceDate===todayStr()){scanAbsentSet=new Set((data.lastAttendanceAbsentIds||[]).map(String));route.publicClosed=true;render();return;}
+    const vote=await db.collection('schools').doc(schoolId).collection('publicAttendance').doc(publicVoteDocumentId(classId,todayStr())).get();
+    if(vote.exists){scanAbsentSet=new Set(((vote.data()||{}).absentIds||[]).map(String));route.publicClosed=true;render();return;}
+    render();
+  }catch(e){console.error('Public class load failed',e);route.publicLoading=false;document.getElementById('app').innerHTML=`<div class="scan-wrap"><div class="empty"><b>تعذر فتح رابط الفصل</b>${esc(e&&e.message||'تحققي من الاتصال أو افتحي الرابط من جديد.')}</div></div>`;}
+}
+function mergePublicAttendanceIntoStore(schoolId,snapshot){
+  (snapshot.docs||[]).forEach(doc=>{
+    const vote=doc.data()||{},classId=String(vote.classId||''),date=String(vote.date||'');
+    if(!classId||!date||store.attendance.some(a=>String(a.classId)===classId&&String(a.date)===date))return;
+    const cls=store.classes.find(c=>String(c.id)===classId);if(!cls)return;
+    const absent=new Set((vote.absentIds||[]).map(String)),boys=store.schoolType==='boys';
+    const records=studentsOfClass(classId).map(st=>({studentId:st.id,studentName:st.name,status:absent.has(String(st.id))?(boys?'غائب':'غائبة'):(boys?'حاضر':'حاضرة')}));
+    let time='—';try{const d=vote.votedAt&&vote.votedAt.toDate?vote.votedAt.toDate():null;if(d)time=d.toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'});}catch(e){}
+    store.attendance.push({id:classId+'|'+date,classId,date,teacher:'تصويت عبر الرابط',time,records});
+  });
+}
+
+/* ==========================================================================
+   صفحة أكواد QR
+   ========================================================================== */
+function viewQR(){
+  const classes = visibleClasses();
+  return `
+  <div class="container">
+    <div class="page-title">
+      <div><h2>أكواد QR للفصول</h2><p>كل فصل له رابط رصد مستقل — يُطبع ويُلصق في الفصل</p></div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline" id="printAll">🖨 طباعة الكل</button>
+      </div>
+    </div>
+    <div class="qr-grid" id="qrGrid">
+      ${classes.map(c=>`
+      <div class="qr-card" id="qrcard-${c.id}">
+        <div class="qr-school">${esc(SCHOOL_NAME)}</div>
+        <div class="qr-class">${esc(classDisplayName(c))}</div>
+        <div class="qr-brand" aria-label="شعار منصة راصد"><span class="qr-brand-mark" aria-hidden="true">ر</span><span>منصة راصد للغياب</span></div>
+        <div class="qr-box" id="qrbox-${c.id}"></div>
+        <div class="qr-hint">امسحي الكود لبدء رصد الغياب</div>
+        <div class="qr-actions">
+          <button class="btn btn-sm btn-outline" data-copy="${c.id}">نسخ الرابط</button>
+          <button class="btn btn-sm btn-outline" data-print="${c.id}">طباعة</button>
+        </div>
+      </div>`).join('') || `<div class="empty" style="grid-column:1/-1"><b>لا توجد فصول</b></div>`}
+    </div>
+  </div>`;
+}
+function classScanUrl(classId){
+  const url = new URL(window.location.href);
+  url.search = '?class=' + encodeURIComponent(classId) + '&school=' + encodeURIComponent(activeSchoolId||'');
   url.hash = '';
   return url.toString();
 }
