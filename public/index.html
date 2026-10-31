@@ -2406,23 +2406,10 @@ function printElement(html, title){
     .qr-actions{display:none;}
   </style></head><body>${html}</body></html>`);
   w.document.close();
-  const images=Array.from(w.document.images);
-  const ready=images.map(img=>{
-    if(img.complete && img.naturalWidth>0) return Promise.resolve();
-    return new Promise(resolve=>{
-      const done=()=>resolve();
-      img.addEventListener('load',done,{once:true});
-      img.addEventListener('error',done,{once:true});
-      setTimeout(done,3000);
-    });
-  });
-  Promise.all(ready).then(()=>{
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      if(w.closed) return;
-      w.focus();
-      w.print();
-    }));
-  });
+  // Opened directly from a user action: print synchronously so popup blockers
+  // and mobile browsers do not discard the print request after async image waits.
+  w.focus();
+  w.print();
 }
 
 /* ==========================================================================\n   أولياء الأمور + تقرير الغياب\n   ========================================================================== */
@@ -2634,7 +2621,7 @@ async function loadAbsenceReport(){
   host.insertAdjacentHTML('beforeend',`<section id="absenceRatePanel" hidden role="tabpanel" aria-labelledby="reportRateTab" style="margin:12px 0 18px"><div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn btn-primary btn-sm" id="printAbsenceRate" type="button">🖨 طباعة النسبة</button></div><div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px"><article class="stat-card danger"><div class="num">${absenceRate}%</div><div class="lbl">نسبة الغياب للفترة</div></article><article class="stat-card"><div class="num">${absent}</div><div class="lbl">حالات الغياب</div></article><article class="stat-card"><div class="num">${attendanceMarked}</div><div class="lbl">إجمالي الحالات المرصودة</div></article></div><div style="display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin:12px 0 18px;padding:18px;background:#fff;border:1px solid var(--line);border-radius:14px"><div role="img" aria-label="مخطط دائري: الغياب ${absenceRate}% والحضور ${attendanceMarked?Math.round(present/attendanceMarked*100):0}%" style="width:170px;height:170px;flex:0 0 170px;border-radius:50%;background:conic-gradient(#dc2626 0% ${absenceRate}%,#16a34a ${absenceRate}% 100%);display:grid;place-items:center"><div style="width:108px;height:108px;border-radius:50%;background:#fff;display:grid;place-content:center;text-align:center"><b style="font-size:1.5rem;color:#dc2626">${absenceRate}%</b><small>غياب</small></div></div><div style="display:grid;gap:10px"><b>توزيع الحالات المرصودة</b><span style="color:#b91c1c">● الغياب: ${absent} (${absenceRate}%)</span><span style="color:#15803d">● الحضور: ${present} (${attendanceMarked?Math.round(present/attendanceMarked*100):0}%)</span></div></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>الفصل</th><th>الغياب</th><th>الحضور</th><th>الحالات المرصودة</th><th>نسبة الغياب</th></tr></thead><tbody>${[...rateGroups.values()].map(group=>{const total=group.absent+group.present,rate=total?Math.round(group.absent/total*100):0;return `<tr><td>${esc(group.name)}</td><td>${group.absent}</td><td>${group.present}</td><td>${total}</td><td><b style="color:#dc2626">${rate}%</b></td></tr>`}).join('')||'<tr><td colspan="5">لا توجد بيانات مرصودة للفترة المحددة</td></tr>'}</tbody></table></div><small style="display:block;margin-top:8px;color:#607d8b">تُحسب النسبة من حالات الغياب والحضور المرصودة فقط؛ الحالات غير المرصودة مستثناة.</small></section>`);
   const ratePanel=host.querySelector('#absenceRatePanel'),detailsTable=host.querySelector('.report-table-wrap'),rateTab=document.getElementById('reportRateTab');
   rateTab.onclick=()=>setAbsenceReportView(true);
-  document.getElementById('printAbsenceRate').onclick=()=>{const printable=ratePanel.innerHTML;printElement(`<header><h1>${esc(SCHOOL_NAME)}</h1><h2>نسبة الغياب — ${periodLabel}</h2><p>${esc(dateLabel)}</p></header>${printable}<style>.report-table{width:100%;border-collapse:collapse;margin-top:14px}.report-table th,.report-table td{padding:8px;border:1px solid #b8c8d0;text-align:right}.report-table th{background:#102a43!important;color:#fff!important}.stat-card{display:inline-block;min-width:140px;padding:12px;border:1px solid #b8c8d0;margin:4px}</style>`,`نسبة الغياب ${periodLabel} ${dateLabel}`);};
+  document.getElementById('printAbsenceRate').onclick=()=>{const printable=ratePanel.innerHTML;printElement(`<header style="display:flex;align-items:center;gap:16px;border-bottom:2px solid #0f766e;padding-bottom:12px;margin-bottom:14px"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:82px;height:72px;object-fit:contain"><div><h1 style="color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="color:#0f766e;margin:5px 0">نسبة الغياب — ${periodLabel}</h2><p style="margin:0">${esc(dateLabel)}</p></div></header>${printable}<style>.report-table{width:100%;border-collapse:collapse;margin-top:14px}.report-table th,.report-table td{padding:8px;border:1px solid #b8c8d0;text-align:right}.report-table th{background:#102a43!important;color:#fff!important}.stat-card{display:inline-block;min-width:140px;padding:12px;border:1px solid #b8c8d0;margin:4px}</style>`,`نسبة الغياب ${periodLabel} ${dateLabel}`);};
   host.dataset.hasRatePanel='true';
   function setAbsenceReportView(showRate){ratePanel.hidden=!showRate;detailsTable.hidden=showRate;rateTab.setAttribute('aria-selected',String(showRate));rateTab.classList.toggle('btn-primary',showRate);rateTab.classList.toggle('btn-outline',!showRate);}
   setAbsenceReportView(false);
