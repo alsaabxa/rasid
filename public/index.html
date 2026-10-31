@@ -2319,6 +2319,7 @@ function reportSignatureFooter(){
 function printElement(html, title){
   const w = window.open('', '_blank');
   if(!w){toast('اسمح بفتح النوافذ المنبثقة للطباعة ثم حاول مرة أخرى.',true);return;}
+  html=String(html).replaceAll('الطالب/ة',reportStudentTerms().student);
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
   <style>
@@ -2493,11 +2494,12 @@ function recordWhatsAppOpened(details){
 function renderWhatsAppContactReport(){
   const host=document.getElementById('reportHost');if(!host)return;
   const date=document.getElementById('reportDate')?.value||todayStr(),period=document.getElementById('waContactPeriod')?.value||document.getElementById('reportPeriod')?.value||'daily',classId=document.getElementById('reportClass')?.value||'__all__';
+  const studentTerms=reportStudentTerms();
   const bounds=reportPeriodBounds(period,date),classMap=new Map(store.classes.map(cls=>[String(cls.id),classDisplayName(cls)]));
   const logs=(store.whatsappContacts||[]).filter(item=>String(item.date)>=bounds.start&&String(item.date)<=bounds.end&&(classId==='__all__'||String(item.classId)===String(classId))).slice().sort((a,b)=>String(b.openedAt).localeCompare(String(a.openedAt)));
   const rows=logs.map((item,index)=>`<tr><td>${index+1}</td><td>${esc(item.date||'')}</td><td>${esc(item.className||classMap.get(String(item.classId))||'')}</td><td>${esc(item.studentName||'')}</td><td class="guardian-phone">${esc(item.phone||'')}</td><td>${esc(item.openedAt?new Date(item.openedAt).toLocaleString('ar-SA'):'—')}</td></tr>`).join('');
   const periodLabel=period==='daily'?'يومي':period==='weekly'?'أسبوعي':'شهري',reportTitle='تقرير التواصل مع أولياء الأمور عبر واتساب';
-  const reportTable=`<table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th><th>التاريخ</th><th>الفصل</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>وقت فتح واتساب</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:28px;color:#8299a6">لا توجد بيانات في الفترة المحددة</td></tr>'}</tbody></table>`;
+  const reportTable=`<table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th><th>التاريخ</th><th>الفصل</th><th>${studentTerms.studentName}</th><th>رقم ولي الأمر</th><th>وقت فتح واتساب</th></tr></thead><tbody>${rows||'<tr><td colspan="6" style="text-align:center;padding:28px;color:#8299a6">لا توجد بيانات في الفترة المحددة</td></tr>'}</tbody></table>`;
   host.innerHTML=`<div style="display:flex;align-items:center;gap:14px;border-bottom:2px solid #0f766e;padding:0 0 12px;margin:8px 0 16px"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:76px;height:66px;object-fit:contain"><div><h2 style="margin:0;color:#102a43">${esc(SCHOOL_NAME)}</h2><h3 style="margin:5px 0 0;color:#0f766e">${reportTitle}</h3><p style="margin:4px 0 0;color:#607d8b">${periodLabel} — ${esc(bounds.start)} إلى ${esc(bounds.end)}</p></div></div><div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:12px"><div class="field" style="margin:0;min-width:150px"><label for="waContactPeriod">فترة تقرير واتساب</label><select id="waContactPeriod"><option value="daily" ${period==='daily'?'selected':''}>يومي</option><option value="weekly" ${period==='weekly'?'selected':''}>أسبوعي</option><option value="monthly" ${period==='monthly'?'selected':''}>شهري</option></select></div><button class="btn btn-outline btn-sm" id="backToAbsenceReport">عودة لتقرير الغياب</button><button class="btn btn-primary btn-sm" id="printWhatsAppReport">🖨 طباعة التقرير</button></div><div class="report-table-wrap" style="overflow:auto">${reportTable}</div>`;
   document.getElementById('waContactPeriod').onchange=()=>renderWhatsAppContactReport();
   document.getElementById('backToAbsenceReport').onclick=loadAbsenceReport;
@@ -2512,6 +2514,10 @@ function reportPeriodBounds(period, date){
     return {start:fmt(from),end:fmt(to)};
   }
   return {start:date,end:date};
+}
+function reportStudentTerms(){
+  const student=store.schoolType==='boys'?'الطالب':'الطالبة';
+  return {student,studentName:`اسم ${student}`,studentNumber:`رقم ${student}`};
 }
 function reportStatus(att, student){
   const rec=att?.records?.find(r=>String(r.studentId)===String(student.id)||normalizeNameClient(r.studentName||'')===normalizeNameClient(student.name));
@@ -2547,9 +2553,10 @@ async function loadAbsenceReport(){
   });
   const absent=rows.filter(r=>statusRank(r.status)===0).length, present=rows.filter(r=>statusRank(r.status)===1).length;
   const periodLabel=period==='daily'?'يومي':period==='weekly'?'أسبوعي':'شهري';
+  const studentTerms=reportStudentTerms();
   const referenceHijri=reportHijriForDate(date);
   const dateLabel=period==='daily'?`${date} — ${referenceHijri}`:`${bounds.start} إلى ${bounds.end} — التاريخ الهجري: ${referenceHijri}`;
-  host.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 14px"><p style="font-size:.85rem;color:#5b7382">${periodLabel} | ${esc(dateLabel)} | الغياب: <b style="color:#dc2626">${absent}</b> | الحضور: <b style="color:#16a34a">${present}</b> | السجلات: <b>${rows.length}</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" id="reportExcel">📊 Excel</button><button class="btn btn-primary btn-sm" id="reportPdf" title="عرض التقرير ثم اختيار الطباعة أو الحفظ بصيغة PDF">📄 عرض / طباعة PDF</button></div></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>#</th>${isAllClasses?'<th>الفصل</th>':''}${period==='daily'?'':'<th>التاريخ</th>'}<th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th><th class="wa-col">إرسال واتساب</th></tr></thead><tbody>${rows.map((r,i)=>{const wa=statusRank(r.status)===0&&r.phone?whatsappLink(r.phone,r.name,r.date):'';return `<tr><td>${i+1}</td>${isAllClasses?`<td>${esc(r.className)}</td>`:''}${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td class="guardian-phone">${r.phone?esc(r.phone):'—'}</td><td class="${statusRank(r.status)===0?'status-absent':statusRank(r.status)===1?'status-present':'status-missing'}">${esc(r.status)}</td><td class="wa-col">${wa?`<a href="${wa}" target="_blank" rel="noopener" aria-label="إرسال واتساب لولي أمر ${esc(r.name)}" data-wa-contact="1" data-student-id="${esc(r.studentId||r.name)}" data-student-name="${esc(r.name)}" data-class-id="${esc(r.classId||classId)}" data-class-name="${esc(r.className||'')}" data-contact-date="${esc(r.date)}" data-contact-phone="${esc(r.phone)}" style="display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:100px;height:42px;padding:3px 8px;border-radius:12px;background:#f0f7f3;color:#176b46;font-size:13px;font-weight:800;text-decoration:none;box-shadow:0 2px 7px #102a4312" title="إرسال إشعار الغياب عبر واتساب"><span style="display:inline-grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border-radius:10px;background:#25d366;color:#fff"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2a9.7 9.7 0 0 0-8.4 14.6L2.4 22l5.6-1.5A9.7 9.7 0 1 0 12 2Zm0 17.7a8 8 0 0 1-4.1-1.1l-.3-.2-3.3.9.9-3.2-.2-.3A8 8 0 1 1 12 19.7Zm4.4-5.9c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.5.1-.2.2-.6.8-.8.9-.1.2-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.3.1-.4l.4-.4c.1-.1.2-.2.2-.4.1-.1 0-.3 0-.4-.1-.1-.5-1.3-.7-1.7-.2-.4-.4-.4-.5-.4h-.4c-.1 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.4c.1.2 1.6 2.4 3.8 3.3.5.2.9.4 1.2.4.5.2 1 .1 1.3.1.4-.1 1.4-.6 1.6-1.1.2-.5.2-1 .1-1.1 0-.1-.2-.2-.5-.3Z"/></svg></span><span>واتساب</span></a>`:'—'}</td></tr>`}).join('')||`<tr><td colspan="8" style="text-align:center;padding:28px;color:#8299a6">لا توجد سجلات في الفترة المحددة</td></tr>`}</tbody></table></div>`;
+  host.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 14px"><p style="font-size:.85rem;color:#5b7382">${periodLabel} | ${esc(dateLabel)} | الغياب: <b style="color:#dc2626">${absent}</b> | الحضور: <b style="color:#16a34a">${present}</b> | السجلات: <b>${rows.length}</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" id="reportExcel">📊 Excel</button><button class="btn btn-primary btn-sm" id="reportPdf" title="عرض التقرير ثم اختيار الطباعة أو الحفظ بصيغة PDF">📄 عرض / طباعة PDF</button></div></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>#</th>${isAllClasses?'<th>الفصل</th>':''}${period==='daily'?'':'<th>التاريخ</th>'}<th>${studentTerms.studentNumber}</th><th>${studentTerms.studentName}</th><th>رقم ولي الأمر</th><th>الحالة</th><th class="wa-col">إرسال واتساب</th></tr></thead><tbody>${rows.map((r,i)=>{const wa=statusRank(r.status)===0&&r.phone?whatsappLink(r.phone,r.name,r.date):'';return `<tr><td>${i+1}</td>${isAllClasses?`<td>${esc(r.className)}</td>`:''}${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td class="guardian-phone">${r.phone?esc(r.phone):'—'}</td><td class="${statusRank(r.status)===0?'status-absent':statusRank(r.status)===1?'status-present':'status-missing'}">${esc(r.status)}</td><td class="wa-col">${wa?`<a href="${wa}" target="_blank" rel="noopener" aria-label="إرسال واتساب لولي أمر ${esc(r.name)}" data-wa-contact="1" data-student-id="${esc(r.studentId||r.name)}" data-student-name="${esc(r.name)}" data-class-id="${esc(r.classId||classId)}" data-class-name="${esc(r.className||'')}" data-contact-date="${esc(r.date)}" data-contact-phone="${esc(r.phone)}" style="display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:100px;height:42px;padding:3px 8px;border-radius:12px;background:#f0f7f3;color:#176b46;font-size:13px;font-weight:800;text-decoration:none;box-shadow:0 2px 7px #102a4312" title="إرسال إشعار الغياب عبر واتساب"><span style="display:inline-grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border-radius:10px;background:#25d366;color:#fff"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 2a9.7 9.7 0 0 0-8.4 14.6L2.4 22l5.6-1.5A9.7 9.7 0 1 0 12 2Zm0 17.7a8 8 0 0 1-4.1-1.1l-.3-.2-3.3.9.9-3.2-.2-.3A8 8 0 1 1 12 19.7Zm4.4-5.9c-.2-.1-1.4-.7-1.6-.8-.2-.1-.4-.1-.5.1-.2.2-.6.8-.8.9-.1.2-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.3.1-.4l.4-.4c.1-.1.2-.2.2-.4.1-.1 0-.3 0-.4-.1-.1-.5-1.3-.7-1.7-.2-.4-.4-.4-.5-.4h-.4c-.1 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.4c.1.2 1.6 2.4 3.8 3.3.5.2.9.4 1.2.4.5.2 1 .1 1.3.1.4-.1 1.4-.6 1.6-1.1.2-.5.2-1 .1-1.1 0-.1-.2-.2-.5-.3Z"/></svg></span><span>واتساب</span></a>`:'—'}</td></tr>`}).join('')||`<tr><td colspan="8" style="text-align:center;padding:28px;color:#8299a6">لا توجد سجلات في الفترة المحددة</td></tr>`}</tbody></table></div>`;
   host.querySelectorAll('[data-wa-contact]').forEach(link=>link.addEventListener('click',()=>recordWhatsAppOpened({studentId:link.dataset.studentId,studentName:link.dataset.studentName,classId:link.dataset.classId,className:link.dataset.className,date:link.dataset.contactDate,phone:link.dataset.contactPhone})));
   document.getElementById('reportExcel').onclick=()=>exportPeriodReportExcel(rows,classId,periodLabel,dateLabel);
   document.getElementById('reportPdf').onclick=()=>exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period);
@@ -2558,17 +2565,19 @@ function exportPeriodReportExcel(rows,classId,periodLabel,dateLabel){
   if(typeof XLSX==='undefined'){toast('تعذر تحميل مكتبة Excel',true);return;}
   const isAll=classId==='__all__',cls=store.classes.find(c=>String(c.id)===String(classId)); const wb=XLSX.utils.book_new();
   const sign=store.reportSignatures||{};
-  const data=[[SCHOOL_NAME],['تقرير الحضور والغياب '+periodLabel],['الفصل: '+(isAll?'كل الفصول':cls?.name||'')],['الفترة: '+dateLabel],['التاريخ الهجري: '+reportHijriForDate(route.date||todayStr())],['التاريخ الميلادي: '+reportGregorianForDate(route.date||todayStr())],['الساعة: '+nowTimeStr()],[],[...(isAll?['الفصل']:[]),...(periodLabel==='يومي'?[]:['التاريخ']),'رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة'],...rows.map(r=>[...(isAll?[r.className]:[]),...(periodLabel==='يومي'?[]:[r.date]),r.number,r.name,r.phone,r.status]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']];
+  const studentTerms=reportStudentTerms();
+  const data=[[SCHOOL_NAME],['تقرير الحضور والغياب '+periodLabel],['الفصل: '+(isAll?'كل الفصول':cls?.name||'')],['الفترة: '+dateLabel],['التاريخ الهجري: '+reportHijriForDate(route.date||todayStr())],['التاريخ الميلادي: '+reportGregorianForDate(route.date||todayStr())],['الساعة: '+nowTimeStr()],[],[...(isAll?['الفصل']:[]),...(periodLabel==='يومي'?[]:['التاريخ']),studentTerms.studentNumber,studentTerms.studentName,'رقم ولي الأمر','الحالة'],...rows.map(r=>[...(isAll?[r.className]:[]),...(periodLabel==='يومي'?[]:[r.date]),r.number,r.name,r.phone,r.status]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']];
   const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=Array.from({length:data[8].length},()=>({wch:20}));
   XLSX.utils.book_append_sheet(wb,ws,'تقرير الحضور');
   XLSX.writeFile(wb,`تقرير_${periodLabel}_${(isAll?'كل_الفصول':cls?.name||'الفصل').replace(/[\\/:*?"<>|]/g,'_')}_${dateLabel.replace(/[^0-9-]/g,'_')}.xlsx`);
 }
 function exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period){
   const cls=store.classes.find(c=>String(c.id)===String(classId));
+  const studentTerms=reportStudentTerms();
   const body=rows.map((r,i)=>`<tr><td>${i+1}</td>${classId==='__all__'?`<td>${esc(r.className)}</td>`:''}${period==='daily'?'':`<td>${esc(r.date)}</td>`}<td>${esc(r.number)}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td>${esc(r.status)}</td></tr>`).join('');
   const dateHead=period==='daily'?'':'<th>التاريخ</th>';
   const isAll=classId==='__all__',classHead=isAll?'<th>الفصل</th>':'';
-  const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${isAll?'كل الفصول':esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p><p style="margin:4px 0 0">التاريخ الهجري: ${reportHijriForDate(route.date||todayStr())} — الميلادي: ${reportGregorianForDate(route.date||todayStr())} — الساعة: ${nowTimeStr()}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${classHead}${dateHead}<th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</p>${reportSignatureFooter()}`;
+  const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${isAll?'كل الفصول':esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p><p style="margin:4px 0 0">التاريخ الهجري: ${reportHijriForDate(route.date||todayStr())} — الميلادي: ${reportGregorianForDate(route.date||todayStr())} — الساعة: ${nowTimeStr()}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${classHead}${dateHead}<th>${studentTerms.studentNumber}</th><th>${studentTerms.studentName}</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</p>${reportSignatureFooter()}`;
   printElement(html,`تقرير ${periodLabel} ${isAll?'كل الفصول':cls?.name||''} ${dateLabel}`);
 }
 async function printAllClassesAbsenceReport(){
@@ -2586,7 +2595,7 @@ async function printAllClassesAbsenceReport(){
     rows=sortAbsentFirst(rows);
     const absentCount=rows.filter(r=>statusRank(r.status)===0).length; totalAbsent+=absentCount;
     const color=st=>statusRank(st)===0?'#dc2626':statusRank(st)===1?'#16a34a':'#8299a6';
-    sections+=`<section style="page-break-after:always;margin-bottom:25px;"><h2>${esc(classDisplayName(cls))}</h2><p>${esc(SCHOOL_NAME)} — التاريخ: ${esc(date)} — الغياب: <b>${absentCount}</b> من ${rows.length}</p><table style="width:100%;border-collapse:collapse;" border="1" cellpadding="7"><thead><tr><th>#</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${rows.map((r,j)=>`<tr><td>${j+1}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td style="color:${color(r.status)};font-weight:700;">${esc(r.status)}</td></tr>`).join('')}</tbody></table></section>`;
+    sections+=`<section style="page-break-after:always;margin-bottom:25px;"><h2>${esc(classDisplayName(cls))}</h2><p>${esc(SCHOOL_NAME)} — التاريخ: ${esc(date)} — الغياب: <b>${absentCount}</b> من ${rows.length}</p><table style="width:100%;border-collapse:collapse;" border="1" cellpadding="7"><thead><tr><th>#</th><th>${reportStudentTerms().studentName}</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${rows.map((r,j)=>`<tr><td>${j+1}</td><td>${esc(r.name)}</td><td>${r.phone?esc(r.phone):'—'}</td><td style="color:${color(r.status)};font-weight:700;">${esc(r.status)}</td></tr>`).join('')}</tbody></table></section>`;
   });
   printElement(`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain;"><div><h1 style="color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2>تقرير الغياب — جميع الفصول</h2><p>التاريخ الميلادي: ${reportGregorianForDate(date)} — التاريخ الهجري: ${reportHijriForDate(date)} — الساعة: ${nowTimeStr()}</p><p>التاريخ: ${esc(date)} — إجمالي الغياب: <b>${totalAbsent}</b></p></div></header>${sections}${reportSignatureFooter()}`,`تقرير غياب جميع الفصول — ${date}`);
 }
@@ -2664,13 +2673,14 @@ function bindAbsenceReport(){
    ========================================================================== */
 function exportClassExcel(classId){
   const cls = store.classes.find(c=>c.id===classId);
+  const studentTerms=reportStudentTerms();
   const students = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
   const att = attendanceOf(classId);
   const rows = sortAbsentFirst(students, s=>{ const rec = att ? att.records.find(r=>r.studentId===s.id) : null; return rec ? rec.status : 'لم يُرصد'; }).map(s=>{
     const rec = att ? att.records.find(r=>r.studentId===s.id) : null;
     return {
-      'رقم الطالب/ة': s.number,
-      'اسم الطالب/ة': s.name,
+      [studentTerms.studentNumber]: s.number,
+      [studentTerms.studentName]: s.name,
       'رقم ولي الأمر': guardianPhoneForStudent(s),
       'الحالة': rec ? rec.status : 'لم يُرصد',
       'المعلمة': att ? att.teacher : '',
@@ -2679,7 +2689,7 @@ function exportClassExcel(classId){
     };
   });
   const sign=store.reportSignatures||{};
-  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+classDisplayName(cls)],['التاريخ الميلادي: '+reportDateLabels().greg],['التاريخ الهجري: '+reportDateLabels().hijri],['الساعة: '+nowTimeStr()],[],['رقم الطالب/ة','اسم الطالب/ة','رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r['رقم الطالب/ة'],r['اسم الطالب/ة'],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']]);
+  const ws = XLSX.utils.aoa_to_sheet([[SCHOOL_NAME],['تقرير الغياب اليومي — '+classDisplayName(cls)],['التاريخ الميلادي: '+reportDateLabels().greg],['التاريخ الهجري: '+reportDateLabels().hijri],['الساعة: '+nowTimeStr()],[],[studentTerms.studentNumber,studentTerms.studentName,'رقم ولي الأمر','الحالة','المعلمة','وقت الرصد','التاريخ'],...rows.map(r=>[r[studentTerms.studentNumber],r[studentTerms.studentName],r['رقم ولي الأمر'],r['الحالة'],r['المعلمة'],r['وقت الرصد'],r['التاريخ']]),[],['مدير / ة المدرسة',sign.manager||'','التوقيع: ........................'],[],['مسؤول / ة الرصد',sign.attendance||'','التوقيع: ........................']]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'الغياب');
   XLSX.writeFile(wb, `تقرير_غياب_${classDisplayName(cls)}_${todayStr()}.xlsx`);
@@ -2688,6 +2698,7 @@ function exportClassPDF(classId){
   const cls = store.classes.find(c=>c.id===classId);
   const students = studentsOfClass(classId).sort((a,b)=> (a.number||'').localeCompare(b.number||'', 'ar', {numeric:true}));
   const att = attendanceOf(classId);
+  const studentTerms=reportStudentTerms();
   const statusOf = s=>{ const rec = att ? att.records.find(r=>r.studentId===s.id) : null; return rec ? rec.status : 'لم يُرصد'; };
   const sortedStudents = sortAbsentFirst(students, statusOf);
   const rowsHtml = sortedStudents.map(s=>{
@@ -2701,7 +2712,7 @@ function exportClassPDF(classId){
     <header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:16px;"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain;"><div><h1 style="font-size:22px;color:#102a43;margin:0;">${esc(SCHOOL_NAME)}</h1><h2 style="color:#102a43;margin:5px 0;">تقرير غياب — ${esc(classDisplayName(cls))}</h2></div></header>
     <p style="color:#555; font-size:13px;">${esc(SCHOOL_NAME)} — التاريخ الميلادي: ${reportDateLabels().greg} — التاريخ الهجري: ${reportDateLabels().hijri} — الساعة: ${nowTimeStr()} ${att? '— المعلمة: '+esc(att.teacher)+' — وقت الرصد: '+esc(att.time):''}</p>
     <table style="width:100%; border-collapse:collapse; margin-top:14px;" border="1" cellpadding="8">
-      <thead style="background:#102a43; color:#fff;"><tr><th>رقم الطالب/ة</th><th>اسم الطالب/ة</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead>
+      <thead style="background:#102a43; color:#fff;"><tr><th>${studentTerms.studentNumber}</th><th>${studentTerms.studentName}</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table>
     ${reportSignatureFooter()}
