@@ -366,6 +366,7 @@ input,select,.btn{min-height:44px; touch-action:manipulation;}
 
 .empty{text-align:center; padding:50px 20px; color:#8299a6;}
 .empty b{display:block; color:var(--navy); font-size:1rem; margin-bottom:6px;}
+#printFallback{display:none;}
 
 @media print{
   .topbar, .no-print{display:none !important;}
@@ -2388,37 +2389,14 @@ function reportSignatureFooter(){
 }
 
 function printElement(html, title){
-  const w = window.open('', '_blank');
   html=String(html).replaceAll('الطالب/ة',reportStudentTerms().student);
-  if(!w){
-    const old=document.getElementById('printFallback');if(old)old.remove();
-    const surface=document.createElement('section');surface.id='printFallback';surface.dir='rtl';surface.lang='ar';
-    surface.innerHTML=`<h1>${esc(title)}</h1>${html}`;document.body.appendChild(surface);document.body.classList.add('printing-report');
-    let cleaned=false;const cleanup=()=>{if(cleaned)return;cleaned=true;document.body.classList.remove('printing-report');surface.remove();window.removeEventListener('afterprint',cleanup);window.removeEventListener('focus',cleanup);};
-    window.addEventListener('afterprint',cleanup,{once:true});window.addEventListener('focus',cleanup,{once:true});
-    window.print();setTimeout(cleanup,120000);return;
-  }
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
-  <style>
-    body{font-family:'Cairo',sans-serif; padding:20px; direction:rtl; -webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    *,*::before,*::after{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
-    .no-print{display:none !important;}
-    .qr-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:20px;}
-    .qr-card{border:2px solid #102a43; border-radius:14px; padding:18px; text-align:center; page-break-inside:avoid;}
-    .qr-school{font-size:11px; color:#555;}
-    .qr-class{font-size:18px; font-weight:800; color:#102a43; margin:6px 0 8px;}
-    .qr-brand{display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; color:#102a43; font-size:12px; font-weight:800;}
-    .qr-brand-mark{display:inline-flex; width:24px; height:24px; align-items:center; justify-content:center; border-radius:8px; background:#0f766e; color:#fff; font-size:14px; font-weight:900;}
-    .qr-box{display:flex; justify-content:center; margin-bottom:10px;}
-    .qr-hint{font-size:11px; color:#0f766e; font-weight:700;}
-    .qr-actions{display:none;}
-  </style></head><body>${html}</body></html>`);
-  w.document.close();
-  // Opened directly from a user action: print synchronously so popup blockers
-  // and mobile browsers do not discard the print request after async image waits.
-  w.focus();
-  w.print();
+  const old=document.getElementById('printFallback');if(old)old.remove();
+  const oldTitle=document.title,surface=document.createElement('section');
+  surface.id='printFallback';surface.dir='rtl';surface.lang='ar';surface.innerHTML=html;
+  document.title=title;document.body.appendChild(surface);document.body.classList.add('printing-report');
+  let cleaned=false;const cleanup=()=>{if(cleaned)return;cleaned=true;document.body.classList.remove('printing-report');surface.remove();document.title=oldTitle;window.removeEventListener('afterprint',cleanup);};
+  window.addEventListener('afterprint',cleanup,{once:true});
+  window.print();setTimeout(cleanup,120000);
 }
 
 /* ==========================================================================\n   أولياء الأمور + تقرير الغياب\n   ========================================================================== */
