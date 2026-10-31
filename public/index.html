@@ -370,6 +370,8 @@ input,select,.btn{min-height:44px; touch-action:manipulation;}
 @media print{
   .topbar, .no-print{display:none !important;}
   body{background:#fff;}
+  body.printing-report>*:not(#printFallback){display:none !important;}
+  body.printing-report>#printFallback{display:block !important;position:static !important;overflow:visible !important;padding:20px !important;background:#fff !important;color:#102a43 !important;}
 }
 </style>
 </head>
@@ -2387,8 +2389,15 @@ function reportSignatureFooter(){
 
 function printElement(html, title){
   const w = window.open('', '_blank');
-  if(!w){toast('اسمح بفتح النوافذ المنبثقة للطباعة ثم حاول مرة أخرى.',true);return;}
   html=String(html).replaceAll('الطالب/ة',reportStudentTerms().student);
+  if(!w){
+    const old=document.getElementById('printFallback');if(old)old.remove();
+    const surface=document.createElement('section');surface.id='printFallback';surface.dir='rtl';surface.lang='ar';
+    surface.innerHTML=`<h1>${esc(title)}</h1>${html}`;document.body.appendChild(surface);document.body.classList.add('printing-report');
+    let cleaned=false;const cleanup=()=>{if(cleaned)return;cleaned=true;document.body.classList.remove('printing-report');surface.remove();window.removeEventListener('afterprint',cleanup);window.removeEventListener('focus',cleanup);};
+    window.addEventListener('afterprint',cleanup,{once:true});window.addEventListener('focus',cleanup,{once:true});
+    window.print();setTimeout(cleanup,120000);return;
+  }
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
   <style>
