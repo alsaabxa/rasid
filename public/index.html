@@ -2406,7 +2406,7 @@ function printElement(html, title){
   w.document.open();
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
-    <style>@page{size:auto;margin:12mm}*{box-sizing:border-box}body{font-family:'Cairo',Arial,sans-serif;padding:18px;direction:rtl;color:#102a43}img{max-width:100%}table{border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px}.qr-card{border:2px solid #102a43;border-radius:14px;padding:18px;text-align:center;page-break-inside:avoid}.qr-actions{display:none}</style>
+    <style>@page{size:auto;margin:12mm}*{box-sizing:border-box}body{font-family:'Cairo',Arial,sans-serif;padding:18px;direction:rtl;color:#102a43}img{max-width:100%}table{border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px}.qr-card{border:2px solid #102a43;border-radius:14px;padding:18px;text-align:center;page-break-inside:avoid}.no-print{display:none!important}.qr-actions{display:none}</style>
     </head><body>${html}</body></html>`);
   w.document.close();
   const ready=()=>waitForReportImages(w.document).then(()=>new Promise(resolve=>w.requestAnimationFrame(()=>w.requestAnimationFrame(resolve)))).then(()=>{if(w.closed)return;w.focus();w.print();}).catch(error=>{console.error('Print preparation failed',error);toast('تعذر تجهيز التقرير للطباعة. تحقق من تحميل الشعار والصور.',true);});
