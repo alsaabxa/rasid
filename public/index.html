@@ -783,7 +783,7 @@ if(auth){auth.onAuthStateChanged(async user=>{
   if(pendingRegistration)return;
   if(!user){
     if(session&&session.type==='admin'){
-      session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();
+      stopAutoSync();session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();
     }
     return;
   }
@@ -791,7 +791,7 @@ if(auth){auth.onAuthStateChanged(async user=>{
   schoolDataReady=false;
   try{
     const snap=await db.collection('users').doc(user.uid).get(),p=snap.data();
-    if(!p||p.status!=='approved'||!p.schoolId){await auth.signOut();session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();return;}
+    if(!p||p.status!=='approved'||!p.schoolId){await auth.signOut();stopAutoSync();session=null;activeSchoolId=null;schoolDataReady=true;route={name:'login'};render();return;}
     activeSchoolId=p.schoolId;resetCloudSyncState(activeSchoolId);STORAGE_KEY='rasid_store_v1_'+activeSchoolId;store=loadStore();store.schoolType=p.schoolType==='boys'?'boys':'girls';SCHOOL_NAME=p.schoolName||'مدرستي';session={type:'admin',id:user.uid,name:SCHOOL_NAME,approved:true,schoolId:activeSchoolId};saveSession();
     await pullFromServer(true);
     schoolDataReady=true;startAutoSync();render();
@@ -802,8 +802,16 @@ if(auth){auth.onAuthStateChanged(async user=>{
 /* ==========================================================================
    المزامنة مع Firebase Cloud Firestore
    ========================================================================== */
-let syncTimer = null;
 let messageCountTimer = null;
+const MESSAGE_BADGE_REFRESH_MS = 5 * 60 * 1000; // عدّاد الرسائل: كل 5 دقائق
+// المزامنة اللحظية لمستندات schools/{id}/private
+let privateUnsubscribe = null;     // دالة إلغاء الاشتراك
+let privateSyncSchoolId = null;    // المدرسة التي يخدمها الاشتراك الحالي
+let privateDocs = new Map();       // آخر حالة معروفة للمستندات (تشمل كتاباتنا المحلية المعلّقة)
+let privateChangedIds = new Set(); // معرّفات المستندات التي وصل تغييرها ولم تُطبَّق بعد
+let privateFlushTimer = null;      // إعادة محاولة محلية فقط (بدون قراءة من الشبكة) أثناء وجود تعديلات محلية
+let privateFromCache = false;
+let publicAttendanceSnapshot = null;
 let guardianImportBusy = false;
 let syncIndicatorState='disconnected';
 function setSyncIndicator(state){
@@ -817,7 +825,7 @@ function setSyncIndicator(state){
 }
 window.addEventListener('offline',()=>setSyncIndicator('disconnected'));
 window.addEventListener('online',()=>{
-  if(db&&activeSchoolId&&session&&session.approved){setSyncIndicator('syncing');checkCloudMetaAndPull();}
+  if(db&&activeSchoolId&&session&&session.approved){setSyncIndicator('syncing');applyPrivateChanges();}
   else setSyncIndicator('disconnected');
 });
 async function pushToServer(action,payload){
@@ -949,48 +957,107 @@ async function pullFromServer(silent){
 }
 let syncListenersBound = false;
 let publicAttendanceUnsubscribe = null;
-async function checkCloudMetaAndPull(){
-  if(!db||!activeSchoolId||cloudDirty)return false;
-  const requestedSchoolId=activeSchoolId;
-  try{
-    const snap=await db.collection('schools').doc(requestedSchoolId).collection('private').doc('appMeta').get();
-    if(activeSchoolId!==requestedSchoolId||cloudDirty||!snap.exists)return false;
-    const data=snap.data()||{},revision=Number(data.revision)||0;
-    if(revision!==cloudRevision){
-      const pulled=await pullFromServer(true);
-      // Pulling silently updates the in-memory store, but the current view also
-      // needs a repaint to show changes made in another device/session. Avoid
-      // interrupting a form or modal the user is currently editing.
-      const active=document.activeElement;
-      const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
-      if(pulled&&!editing&&!document.querySelector('.overlay'))render();
-      return pulled;
-    }
-  }catch(e){setSyncIndicator('disconnected');console.error('Cloud revision check failed',e);}
-  return false;
+function recordKindFromId(id){const m=/^v2_([^_]+)_/.exec(String(id));return m?m[1]:null;}
+function privateRecordsOf(kind){
+  const prefix='v2_'+kind+'_',rows=[];
+  privateDocs.forEach((data,id)=>{
+    if(id.indexOf(prefix)!==0||!data||data.kind!=='record'||data.recordType!==kind)return;
+    if(!data.record||typeof data.record!=='object')return;
+    rows.push({order:Number.isFinite(data.order)?data.order:rows.length,record:data.record});
+  });
+  rows.sort((a,b)=>a.order-b.order);
+  return rows.map(r=>r.record);
+}
+// تطبيق ما وصل من docChanges (added/modified/removed) على المخزن المحلي.
+function applyPrivateChanges(){
+  clearTimeout(privateFlushTimer);privateFlushTimer=null;
+  const schoolId=privateSyncSchoolId;
+  if(!schoolId||!privateChangedIds.size||!db||activeSchoolId!==schoolId||!session)return false;
+  // حماية التعديلات المحلية: لا نستبدل شيئًا ما دامت هناك تعديلات غير محفوظة.
+  // التغييرات الواردة تبقى في privateChangedIds وتُطبَّق بعد اكتمال الحفظ (فحص محلي فقط).
+  if(cloudDirty){privateFlushTimer=setTimeout(applyPrivateChanges,1000);return false;}
+  if(privateFromCache)return false;
+  // appMeta يُكتب في آخر دفعة، فهو علامة اكتمال اللقطة؛ ننتظره قبل التطبيق.
+  const meta=privateDocs.get('appMeta');
+  if(!meta||meta.schemaVersion!==2)return false;
+  const revision=Number(meta.revision)||0;
+  const changed=privateChangedIds;privateChangedIds=new Set();
+  // نفس المراجعة المعروفة = صدى لكتابتنا نحن أو لا جديد.
+  if(revision===cloudRevision)return false;
+  const kinds=new Set();let metaChanged=false;
+  changed.forEach(id=>{
+    if(id==='appMeta'){metaChanged=true;return;}
+    const kind=recordKindFromId(id);
+    if(kind&&CLOUD_ARRAY_FIELDS.includes(kind))kinds.add(kind);
+  });
+  const next=cloneStoreSnapshot();
+  kinds.forEach(kind=>{next[kind]=privateRecordsOf(kind);});
+  if(metaChanged){
+    next.schoolType=meta.schoolType||'girls';
+    next.teacherNames=Array.isArray(meta.teacherNames)?meta.teacherNames:[];
+    next.reportSignatures=meta.reportSignatures||{manager:'',attendance:''};
+  }
+  store=normalizeCloudStore(next);
+  // إعادة دمج تصويتات الروابط العامة لأن إعادة بناء الحضور تُسقط ما كان مدمجًا في الذاكرة فقط
+  if(kinds.has('attendance')&&publicAttendanceSnapshot)mergePublicAttendanceIntoStore(schoolId,publicAttendanceSnapshot);
+  cloudBaseline=cloneStoreSnapshot();cloudMetaExists=true;cloudRevision=revision;cloudDirty=false;
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(store));}catch(e){console.error('Local save failed',e);}
+  setSyncIndicator('synced');
+  // أعد الرسم دون مقاطعة نموذج أو نافذة يعمل عليها المستخدم الآن
+  const active=document.activeElement;
+  const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);
+  if(!editing&&!document.querySelector('.overlay'))render();
+  return true;
+}
+function stopPrivateListener(){
+  if(privateUnsubscribe){try{privateUnsubscribe();}catch(e){console.warn('Private listener cleanup failed',e);}privateUnsubscribe=null;}
+  clearTimeout(privateFlushTimer);privateFlushTimer=null;
+  privateSyncSchoolId=null;privateDocs=new Map();privateChangedIds=new Set();privateFromCache=false;
+}
+function startPrivateListener(schoolId){
+  stopPrivateListener();
+  privateSyncSchoolId=schoolId;
+  privateUnsubscribe=db.collection('schools').doc(schoolId).collection('private').onSnapshot(snapshot=>{
+    if(privateSyncSchoolId!==schoolId||activeSchoolId!==schoolId||!session)return;
+    snapshot.docChanges().forEach(change=>{
+      const id=change.doc.id;
+      if(change.type==='removed')privateDocs.delete(id);
+      else privateDocs.set(id,change.doc.data()||{});
+      privateChangedIds.add(id);
+    });
+    privateFromCache=!!snapshot.metadata.fromCache;
+    if(!privateFromCache&&!cloudDirty&&syncIndicatorState==='disconnected')setSyncIndicator('synced');
+    applyPrivateChanges();
+  },error=>{setSyncIndicator('disconnected');console.warn('Realtime school sync unavailable',error);});
+}
+// إيقاف كل الاشتراكات والمؤقتات (تبديل المدرسة / تسجيل الخروج / إعادة التشغيل)
+function stopAutoSync(){
+  if(messageCountTimer){clearInterval(messageCountTimer);messageCountTimer=null;}
+  if(publicAttendanceUnsubscribe){publicAttendanceUnsubscribe();publicAttendanceUnsubscribe=null;}
+  publicAttendanceSnapshot=null;
+  stopPrivateListener();
 }
 function startAutoSync(){
-  if(syncTimer) clearInterval(syncTimer);
-  if(messageCountTimer) clearInterval(messageCountTimer);
-  if(publicAttendanceUnsubscribe){publicAttendanceUnsubscribe();publicAttendanceUnsubscribe=null;}
+  stopAutoSync();
   if(!db || !activeSchoolId){setSyncIndicator('disconnected');return;}
   if(!navigator.onLine){setSyncIndicator('disconnected');return;}
   setSyncIndicator('synced');
-  syncTimer = setInterval(()=>checkCloudMetaAndPull(), 4000);
+  const schoolId=activeSchoolId;
+  startPrivateListener(schoolId);
   if(session&&session.type==='admin'){
-    const schoolId=activeSchoolId;
     publicAttendanceUnsubscribe=db.collection('schools').doc(schoolId).collection('publicAttendance').onSnapshot(snapshot=>{
       if(activeSchoolId!==schoolId||!session||session.type!=='admin')return;
+      publicAttendanceSnapshot=snapshot;
       const before=store.attendance.length;mergePublicAttendanceIntoStore(schoolId,snapshot);
       if(store.attendance.length!==before){localStorage.setItem(STORAGE_KEY,JSON.stringify(store));const active=document.activeElement;const editing=active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName);if(!editing&&!document.querySelector('.overlay'))render();}
     },error=>console.warn('Public attendance updates unavailable',error));
     refreshMessageBadge();
-    messageCountTimer=setInterval(refreshMessageBadge,20000);
+    messageCountTimer=setInterval(refreshMessageBadge,MESSAGE_BADGE_REFRESH_MS);
   }
   if(!syncListenersBound){
     syncListenersBound = true;
-    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){checkCloudMetaAndPull();refreshMessageBadge();} });
-    window.addEventListener('focus', ()=>{checkCloudMetaAndPull();refreshMessageBadge();});
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){applyPrivateChanges();refreshMessageBadge();} });
+    window.addEventListener('focus', ()=>{applyPrivateChanges();refreshMessageBadge();});
   }
 }
 
@@ -1006,6 +1073,7 @@ async function doLoginAdmin(){ return false; }
 async function verifyAdminPassword(){ return false; }
 async function doLoginStaff(){ return false; }
 function logout(){
+  stopAutoSync();
   session = null; sessionStorage.removeItem(SESSION_KEY);
   if(auth) auth.signOut(); activeSchoolId=null;
   navigate('login');
