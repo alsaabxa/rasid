@@ -399,6 +399,7 @@ input,select,.btn{min-height:44px; touch-action:manipulation;}
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -2388,15 +2389,28 @@ function reportSignatureFooter(){
   return `<footer style="display:flex;direction:ltr;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-top:36px;padding-top:14px;border-top:1px solid #b8c8d0;color:#102a43;font-size:13px;page-break-inside:avoid"><div style="direction:rtl;min-width:220px;text-align:center">${managerTitle}<br><strong>${esc(names.manager||'')}</strong><br>التوقيع: ........................</div><div style="direction:rtl;min-width:220px;text-align:center">${attendanceTitle}<br><strong>${esc(names.attendance||'')}</strong><br>التوقيع: ........................</div></footer>`;
 }
 
+function waitForReportImages(root,timeoutMs=10000){
+  return Promise.all(Array.from(root.querySelectorAll('img')).map(img=>{
+    if(img.complete)return img.naturalWidth>0?Promise.resolve():Promise.reject(new Error('تعذر تحميل صورة في التقرير'));
+    return new Promise((resolve,reject)=>{
+      let done=false;const finish=(ok)=>{if(done)return;done=true;clearTimeout(timer);img.removeEventListener('load',onLoad);img.removeEventListener('error',onError);ok?resolve():reject(new Error('تعذر تحميل صورة في التقرير'));};
+      const onLoad=()=>finish(img.naturalWidth>0),onError=()=>finish(false),timer=setTimeout(()=>finish(false),timeoutMs);
+      img.addEventListener('load',onLoad,{once:true});img.addEventListener('error',onError,{once:true});
+    });
+  }));
+}
 function printElement(html, title){
   html=String(html).replaceAll('الطالب/ة',reportStudentTerms().student);
-  const old=document.getElementById('printFallback');if(old)old.remove();
-  const oldTitle=document.title,surface=document.createElement('section');
-  surface.id='printFallback';surface.dir='rtl';surface.lang='ar';surface.innerHTML=html;
-  document.title=title;document.body.appendChild(surface);document.body.classList.add('printing-report');
-  let cleaned=false;const cleanup=()=>{if(cleaned)return;cleaned=true;document.body.classList.remove('printing-report');surface.remove();document.title=oldTitle;window.removeEventListener('afterprint',cleanup);};
-  window.addEventListener('afterprint',cleanup,{once:true});
-  window.print();setTimeout(cleanup,120000);
+  const w=window.open('','_blank');
+  if(!w){toast('تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.',true);return;}
+  w.document.open();
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>${esc(title)}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800&display=swap" rel="stylesheet">
+    <style>@page{size:auto;margin:12mm}*{box-sizing:border-box}body{font-family:'Cairo',Arial,sans-serif;padding:18px;direction:rtl;color:#102a43}img{max-width:100%}table{border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px}.qr-card{border:2px solid #102a43;border-radius:14px;padding:18px;text-align:center;page-break-inside:avoid}.qr-actions{display:none}</style>
+    </head><body>${html}</body></html>`);
+  w.document.close();
+  const ready=()=>waitForReportImages(w.document).then(()=>new Promise(resolve=>w.requestAnimationFrame(()=>w.requestAnimationFrame(resolve)))).then(()=>{if(w.closed)return;w.focus();w.print();}).catch(error=>{console.error('Print preparation failed',error);toast('تعذر تجهيز التقرير للطباعة. تحقق من تحميل الشعار والصور.',true);});
+  if(w.document.fonts?.ready)w.document.fonts.ready.then(ready).catch(ready);else ready();
 }
 
 /* ==========================================================================\n   أولياء الأمور + تقرير الغياب\n   ========================================================================== */
@@ -2634,7 +2648,18 @@ function exportPeriodReportPDF(rows,classId,periodLabel,dateLabel,period){
   const dateHead=period==='daily'?'':'<th>التاريخ</th>';
   const isAll=classId==='__all__',classHead=isAll?'<th>الفصل</th>':'';
   const html=`<header style="display:flex;align-items:center;gap:18px;border-bottom:2px solid #0f766e;padding:0 0 14px;margin-bottom:16px"><img src="${MINISTRY_LOGO_URL}" alt="شعار وزارة التعليم" style="width:92px;height:76px;object-fit:contain"><div><h1 style="font-size:22px;color:#102a43;margin:0">${esc(SCHOOL_NAME)}</h1><h2 style="font-size:17px;margin:5px 0">تقرير ${periodLabel} — ${isAll?'كل الفصول':esc(cls?.name||'')}</h2><p style="margin:0">الفترة: ${esc(dateLabel)}</p><p style="margin:4px 0 0">التاريخ الهجري: ${reportHijriForDate(route.date||todayStr())} — الميلادي: ${reportGregorianForDate(route.date||todayStr())} — الساعة: ${nowTimeStr()}</p></div></header><table style="width:100%;border-collapse:collapse" border="1" cellpadding="7"><thead><tr><th>#</th>${classHead}${dateHead}<th>${studentTerms.studentNumber}</th><th>${studentTerms.studentName}</th><th>رقم ولي الأمر</th><th>الحالة</th></tr></thead><tbody>${body}</tbody></table><p style="margin-top:14px">إجمالي الغياب: <b>${rows.filter(r=>statusRank(r.status)===0).length}</b> | إجمالي الحضور: <b>${rows.filter(r=>statusRank(r.status)===1).length}</p>${reportSignatureFooter()}`;
-  printElement(html,`تقرير ${periodLabel} ${isAll?'كل الفصول':cls?.name||''} ${dateLabel}`);
+  const title=`تقرير ${periodLabel} ${isAll?'كل الفصول':cls?.name||''} ${dateLabel}`;
+  if(!window.html2canvas||!window.jspdf?.jsPDF){toast('تعذر تحميل أدوات إنشاء PDF. تحقق من الاتصال ثم أعد المحاولة.',true);return;}
+  const host=document.createElement('div');host.dir='rtl';host.lang='ar';host.style.cssText='position:fixed;left:-10000px;top:0;width:794px;padding:28px;background:#fff;color:#102a43;font-family:Cairo,Arial,sans-serif;';host.innerHTML=html;document.body.appendChild(host);
+  toast('جاري تجهيز ملف PDF…');
+  const finish=()=>host.remove();
+  Promise.resolve(document.fonts?.ready).then(()=>waitForReportImages(host)).then(()=>window.html2canvas(host,{scale:2,backgroundColor:'#ffffff',useCORS:true,allowTaint:false,logging:false,windowWidth:850})).then(canvas=>{
+    const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const pageWidth=210,pageHeight=297,margin=8,imageWidth=pageWidth-margin*2,usableHeight=pageHeight-margin*2;
+    const sliceHeight=Math.floor(usableHeight*canvas.width/imageWidth);let y=0,page=0;
+    while(y<canvas.height){const h=Math.min(sliceHeight,canvas.height-y),slice=document.createElement('canvas');slice.width=canvas.width;slice.height=h;slice.getContext('2d').drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);if(page)doc.addPage();const segmentHeight=h*imageWidth/canvas.width;doc.addImage(slice.toDataURL('image/jpeg',0.94),'JPEG',margin,margin,imageWidth,segmentHeight,undefined,'FAST');y+=h;page++;}
+    const safeName=title.replaceAll('/','_').replaceAll('\\','_').replaceAll(':','_');doc.save(`${safeName}.pdf`);toast('تم تنزيل ملف PDF مع شعار الوزارة.');
+  }).catch(error=>{console.error('PDF export failed',error);toast('تعذر إنشاء PDF. أعد المحاولة أو استخدم زر الطباعة.',true);}).finally(finish);
 }
 async function printAllClassesAbsenceReport(){
   const date=document.getElementById('reportDate')?.value||todayStr(), classes=visibleClasses();
