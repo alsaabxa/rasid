@@ -2855,20 +2855,25 @@ function printRepeatedAbsenceStudent(studentId,classId){
   ['٥ أيام',row.count>=5,'استدعاء ولي الأمر ومناقشة أسباب الغياب ووضع خطة علاجية.',5],
   ['١٠ أيام',row.count>=10,'مخاطبة الجهات ذات الاختصاص وفق التعليمات ومتابعة الحالة.',10]
  ];
- const rows=events.map(([days,enabled,action,n])=>'<tr style="height:72px"><td>'+days+'</td><td style="text-align:right">'+(enabled?esc(action):'')+'</td><td>'+(enabled?esc(row.dates[Math.min(n-1,row.dates.length-1)]||''):'')+'</td><td></td><td></td><td></td></tr>').join('');
+ const editable=(value)=>'<span contenteditable="true" spellcheck="false" style="display:inline-block;min-width:55px;min-height:20px;border-bottom:1px dashed #bbb;padding:3px;white-space:pre-wrap">'+esc(String(value||''))+'</span>';
+ const rows=events.map(([days,enabled,action,n])=>'<tr style="height:72px"><td>'+days+'</td><td style="text-align:right">'+editable(enabled?action:'')+'</td><td>'+editable(enabled?(row.dates[Math.min(n-1,row.dates.length-1)]||''):'')+'</td><td>'+editable('')+'</td><td>'+editable('')+'</td><td>'+editable('')+'</td></tr>').join('');
  const html='<div style="font-family:Arial,sans-serif;color:#111;direction:rtl;font-size:13px">'+
  '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:start;text-align:center;min-height:105px">'+
- '<div>المملكة العربية السعودية<br>وزارة التعليم<br>المنطقة/المحافظة: '+esc(region)+'<br>المدرسة: '+esc(school)+'</div>'+
+ '<div>المملكة العربية السعودية<br>وزارة التعليم<br>المنطقة/المحافظة: '+editable(region)+'<br>المدرسة: '+editable(school)+'</div>'+
  '<div><img src="'+MINISTRY_LOGO_URL+'" alt="شعار وزارة التعليم" style="width:112px;max-height:88px;object-fit:contain"></div>'+
  '<div style="text-align:right"><img src="'+MINISTRY_LOGO_URL+'" alt="شعار وزارة التعليم" style="width:105px;max-height:76px;object-fit:contain"></div></div>'+
  '<h2 style="text-align:center;margin:18px 0 28px;font-size:19px">نموذج إجراءات الغياب بدون عذر</h2>'+
- '<p style="border-bottom:1px dotted #777;padding-bottom:9px">اسم '+studentLabel+': <strong>'+esc(row.student.name)+'</strong></p>'+
- '<p style="border-bottom:1px dotted #777;padding-bottom:9px">المرحلة: '+esc(store.schoolStage||'')+' &nbsp;&nbsp; الصف: <strong>'+esc(classDisplayName(row.cls))+'</strong></p>'+
+ '<p style="border-bottom:1px dotted #777;padding-bottom:9px">اسم '+studentLabel+': <strong>'+editable(row.student.name)+'</strong></p>'+
+ '<p style="border-bottom:1px dotted #777;padding-bottom:9px">المرحلة: '+editable(store.schoolStage||'')+' &nbsp;&nbsp; الصف: <strong>'+editable(classDisplayName(row.cls))+'</strong></p>'+
  '<table style="width:100%;border-collapse:collapse;text-align:center;margin-top:35px;table-layout:fixed" border="1" cellpadding="11"><thead><tr>'+
  '<th style="width:12%">عدد أيام الغياب</th><th style="width:31%">الإجراء المتخذ</th><th style="width:14%">تاريخ الإجراء</th><th style="width:12%">توقيع '+studentLabel+'</th><th style="width:14%">توقيع ولي الأمر</th><th style="width:17%">عدد درجات المواظبة المحسومة</th>'+
  '</tr></thead><tbody>'+rows+'</tbody></table>'+
- '<div style="display:flex;justify-content:space-between;gap:35px;margin-top:80px"><div>مسؤول الرصد: <strong>'+esc(recorder)+'</strong><p>التوقيع: ................................</p></div><div>مدير المدرسة: <strong>'+esc(manager)+'</strong><p>التوقيع: ................................</p></div></div></div>';
- printElement(html,'نموذج إجراءات الغياب بدون عذر - '+row.student.name);
+ '<div style="display:flex;justify-content:space-between;gap:35px;margin-top:80px"><div>مسؤول الرصد: <strong>'+editable(recorder)+'</strong><p>التوقيع: ................................</p></div><div>مدير المدرسة: <strong>'+editable(manager)+'</strong><p>التوقيع: ................................</p></div></div></div>';
+ const w=window.open('','_blank');
+ if(!w)return toast('يرجى السماح بالنوافذ المنبثقة لفتح التقرير',true);
+ w.document.open();
+ w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>نموذج إجراءات الغياب بدون عذر</title><style>@page{size:A4 portrait;margin:12mm}body{font-family:Arial,sans-serif;color:#111;padding:15px}table{border-collapse:collapse}th,td{border:1px solid #999}*[contenteditable=true]:focus{outline:2px solid #25a8b0;background:#eaf9fa}.toolbar{position:sticky;top:0;background:#edf7f7;padding:12px;margin-bottom:20px;text-align:center}.toolbar button{background:#0f766e;color:white;border:0;border-radius:8px;padding:12px 28px;cursor:pointer}@media print{.toolbar{display:none}*[contenteditable=true]{border:0!important;outline:0!important}}</style></head><body><div class="toolbar"><strong>يمكن تعديل البيانات مباشرة داخل النموذج قبل الطباعة</strong> <button onclick="window.print()">طباعة / حفظ PDF</button></div>'+html+'</body></html>');
+ w.document.close();
 }
 
 async function loadRepeatedAbsenceReport(){
