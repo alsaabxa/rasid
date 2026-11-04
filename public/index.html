@@ -2773,12 +2773,39 @@ async function deleteSchoolMessage(messageId,attachmentPath,button){
   }catch(e){console.error('Message delete failed',e);toast('تعذر حذف الرسالة؛ تحقق من الاتصال ثم أعد المحاولة.',true);button.disabled=false;}
 }
 
+/* تحويل التاريخ الهجري باستخدام التقويم نفسه المعتمد في عرض تقارير المنصة */
+function repeatedHijriParts(gregorian){
+ const [y,m,d]=String(gregorian).split('-').map(Number);
+ const parts=new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn',{year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'}).formatToParts(new Date(Date.UTC(y,m-1,d,12)));
+ const n=k=>Number(parts.find(p=>p.type===k)?.value);
+ return {year:n('year'),month:n('month'),day:n('day')};
+}
+function repeatedHijriValue(gregorian){const h=repeatedHijriParts(gregorian);return [h.year,String(h.month).padStart(2,'0'),String(h.day).padStart(2,'0')].join('-');}
+function repeatedHijriToGregorian(hijri){
+ const match=/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/.exec(String(hijri||'').trim());if(!match)return '';
+ const [year,month,day]=match.slice(1).map(Number);if(month<1||month>12||day<1||day>30)return '';
+ const approximate=(year-1)*354.367+1948440-2440588;
+ const start=new Date(Math.round(approximate)*86400000);
+ for(let offset=-70;offset<=70;offset++){
+  const date=new Date(start.getTime()+offset*86400000);
+  const iso=date.toISOString().slice(0,10),h=repeatedHijriParts(iso);
+  if(h.year===year&&h.month===month&&h.day===day)return iso;
+ }
+ return '';
+}
+function repeatedPeriod(){
+ const from=document.getElementById('repeatedFrom')?.value||'',to=document.getElementById('repeatedTo')?.value||'';
+ const start=repeatedHijriToGregorian(from),end=repeatedHijriToGregorian(to);
+ if(!start||!end||start>end)return null;
+ return {start,end};
+}
 /* الغياب المتكرر: اشتقاق مباشر من سجلات الرصد، دون تغيير تخزين البيانات */
 function repeatedAbsenceRows(){
- const cutoff=document.getElementById('reportDate')?.value||todayStr(),classId=document.getElementById('reportClass')?.value||'__all__';
+ const period=repeatedPeriod();if(!period)return [];
+ const cutoff=period.end,classId=document.getElementById('reportClass')?.value||'__all__';
  const classes=visibleClasses().filter(c=>classId==='__all__'||String(c.id)===String(classId));
  const byClass=new Map();
- (store.attendance||[]).filter(a=>String(a.date||'')<=cutoff).forEach(a=>{
+ (store.attendance||[]).filter(a=>String(a.date||'')>=period.start&&String(a.date||'')<=cutoff).forEach(a=>{
   const id=String(a.classId),date=String(a.date||'');if(!date)return;
   if(!byClass.has(id))byClass.set(id,new Map());
   const dates=byClass.get(id),old=dates.get(date);
@@ -2795,7 +2822,8 @@ function repeatedAbsenceRows(){
    });
    dates.sort();const unique=[...new Set(dates)];if(unique.length<3)return;
    let streak=1,maxStreak=1;
-   for(let i=1;i<unique.length;i++){const d=(Date.parse(unique[i]+'T12:00:00')-Date.parse(unique[i-1]+'T12:00:00'))/86400000;streak=d===1?streak+1:1;maxStreak=Math.max(maxStreak,streak);}
+   const schoolDates=[...sessions.keys()].sort();
+   for(let i=1;i<unique.length;i++){const between=schoolDates.filter(d=>d>unique[i-1]&&d<unique[i]);streak=between.length===0?streak+1:1;maxStreak=Math.max(maxStreak,streak);}
    result.push({student,cls,dates:unique,count:unique.length,maxStreak,phone:guardianPhoneForStudent(student)});
   });
  });
@@ -2812,7 +2840,7 @@ function repeatedAbsenceActions(row){
 function repeatedAbsenceWhatsApp(row){
  const num=normalizePhoneClient(row.phone);if(!num)return '';
  const girl=store.schoolType!=='boys',noun=girl?'الطالبة':'الطالب';
- const message='السلام عليكم ورحمة الله وبركاته\\nولي أمر '+noun+' / '+row.student.name+'\\nنفيدكم بتكرار غياب '+(girl?'ابنتكم':'ابنكم')+' دون عذر مسجل بعدد '+row.count+' أيام حتى '+(document.getElementById('reportDate')?.value||todayStr())+' في '+SCHOOL_NAME+'.\\nنرجو التواصل مع المدرسة لبحث الأسباب واستكمال الإجراءات التربوية. شاكرين تعاونكم.';
+ const message='السلام عليكم ورحمة الله وبركاته\\nولي أمر '+noun+' / '+row.student.name+'\\nنفيدكم بتكرار غياب '+(girl?'ابنتكم':'ابنكم')+' دون عذر مسجل بعدد '+row.count+' أيام حتى '+(repeatedPeriod()?.end||todayStr())+' في '+SCHOOL_NAME+'.\\nنرجو التواصل مع المدرسة لبحث الأسباب واستكمال الإجراءات التربوية. شاكرين تعاونكم.';
  return 'https://wa.me/'+num+'?text='+encodeURIComponent(message);
 }
 function printRepeatedAbsenceStudent(studentId,classId){
@@ -2826,10 +2854,15 @@ async function loadRepeatedAbsenceReport(){
  const host=document.getElementById('reportHost'),tab=document.getElementById('reportRepeatedTab'),rate=document.getElementById('reportRateTab');
  tab.setAttribute('aria-selected','true');tab.classList.add('btn-primary');tab.classList.remove('btn-outline');
  rate.setAttribute('aria-selected','false');rate.classList.remove('btn-primary');rate.classList.add('btn-outline');
+ const earliest=(store.attendance||[]).map(a=>String(a.date||'')).filter(d=>/^\\d{4}-\\d{2}-\\d{2}$/.test(d)).sort()[0]||todayStr();
+ const initialFrom=host.dataset.repeatedFrom||repeatedHijriValue(earliest),initialTo=host.dataset.repeatedTo||repeatedHijriValue(todayStr());
  host.innerHTML='<div class="empty">جارٍ تحديث بيانات الغياب المتكرر...</div>';
  try{await fetchReportBootstrap();}catch(e){console.warn('Repeated absence refresh unavailable',e);}
- const rows=repeatedAbsenceRows(),noun=store.schoolType==='boys'?'الطالب':'الطالبة';
- host.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0"><h3>الغياب المتكرر — '+rows.length+' '+(store.schoolType==='boys'?'طالب':'طالبة')+'</h3><small>تظهر الحالات تلقائيًا من الرصد (3 أيام فأكثر) حتى التاريخ المحدد. الفلاتر أعلاه متاحة.</small></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>#</th><th>الفصل</th><th>اسم '+noun+'</th><th>أيام الغياب</th><th>المرحلة</th><th>واتساب</th><th>تقرير الإجراءات</th></tr></thead><tbody>'+ (rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(classDisplayName(r.cls))+'</td><td>'+esc(r.student.name)+'</td><td>'+r.count+'</td><td>'+esc(r.count>=10?'10 أيام':r.count>=5?'5 أيام':r.maxStreak>=3?'3 أيام متصلة':'3 أيام')+'</td><td>'+(repeatedAbsenceWhatsApp(r)?'<a class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="'+esc(repeatedAbsenceWhatsApp(r))+'">واتساب</a>':'لا يوجد رقم')+'</td><td><button class="btn btn-outline btn-sm" data-repeat-student="'+esc(r.student.id)+'" data-repeat-class="'+esc(r.cls.id)+'">🖨 تقرير</button></td></tr>').join('')||'<tr><td colspan="7" style="text-align:center">لا توجد حالات غياب متكرر وفق الفلتر الحالي</td></tr>')+'</tbody></table></div>';
+ host.innerHTML='<div class="report-filters"><div class="field"><label>من التاريخ الهجري (سنة-شهر-يوم)</label><input id="repeatedFrom" type="text" inputmode="numeric" dir="ltr" placeholder="1448-01-01" value="'+esc(initialFrom)+'"></div><div class="field"><label>إلى التاريخ الهجري (سنة-شهر-يوم)</label><input id="repeatedTo" type="text" inputmode="numeric" dir="ltr" placeholder="1448-05-01" value="'+esc(initialTo)+'"></div><button class="btn btn-primary" id="applyRepeatedPeriod">تطبيق الفترة</button></div><div id="repeatedResults"></div>';
+ const period=repeatedPeriod(),rows=period?repeatedAbsenceRows():[],noun=store.schoolType==='boys'?'الطالب':'الطالبة';
+ const results=document.getElementById('repeatedResults');
+ results.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0"><h3>الغياب المتكرر — '+rows.length+' '+(store.schoolType==='boys'?'طالب':'طالبة')+'</h3><small>تظهر الحالات تلقائيًا من الرصد (3 أيام فأكثر) حتى التاريخ المحدد. الفلاتر أعلاه متاحة.</small></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>#</th><th>الفصل</th><th>اسم '+noun+'</th><th>أيام الغياب</th><th>المرحلة</th><th>واتساب</th><th>تقرير الإجراءات</th></tr></thead><tbody>'+ (rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(classDisplayName(r.cls))+'</td><td>'+esc(r.student.name)+'</td><td>'+r.count+'</td><td>'+esc(r.count>=10?'10 أيام':r.count>=5?'5 أيام':r.maxStreak>=3?'3 أيام متصلة':'3 أيام')+'</td><td>'+(repeatedAbsenceWhatsApp(r)?'<a class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="'+esc(repeatedAbsenceWhatsApp(r))+'">واتساب</a>':'لا يوجد رقم')+'</td><td><button class="btn btn-outline btn-sm" data-repeat-student="'+esc(r.student.id)+'" data-repeat-class="'+esc(r.cls.id)+'">🖨 تقرير</button></td></tr>').join('')||'<tr><td colspan="7" style="text-align:center">لا توجد حالات غياب متكرر وفق الفلتر الحالي</td></tr>')+'</tbody></table></div>';
+ document.getElementById('applyRepeatedPeriod').onclick=()=>{const from=document.getElementById('repeatedFrom').value,to=document.getElementById('repeatedTo').value;const range=repeatedPeriod();if(!range){toast('تحققي من التاريخ الهجري من وإلى',true);return;}host.dataset.repeatedFrom=from;host.dataset.repeatedTo=to;loadRepeatedAbsenceReport();};
  host.querySelectorAll('[data-repeat-student]').forEach(b=>b.onclick=()=>printRepeatedAbsenceStudent(b.dataset.repeatStudent,b.dataset.repeatClass));
 }
 
