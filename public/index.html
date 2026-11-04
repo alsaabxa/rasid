@@ -2846,34 +2846,65 @@ function repeatedAbsenceWhatsApp(row){
 function printRepeatedAbsenceStudent(studentId,classId){
  const row=repeatedAbsenceRows().find(r=>String(r.student.id)===String(studentId)&&String(r.cls.id)===String(classId));
  if(!row)return toast('تعذر العثور على سجل الغياب',true);
- const girl=store.schoolType!=='boys',studentLabel=girl?'الطالبة':'الطالب';
- const signatures=store.reportSignatures||{},recorder=String(signatures.attendance||'').trim(),manager=String(signatures.manager||'').trim();
- const school=String(SCHOOL_NAME||'').trim(),region=String(store.region||store.educationRegion||'').trim();
+ const studentLabel=store.schoolType==='boys'?'الطالب':'الطالبة';
+ const signatures=store.reportSignatures||{};
+ const values={
+  region:String(store.region||store.educationRegion||''),
+  school:String(SCHOOL_NAME||''),
+  student:String(row.student.name||''),
+  stage:String(store.schoolStage||''),
+  className:String(classDisplayName(row.cls)),
+  recorder:String(signatures.attendance||''),
+  manager:String(signatures.manager||'')
+ };
+ const labels={region:'المنطقة / المحافظة',school:'المدرسة',student:'اسم '+studentLabel,stage:'المرحلة',className:'الصف / الفصل',recorder:'مسؤول الرصد',manager:'مدير المدرسة'};
+ const field=(key)=>'<span data-edit-key="'+key+'">'+esc(values[key]||'')+'</span>';
  const events=[
   ['٣ أيام',row.count>=3,'إحالة الحالة للموجه الطلابي أو الموجهة الطلابية لدراسة أسباب الغياب وتقديم الدعم.',3],
   ['٣ أيام متصلة',row.maxStreak>=3,'التواصل مع ولي الأمر وتوثيق أسباب الغياب المتصل.',3],
   ['٥ أيام',row.count>=5,'استدعاء ولي الأمر ومناقشة أسباب الغياب ووضع خطة علاجية.',5],
   ['١٠ أيام',row.count>=10,'مخاطبة الجهات ذات الاختصاص وفق التعليمات ومتابعة الحالة.',10]
  ];
- const editable=(value)=>'<span contenteditable="true" spellcheck="false" style="display:inline-block;min-width:55px;min-height:20px;border-bottom:1px dashed #bbb;padding:3px;white-space:pre-wrap">'+esc(String(value||''))+'</span>';
- const rows=events.map(([days,enabled,action,n])=>'<tr style="height:72px"><td>'+days+'</td><td style="text-align:right">'+editable(enabled?action:'')+'</td><td>'+editable(enabled?(row.dates[Math.min(n-1,row.dates.length-1)]||''):'')+'</td><td>'+editable('')+'</td><td>'+editable('')+'</td><td>'+editable('')+'</td></tr>').join('');
- const html='<div style="font-family:Arial,sans-serif;color:#111;direction:rtl;font-size:13px">'+
- '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:start;text-align:center;min-height:105px">'+
- '<div>المملكة العربية السعودية<br>وزارة التعليم<br>المنطقة/المحافظة: '+editable(region)+'<br>المدرسة: '+editable(school)+'</div>'+
- '<div><img src="'+MINISTRY_LOGO_URL+'" alt="شعار وزارة التعليم" style="width:112px;max-height:88px;object-fit:contain"></div>'+
- '<div style="text-align:right"><img src="'+MINISTRY_LOGO_URL+'" alt="شعار وزارة التعليم" style="width:105px;max-height:76px;object-fit:contain"></div></div>'+
- '<h2 style="text-align:center;margin:18px 0 28px;font-size:19px">نموذج إجراءات الغياب بدون عذر</h2>'+
- '<p style="border-bottom:1px dotted #777;padding-bottom:9px">اسم '+studentLabel+': <strong>'+editable(row.student.name)+'</strong></p>'+
- '<p style="border-bottom:1px dotted #777;padding-bottom:9px">المرحلة: '+editable(store.schoolStage||'')+' &nbsp;&nbsp; الصف: <strong>'+editable(classDisplayName(row.cls))+'</strong></p>'+
- '<table style="width:100%;border-collapse:collapse;text-align:center;margin-top:35px;table-layout:fixed" border="1" cellpadding="11"><thead><tr>'+
- '<th style="width:12%">عدد أيام الغياب</th><th style="width:31%">الإجراء المتخذ</th><th style="width:14%">تاريخ الإجراء</th><th style="width:12%">توقيع '+studentLabel+'</th><th style="width:14%">توقيع ولي الأمر</th><th style="width:17%">عدد درجات المواظبة المحسومة</th>'+
- '</tr></thead><tbody>'+rows+'</tbody></table>'+
- '<div style="display:flex;justify-content:space-between;gap:35px;margin-top:80px"><div>مسؤول الرصد: <strong>'+editable(recorder)+'</strong><p>التوقيع: ................................</p></div><div>مدير المدرسة: <strong>'+editable(manager)+'</strong><p>التوقيع: ................................</p></div></div></div>';
+ const rowFields={};
+ const rows=events.map(([days,enabled,action,n],i)=>{
+  const prefix='action'+i;
+  rowFields[prefix]={label:'الإجراء - '+days,value:enabled?action:''};
+  rowFields['date'+i]={label:'تاريخ الإجراء - '+days,value:enabled?(row.dates[Math.min(n-1,row.dates.length-1)]||''):''};
+  rowFields['studentSign'+i]={label:'توقيع '+studentLabel+' - '+days,value:''};
+  rowFields['guardianSign'+i]={label:'توقيع ولي الأمر - '+days,value:''};
+  rowFields['deduction'+i]={label:'درجات المواظبة المحسومة - '+days,value:''};
+  Object.keys(rowFields).forEach(key=>{values[key]=rowFields[key].value;labels[key]=rowFields[key].label;});
+  return '<tr style="height:72px"><td>'+days+'</td><td style="text-align:right">'+field(prefix)+'</td><td>'+field('date'+i)+'</td><td>'+field('studentSign'+i)+'</td><td>'+field('guardianSign'+i)+'</td><td>'+field('deduction'+i)+'</td></tr>';
+ }).join('');
+ Object.keys(rowFields).forEach(key=>{values[key]=rowFields[key].value;labels[key]=rowFields[key].label;});
+ const html='<div class="report-page">'+
+ '<header class="report-header"><div class="report-government">المملكة العربية السعودية<br>وزارة التعليم<br>المنطقة/المحافظة: '+field('region')+'<br>المدرسة: '+field('school')+'</div>'+
+ '<img src="'+MINISTRY_LOGO_URL+'" alt="شعار وزارة التعليم" class="report-logo"></header>'+
+ '<h2 class="report-title">نموذج إجراءات الغياب بدون عذر</h2>'+
+ '<p class="report-detail">اسم '+studentLabel+': <strong>'+field('student')+'</strong></p>'+
+ '<p class="report-detail">المرحلة: '+field('stage')+' &nbsp;&nbsp; الصف: <strong>'+field('className')+'</strong></p>'+
+ '<table class="report-table" border="1" cellpadding="9"><thead><tr><th>عدد أيام الغياب</th><th>الإجراء المتخذ</th><th>تاريخ الإجراء</th><th>توقيع '+studentLabel+'</th><th>توقيع ولي الأمر</th><th>درجات المواظبة المحسومة</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+ '<footer class="report-footer"><div>مسؤول الرصد: <strong>'+field('recorder')+'</strong><p>التوقيع: ........................</p></div><div>مدير المدرسة: <strong>'+field('manager')+'</strong><p>التوقيع: ........................</p></div></footer></div>';
  const w=window.open('','_blank');
  if(!w)return toast('يرجى السماح بالنوافذ المنبثقة لفتح التقرير',true);
  w.document.open();
- w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>نموذج إجراءات الغياب بدون عذر</title><style>@page{size:A4 portrait;margin:12mm}body{font-family:Arial,sans-serif;color:#111;padding:15px}table{border-collapse:collapse}th,td{border:1px solid #999}*[contenteditable=true]:focus{outline:2px solid #25a8b0;background:#eaf9fa}.toolbar{position:sticky;top:0;background:#edf7f7;padding:12px;margin-bottom:20px;text-align:center}.toolbar button{background:#0f766e;color:white;border:0;border-radius:8px;padding:12px 28px;cursor:pointer}@media print{.toolbar{display:none}*[contenteditable=true]{border:0!important;outline:0!important}}</style></head><body><div class="toolbar"><strong>يمكن تعديل البيانات مباشرة داخل النموذج قبل الطباعة</strong> <button onclick="window.print()">طباعة / حفظ PDF</button></div>'+html+'</body></html>');
+ w.document.write('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>نموذج إجراءات الغياب بدون عذر</title><style>@page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;margin:0;padding:20px}.toolbar{display:flex;justify-content:center;gap:12px;background:#eef6f6;padding:12px;margin-bottom:18px}.toolbar button,.dialog-actions button{background:#0f766e;color:#fff;border:0;border-radius:8px;padding:11px 18px;cursor:pointer}.report-page{max-width:800px;margin:auto}.report-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;min-height:105px}.report-government{font-size:13px;line-height:1.9;text-align:right}.report-logo{width:120px;height:95px;object-fit:contain}.report-title{text-align:center;margin:15px 0 28px;font-size:19px}.report-detail{border-bottom:1px dotted #777;padding-bottom:9px}.report-table{width:100%;border-collapse:collapse;text-align:center;margin-top:30px;table-layout:fixed;font-size:12px}.report-table th,.report-table td{border:1px solid #555;padding:8px;overflow-wrap:anywhere}.report-footer{display:flex;justify-content:space-between;gap:35px;margin-top:75px}.editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100;padding:15px}.editor-backdrop.open{display:flex}.editor-dialog{background:white;width:min(780px,100%);max-height:90vh;overflow:auto;border-radius:12px;padding:22px;box-shadow:0 8px 35px #0004}.editor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.editor-field{display:flex;flex-direction:column;gap:5px}.editor-field input,.editor-field textarea{padding:9px;border:1px solid #aaa;border-radius:6px;font:inherit;width:100%}.dialog-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}@media print{body{padding:0}.toolbar,.editor-backdrop{display:none!important}.report-page{max-width:none}}</style></head><body><div class="toolbar"><button id="editReportBtn" type="button">تعديل بيانات التقرير</button><button id="printReportBtn" type="button">طباعة / حفظ PDF</button></div>'+html+'<div id="editorBackdrop" class="editor-backdrop"><section class="editor-dialog" role="dialog" aria-modal="true" aria-label="تعديل بيانات التقرير"><h3>تعديل بيانات التقرير</h3><p>عدّل البيانات هنا ثم اضغط تطبيق. سيبقى النموذج المطبوع خاليًا من خانات التحرير.</p><div id="editorGrid" class="editor-grid"></div><div class="dialog-actions"><button id="cancelEditorBtn" type="button">إغلاق</button><button id="applyEditorBtn" type="button">تطبيق التعديلات</button></div></section></div></body></html>');
  w.document.close();
+ const doc=w.document,backdrop=doc.getElementById('editorBackdrop'),grid=doc.getElementById('editorGrid');
+ const controls={};
+ Object.keys(values).forEach(key=>{
+  const wrap=doc.createElement('label');wrap.className='editor-field';
+  const name=doc.createElement('span');name.textContent=labels[key];wrap.appendChild(name);
+  const input=key.startsWith('action')?doc.createElement('textarea'):doc.createElement('input');
+  input.value=values[key];input.rows=3;controls[key]=input;wrap.appendChild(input);grid.appendChild(wrap);
+ });
+ doc.getElementById('editReportBtn').onclick=()=>{Object.keys(values).forEach(key=>{controls[key].value=values[key]});backdrop.classList.add('open');};
+ doc.getElementById('cancelEditorBtn').onclick=()=>backdrop.classList.remove('open');
+ doc.getElementById('applyEditorBtn').onclick=()=>{
+  Object.keys(values).forEach(key=>{values[key]=controls[key].value;doc.querySelectorAll('[data-edit-key="'+key+'"]').forEach(el=>el.textContent=values[key]);});
+  backdrop.classList.remove('open');
+ };
+ doc.getElementById('printReportBtn').onclick=()=>w.print();
 }
 
 async function loadRepeatedAbsenceReport(){
