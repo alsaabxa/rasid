@@ -2873,6 +2873,7 @@ function printRepeatedAbsenceStudent(studentId,classId){
   rowFields['studentSign'+i]={label:'توقيع '+studentLabel+' - '+days,value:''};
   rowFields['guardianSign'+i]={label:'توقيع ولي الأمر - '+days,value:''};
   rowFields['deduction'+i]={label:'درجات المواظبة المحسومة - '+days,value:''};
+  Object.keys(rowFields).forEach(key=>{values[key]=rowFields[key].value;labels[key]=rowFields[key].label;});
   return '<tr style="height:72px"><td>'+days+'</td><td style="text-align:right">'+field(prefix)+'</td><td>'+field('date'+i)+'</td><td>'+field('studentSign'+i)+'</td><td>'+field('guardianSign'+i)+'</td><td>'+field('deduction'+i)+'</td></tr>';
  }).join('');
  Object.keys(rowFields).forEach(key=>{values[key]=rowFields[key].value;labels[key]=rowFields[key].label;});
