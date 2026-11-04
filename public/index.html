@@ -2782,7 +2782,7 @@ function repeatedHijriParts(gregorian){
 }
 function repeatedHijriValue(gregorian){const h=repeatedHijriParts(gregorian);return [h.year,String(h.month).padStart(2,'0'),String(h.day).padStart(2,'0')].join('-');}
 function repeatedHijriToGregorian(hijri){
- const match=/^(\\d{4})-(\\d{1,2})-(\\d{1,2})$/.exec(String(hijri||'').trim());if(!match)return '';
+ const match=/^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(hijri||'').trim());if(!match)return '';
  const [year,month,day]=match.slice(1).map(Number);if(month<1||month>12||day<1||day>30)return '';
  const approximate=(year-1)*354.367+1948440-2440588;
  const start=new Date(Math.round(approximate)*86400000);
@@ -2854,7 +2854,7 @@ async function loadRepeatedAbsenceReport(){
  const host=document.getElementById('reportHost'),tab=document.getElementById('reportRepeatedTab'),rate=document.getElementById('reportRateTab');
  tab.setAttribute('aria-selected','true');tab.classList.add('btn-primary');tab.classList.remove('btn-outline');
  rate.setAttribute('aria-selected','false');rate.classList.remove('btn-primary');rate.classList.add('btn-outline');
- const earliest=(store.attendance||[]).map(a=>String(a.date||'')).filter(d=>/^\\d{4}-\\d{2}-\\d{2}$/.test(d)).sort()[0]||todayStr();
+ const earliest=(store.attendance||[]).map(a=>String(a.date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort()[0]||todayStr();
  const initialFrom=host.dataset.repeatedFrom||repeatedHijriValue(earliest),initialTo=host.dataset.repeatedTo||repeatedHijriValue(todayStr());
  host.innerHTML='<div class="empty">جارٍ تحديث بيانات الغياب المتكرر...</div>';
  try{await fetchReportBootstrap();}catch(e){console.warn('Repeated absence refresh unavailable',e);}
