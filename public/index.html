@@ -2868,10 +2868,8 @@ async function loadRepeatedAbsenceReport(){
 
 function bindAbsenceReport(){
   document.getElementById('loadReport').onclick=loadAbsenceReport;
-  document.getElementById('reportRefresh').onclick=()=>{if(document.getElementById('reportRepeatedTab')?.getAttribute('aria-selected')==='true')loadRepeatedAbsenceReport();else loadAbsenceReport();};
+  document.getElementById('reportRefresh').onclick=loadAbsenceReport;
   document.getElementById('reportRepeatedTab').onclick=loadRepeatedAbsenceReport;
-  document.getElementById('reportClass').addEventListener('change',()=>{if(document.getElementById('reportRepeatedTab')?.getAttribute('aria-selected')==='true')loadRepeatedAbsenceReport();});
-  document.getElementById('reportDate').addEventListener('change',()=>{if(document.getElementById('reportRepeatedTab')?.getAttribute('aria-selected')==='true')loadRepeatedAbsenceReport();});
   document.getElementById('allClassesReport').onclick=printAllClassesAbsenceReport;
   document.getElementById('whatsappContactReport').onclick=renderWhatsAppContactReport;
   document.getElementById('reportDate').onchange=e=>{document.getElementById('reportHijriReference').textContent='التاريخ الهجري: '+reportHijriForDate(e.target.value);};
