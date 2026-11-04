@@ -2516,7 +2516,7 @@ function openGuardianImportModal(){
 }
 function viewAbsenceReport(){
   const classes=visibleClasses(); const selected=route.classId||classes[0]?.id||''; const date=route.date||todayStr();
-  return `<div class="container"><div class="page-title"><div><h2>تقارير الحضور والغياب</h2><p>تقارير يومية وأسبوعية وشهرية</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" id="reportRateTab" type="button" role="tab" aria-selected="false">نسبة الغياب</button><button class="btn btn-outline" id="reportRefresh">↻ تحديث البيانات</button></div></div>
+  return `<div class="container"><div class="page-title"><div><h2>تقارير الحضور والغياب</h2><p>تقارير يومية وأسبوعية وشهرية</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" id="reportRateTab" type="button" role="tab" aria-selected="false">نسبة الغياب</button><button class="btn btn-outline" id="reportRepeatedTab" type="button" role="tab" aria-selected="false">الغياب المتكرر</button><button class="btn btn-outline" id="reportRefresh">↻ تحديث البيانات</button></div></div>
   <div class="report-filters"><div class="field"><label>الفصل</label><select id="reportClass"><option value="__all__" ${selected==='__all__'?'selected':''}>كل الفصول</option>${classes.map(c=>`<option value="${esc(c.id)}" ${c.id===selected?'selected':''}>${esc(classDisplayName(c))}</option>`).join('')}</select></div><div class="field"><label>نوع التقرير</label><select id="reportPeriod"><option value="daily">يومي</option><option value="weekly">أسبوعي</option><option value="monthly">شهري</option></select></div><div class="field"><label>التاريخ</label><input id="reportDate" type="date" value="${esc(date)}"><small id="reportHijriReference" style="display:block;color:#5b7382;margin-top:5px">التاريخ الهجري: ${esc(reportHijriForDate(date))}</small></div><button class="btn btn-primary" id="loadReport">عرض التقرير</button><button class="btn btn-outline" id="allClassesReport">🖨 تقرير اليوم لجميع الفصول</button><button class="btn btn-outline" id="whatsappContactReport">📱 تقرير التواصل عبر واتساب</button></div>
   <div id="reportHost"></div></div>`;
 }
@@ -2772,9 +2772,73 @@ async function deleteSchoolMessage(messageId,attachmentPath,button){
     toast('حُذفت الرسالة');await loadSchoolMessages();
   }catch(e){console.error('Message delete failed',e);toast('تعذر حذف الرسالة؛ تحقق من الاتصال ثم أعد المحاولة.',true);button.disabled=false;}
 }
+
+/* الغياب المتكرر: اشتقاق مباشر من سجلات الرصد، دون تغيير تخزين البيانات */
+function repeatedAbsenceRows(){
+ const cutoff=document.getElementById('reportDate')?.value||todayStr(),classId=document.getElementById('reportClass')?.value||'__all__';
+ const classes=visibleClasses().filter(c=>classId==='__all__'||String(c.id)===String(classId));
+ const byClass=new Map();
+ (store.attendance||[]).filter(a=>String(a.date||'')<=cutoff).forEach(a=>{
+  const id=String(a.classId),date=String(a.date||'');if(!date)return;
+  if(!byClass.has(id))byClass.set(id,new Map());
+  const dates=byClass.get(id),old=dates.get(date);
+  if(!old||String(a.time||'')>=String(old.time||''))dates.set(date,a);
+ });
+ const result=[];
+ classes.forEach(cls=>{
+  const sessions=byClass.get(String(cls.id))||new Map();
+  studentsOfClass(cls.id).forEach(student=>{
+   const dates=[];
+   sessions.forEach((att,date)=>{
+    const rec=(att.records||[]).find(r=>String(r.studentId||'')===String(student.id)||normalizeNameClient(r.studentName||'')===normalizeNameClient(student.name));
+    if(rec&&statusRank(rec.status)===0&&!rec.excused&&!rec.isExcused&&!/بعذر|مُبرر|مبرر/.test(String(rec.excuseStatus||rec.reason||'')))dates.push(date);
+   });
+   dates.sort();const unique=[...new Set(dates)];if(unique.length<3)return;
+   let streak=1,maxStreak=1;
+   for(let i=1;i<unique.length;i++){const d=(Date.parse(unique[i]+'T12:00:00')-Date.parse(unique[i-1]+'T12:00:00'))/86400000;streak=d===1?streak+1:1;maxStreak=Math.max(maxStreak,streak);}
+   result.push({student,cls,dates:unique,count:unique.length,maxStreak,phone:guardianPhoneForStudent(student)});
+  });
+ });
+ return result.sort((a,b)=>b.count-a.count||a.student.name.localeCompare(b.student.name,'ar'));
+}
+function repeatedAbsenceActions(row){
+ const steps=[];
+ if(row.count>=3)steps.push('اليوم الثالث: تحويل الحالة للموجهة الطلابية لدراسة الحالة وتقديم الخدمات التربوية المناسبة.');
+ if(row.maxStreak>=3)steps.push('ثلاثة أيام متصلة: التواصل مع ولي الأمر في اليوم الثالث وتوثيق أسباب الغياب.');
+ if(row.count>=5)steps.push('اليوم الخامس: استدعاء ولي الأمر لمناقشة أسباب الغياب ومراجعة الخطة التربوية والعلاجية، والتنبيه على استمرار الغياب.');
+ if(row.count>=10)steps.push('اليوم العاشر: مخاطبة الجهات ذات الاختصاص وفق الأنظمة والتعليمات ومتابعة الحالة بالتنسيق مع إدارة التعليم.');
+ return steps;
+}
+function repeatedAbsenceWhatsApp(row){
+ const num=normalizePhoneClient(row.phone);if(!num)return '';
+ const girl=store.schoolType!=='boys',noun=girl?'الطالبة':'الطالب';
+ const message='السلام عليكم ورحمة الله وبركاته\\nولي أمر '+noun+' / '+row.student.name+'\\nنفيدكم بتكرار غياب '+(girl?'ابنتكم':'ابنكم')+' دون عذر مسجل بعدد '+row.count+' أيام حتى '+(document.getElementById('reportDate')?.value||todayStr())+' في '+SCHOOL_NAME+'.\\nنرجو التواصل مع المدرسة لبحث الأسباب واستكمال الإجراءات التربوية. شاكرين تعاونكم.';
+ return 'https://wa.me/'+num+'?text='+encodeURIComponent(message);
+}
+function printRepeatedAbsenceStudent(studentId,classId){
+ const row=repeatedAbsenceRows().find(r=>String(r.student.id)===String(studentId)&&String(r.cls.id)===String(classId));if(!row)return toast('تعذر العثور على سجل الغياب',true);
+ const title='تقرير إجراءات الغياب المتكرر',girl=store.schoolType!=='boys',manager=store.reportSignatures?.manager||'';
+ const actions=repeatedAbsenceActions(row).map((a,i)=>'<tr><td>'+ (i+1) +'</td><td>'+esc(a)+'</td><td>........................</td></tr>').join('');
+ const html='<header style="display:flex;gap:20px;align-items:center;border-bottom:2px solid #0f766e;padding-bottom:12px"><img src="'+MINISTRY_LOGO_URL+'" style="width:90px"><div><h2>'+esc(SCHOOL_NAME)+'</h2><h3>'+title+'</h3></div></header><p>وفق المادة (34) من قواعد السلوك والمواظبة: إجراءات التعامل مع المتغيبين بدون عذر خلال العام الدراسي.</p><p><strong>'+(girl?'اسم الطالبة':'اسم الطالب')+':</strong> '+esc(row.student.name)+' — <strong>الفصل:</strong> '+esc(classDisplayName(row.cls))+'</p><p><strong>عدد أيام الغياب:</strong> '+row.count+' — <strong>تواريخ الغياب:</strong> '+esc(row.dates.join('، '))+'</p><table border="1" cellpadding="9" style="width:100%;border-collapse:collapse"><thead><tr><th>#</th><th>الإجراء المعتمد</th><th>الإجراء المتخذ والملاحظات</th></tr></thead><tbody>'+actions+'</tbody></table><p>استمرار تقديم الخدمات التعليمية والدعم والتنسيق في انقطاعها.</p><div style="margin-top:40px;text-align:left"><strong>'+(girl?'مديرة المدرسة':'مدير المدرسة')+': '+esc(manager)+'</strong><p>التوقيع: ...................... &nbsp;&nbsp; الختم: ......................</p></div>';
+ printElement(html,title+' - '+row.student.name);
+}
+async function loadRepeatedAbsenceReport(){
+ const host=document.getElementById('reportHost'),tab=document.getElementById('reportRepeatedTab'),rate=document.getElementById('reportRateTab');
+ tab.setAttribute('aria-selected','true');tab.classList.add('btn-primary');tab.classList.remove('btn-outline');
+ rate.setAttribute('aria-selected','false');rate.classList.remove('btn-primary');rate.classList.add('btn-outline');
+ host.innerHTML='<div class="empty">جارٍ تحديث بيانات الغياب المتكرر...</div>';
+ try{await fetchReportBootstrap();}catch(e){console.warn('Repeated absence refresh unavailable',e);}
+ const rows=repeatedAbsenceRows(),noun=store.schoolType==='boys'?'الطالب':'الطالبة';
+ host.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0"><h3>الغياب المتكرر — '+rows.length+' '+(store.schoolType==='boys'?'طالب':'طالبة')+'</h3><small>تظهر الحالات تلقائيًا من الرصد (3 أيام فأكثر) حتى التاريخ المحدد. الفلاتر أعلاه متاحة.</small></div><div class="report-table-wrap" style="overflow:auto"><table class="report-table"><thead><tr><th>#</th><th>الفصل</th><th>اسم '+noun+'</th><th>أيام الغياب</th><th>المرحلة</th><th>واتساب</th><th>تقرير الإجراءات</th></tr></thead><tbody>'+ (rows.map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(classDisplayName(r.cls))+'</td><td>'+esc(r.student.name)+'</td><td>'+r.count+'</td><td>'+esc(r.count>=10?'10 أيام':r.count>=5?'5 أيام':r.maxStreak>=3?'3 أيام متصلة':'3 أيام')+'</td><td>'+(repeatedAbsenceWhatsApp(r)?'<a class="btn btn-outline btn-sm" target="_blank" rel="noopener" href="'+esc(repeatedAbsenceWhatsApp(r))+'">واتساب</a>':'لا يوجد رقم')</td><td><button class="btn btn-outline btn-sm" data-repeat-student="'+esc(r.student.id)+'" data-repeat-class="'+esc(r.cls.id)+'">🖨 تقرير</button></td></tr>').join('')||'<tr><td colspan="7" style="text-align:center">لا توجد حالات غياب متكرر وفق الفلتر الحالي</td></tr>')+'</tbody></table></div>';
+ host.querySelectorAll('[data-repeat-student]').forEach(b=>b.onclick=()=>printRepeatedAbsenceStudent(b.dataset.repeatStudent,b.dataset.repeatClass));
+}
+
 function bindAbsenceReport(){
   document.getElementById('loadReport').onclick=loadAbsenceReport;
-  document.getElementById('reportRefresh').onclick=loadAbsenceReport;
+  document.getElementById('reportRefresh').onclick=()=>{if(document.getElementById('reportRepeatedTab')?.getAttribute('aria-selected')==='true')loadRepeatedAbsenceReport();else loadAbsenceReport();};
+  document.getElementById('reportRepeatedTab').onclick=loadRepeatedAbsenceReport;
+  document.getElementById('reportClass').addEventListener('change',()=>{if(document.getElementById('reportRepeatedTab')?.getAttribute('aria-selected')==='true')loadRepeatedAbsenceReport();});
+  document.getElementById('reportDate').addEventListener('change',()=>{if(document.getElementById('reportRepeatedTab')?.getAttribute('aria-selected')==='true')loadRepeatedAbsenceReport();});
   document.getElementById('allClassesReport').onclick=printAllClassesAbsenceReport;
   document.getElementById('whatsappContactReport').onclick=renderWhatsAppContactReport;
   document.getElementById('reportDate').onchange=e=>{document.getElementById('reportHijriReference').textContent='التاريخ الهجري: '+reportHijriForDate(e.target.value);};
